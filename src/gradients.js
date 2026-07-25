@@ -19,6 +19,7 @@ export function gradientForCat(id) {
     mammiferes: 'linear-gradient(140deg,#3E4A2C 0%,#7D8C5A 100%)',
     oiseaux:    'linear-gradient(140deg,#3A4C52 0%,#7B9AA0 100%)',
     arbres:     'linear-gradient(140deg,#2F4433 0%,#6E8A6A 100%)',
+    arbustes:   'linear-gradient(140deg,#3D4A28 0%,#8A9B5E 100%)',
     champignons:'linear-gradient(140deg,#5C3A26 0%,#B0764A 100%)',
     lichens:    'linear-gradient(140deg,#4A5240 0%,#93A07E 100%)',
     insectes:   'linear-gradient(140deg,#5A4A2A 0%,#AE9455 100%)',

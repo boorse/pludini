@@ -4,6 +4,7 @@ import MindMap from './mindmap.jsx'
 import { gradientFor, gradientForCat } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
+import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroIndividuals, PhotoButton, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive } from './store.js'
@@ -60,56 +61,90 @@ function LangPicker({ onPick }) {
   )
 }
 
+// ── Vignette de menu : couleur unie, la photo apparaît au survol (miniature de la page ciblée) ──
+function NavCard({ c, wide, edit, onOpen, onEditPhoto }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+      style={{ textAlign:'left', borderRadius:14, overflow:'hidden', border:'none', padding:0,
+        position:'relative', minHeight: wide?200:150 }}>
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(145deg,#39432E 0%,#5C6B48 100%)' }} />
+      <div style={{ position:'absolute', inset:0, opacity: hover?1:0, transition:'opacity .3s' }}>
+        <PhotoBg target={`site:card:${c.k}`} fallback="transparent" />
+      </div>
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.72), transparent 60%)' }} />
+      {edit && (
+        <button onClick={(e)=>{ e.stopPropagation(); onEditPhoto(c) }} style={{ position:'absolute', top:10, right:10, zIndex:6,
+          background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'6px 9px' }}>
+          <i className="ti ti-camera-plus" style={{ fontSize:13 }} aria-hidden="true" />
+        </button>
+      )}
+      <div style={{ position:'relative', height:'100%', minHeight: wide?200:150, display:'flex', flexDirection:'column',
+        justifyContent:'flex-end', padding: wide?'22px':'18px' }}>
+        <span style={{ fontSize:10.5, letterSpacing:'1.4px', textTransform:'uppercase', color:'#C8DBA4', fontWeight:700, marginBottom:5 }}>{c.tag}</span>
+        <span className="serif" style={{ fontSize: wide?28:23, fontWeight:900, color:'#F2EEE2', lineHeight:1.05, letterSpacing:'-.6px' }}>{c.title}</span>
+        <span style={{ fontSize:12, color:'rgba(242,238,226,.76)', marginTop:6, lineHeight:1.45 }}>{c.sub}</span>
+      </div>
+    </button>
+  )
+}
+
 // ══════════════════ LANDING ══════════════════
-function Landing({ lang, setLang, go, onQuiz, edit, onEditHero }) {
+function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
   const wide = useWide()
   const SPECIES = allSpecies(), CATS = allCats(), PLAYERS = allPlayers().filter(p=>!p.demo)
   const t = UI[lang]
   const obs = SPECIES.filter(isObserved).length
   const cards = [
-    { k:'app',       tag:t.consult, title:t.pokedex,   sub: lang==='ru'?'Карта живого, матрица, очки и значки':'Map du vivant, matrice, scores et badges', g:'linear-gradient(145deg,#2F4433 0%,#5B7A4E 55%,#8CA372 100%)', accent:'#C8DBA4' },
-    { k:'territory', tag:t.locate,  title:t.territory, sub: lang==='ru'?'Камеры, норы, грибные места, проекты':'Caméras, terriers, coins à champignons, projets', g:'linear-gradient(145deg,#3A4C52 0%,#5F7F84 55%,#93AFAE 100%)', accent:'#CFE4E2' },
-    { k:'calendar',  tag:t.plan,    title:t.calendar,  sub: lang==='ru'?'Работы и наблюдения по месяцам':'Travaux et observations mois par mois', g:'linear-gradient(145deg,#4A3F26 0%,#8A7440 55%,#BFA76A 100%)', accent:'#F0E2B8' },
-    { k:'gallery',   tag:t.browse,  title:t.gallery,   sub: lang==='ru'?'Все снимки особей':'Tous les clichés d\'individus', g:'linear-gradient(145deg,#3F3A4A 0%,#6E6580 55%,#A099AE 100%)', accent:'#E2DDEA' },
-    { k:'quiz',      tag:t.play,    title:t.quiz,      sub: lang==='ru'?'Карточки-угадайки из ваших наблюдений':'Des cartes à deviner, tirées de vos observations', g:'linear-gradient(145deg,#5C3A26 0%,#9A6B3E 55%,#C09A5E 100%)', accent:'#F0D9A8' },
+    { k:'app',       tag:t.consult, title:t.pokedex,   sub: lang==='ru'?'Карта живого, матрица, очки и значки':'Map du vivant, matrice, scores et badges' },
+    { k:'territory', tag:t.locate,  title:t.territory, sub: lang==='ru'?'Камеры, норы, грибные места, проекты':'Caméras, terriers, coins à champignons, projets' },
+    { k:'calendar',  tag:t.plan,    title:t.calendar,  sub: lang==='ru'?'Работы и наблюдения по месяцам':'Travaux et observations mois par mois' },
+    { k:'gallery',   tag:t.browse,  title:t.gallery,   sub: lang==='ru'?'Все снимки особей':'Tous les clichés d\'individus' },
+    { k:'quiz',      tag:t.play,    title:t.quiz,      sub: lang==='ru'?'Карточки-угадайки из ваших наблюдений':'Des cartes à deviner, tirées de vos observations' },
   ]
+  const heroH = wide ? 56 : 42
+  const bleed = wide ? 90 : 70
   return (
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
-      <div style={{ position:'relative', height: wide?'58vh':'46vh', minHeight:320,
-        display:'flex', flexDirection:'column', justifyContent:'flex-end', overflow:'hidden' }}>
+      <div style={{ position:'relative', height:`calc(${heroH}vh + ${bleed}px)`, minHeight:460, overflow:'hidden' }}>
         <PhotoBg target="site:hero" thumb={false} fallback="linear-gradient(155deg,#22301C 0%,#3E5233 42%,#6E8557 78%,#94A874 100%)" />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,20,12,.72), rgba(16,20,12,.15) 55%, rgba(16,20,12,.35))' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,20,12,.55) 0%, rgba(16,20,12,.12) 40%, rgba(16,20,12,.4) 75%, rgba(16,20,12,.58) 100%)' }} />
         {edit && (
-          <button onClick={onEditHero} style={{ position:'absolute', top:70, right:20, zIndex:4,
+          <button onClick={onEditHero} style={{ position:'absolute', top:64, right:20, zIndex:4,
             background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'7px 13px',
             fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
             <i className="ti ti-camera-plus" style={{ fontSize:14 }} aria-hidden="true" />
             {lang==='ru'?'Фон':'Changer l\u2019image'}
           </button>
         )}
-        <div style={{ position:'absolute', top:0, left:0, right:0, padding: wide?'22px 40px':'18px 22px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span className="serif" style={{ fontSize: wide?26:21, fontWeight:900, color:'#EDE7D8' }}>Pludini</span>
+        <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
+            <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
+          </button>
           <div style={{ display:'flex', gap:5 }}>
             {['fr','ru'].map(c=>(
-              <button key={c} onClick={()=>setLang(c)} style={{ fontSize:11, padding:'4px 10px', borderRadius:12,
+              <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
                 background: lang===c?'rgba(242,238,226,.9)':'rgba(242,238,226,.13)',
                 color: lang===c?'#2B2620':'rgba(242,238,226,.8)', fontWeight:600,
                 border:'1px solid rgba(242,238,226,.28)' }}>{c==='fr'?'FR':'RU'}</button>
             ))}
           </div>
         </div>
-        <div style={{ position:'relative', padding: wide?'0 40px 40px':'0 22px 28px', maxWidth:900 }}>
-          <h1 className="serif" style={{ fontSize: wide?50:31, lineHeight:1.03, fontWeight:900, color:'#F2EEE2', letterSpacing:'-1.4px', marginBottom:13, whiteSpace:'pre-line' }}>
+        <div style={{ position:'relative', height:`${heroH}vh`, display:'flex', flexDirection:'column', alignItems:'center',
+          justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
+          <h1 className="serif" style={{ fontSize: wide?60:33, lineHeight:1.05, fontWeight:600, color:'#F2EEE2', letterSpacing:'-1.3px', marginBottom:16, whiteSpace:'pre-line' }}>
             {t.heroTitle}
           </h1>
-          <p style={{ fontSize: wide?14.5:13, color:'rgba(237,231,216,.82)', maxWidth:520, lineHeight:1.6 }}>{t.heroSub}</p>
+          <p style={{ fontSize: wide?15:13, color:'rgba(237,231,216,.85)', maxWidth:520, lineHeight:1.65 }}>{t.heroSub}</p>
         </div>
       </div>
 
-      <div style={{ padding: wide?'24px 40px 40px':'18px 22px 32px' }}>
-        <div style={{ display:'flex', gap:20, marginBottom:20, flexWrap:'wrap' }}>
+      <div style={{ position:'relative', marginTop:-bleed, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
+        backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)',
+        padding: wide?'28px 40px 40px':'20px 20px 32px' }}>
+        <div style={{ display:'flex', gap:20, marginBottom:20, flexWrap:'wrap', justifyContent:'center' }}>
           {[[SPECIES.length,t.species],[obs,t.observed],[CATS.length,t.reigns],[PLAYERS.length,t.observers]].map(([v,l])=>(
-            <div key={l}>
+            <div key={l} style={{ textAlign:'center' }}>
               <div className="serif" style={{ fontSize: wide?30:24, fontWeight:900, color:'#2B2620', lineHeight:1 }}>{v}</div>
               <div style={{ fontSize:11.5, color:'#9A9081', marginTop:3 }}>{l}</div>
             </div>
@@ -117,19 +152,47 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero }) {
         </div>
         <div style={{ display:'grid', gridTemplateColumns: wide?'repeat(auto-fit,minmax(230px,1fr))':'1fr', gap:13 }}>
           {cards.map(c=>(
-            <button key={c.k} onClick={()=> c.k==='quiz' ? onQuiz() : go(c.k)}
-              style={{ textAlign:'left', borderRadius:20, overflow:'hidden', border:'none', padding:0,
-                position:'relative', minHeight: wide?200:150 }}>
-              <div style={{ position:'absolute', inset:0, background:c.g }} />
-              <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.66), transparent 60%)' }} />
-              <div style={{ position:'relative', height:'100%', minHeight: wide?200:150, display:'flex', flexDirection:'column',
-                justifyContent:'flex-end', padding: wide?'22px':'18px' }}>
-                <span style={{ fontSize:10.5, letterSpacing:'1.4px', textTransform:'uppercase', color:c.accent, fontWeight:700, marginBottom:5 }}>{c.tag}</span>
-                <span className="serif" style={{ fontSize: wide?28:23, fontWeight:900, color:'#F2EEE2', lineHeight:1.05, letterSpacing:'-.6px' }}>{c.title}</span>
-                <span style={{ fontSize:12, color:'rgba(242,238,226,.76)', marginTop:6, lineHeight:1.45 }}>{c.sub}</span>
-              </div>
-            </button>
+            <NavCard key={c.k} c={c} wide={wide} edit={edit}
+              onOpen={()=> c.k==='quiz' ? onQuiz() : go(c.k)} onEditPhoto={onEditCard} />
           ))}
+        </div>
+      </div>
+
+      <div style={{ padding: wide?'56px 40px 20px':'40px 22px 14px', textAlign:'center', maxWidth:640, margin:'0 auto' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+          <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
+          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:'#2B2620', whiteSpace:'nowrap' }}>
+            {lang==='ru'?'Наша история':'Notre histoire'}
+          </h2>
+          <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
+        </div>
+        <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:'#6B6357' }}>
+          {lang==='ru'
+            ? 'Документировать всё живое вокруг нас, сезон за сезоном, чтобы научиться узнавать и беречь это. Четыре наблюдателя, одно поместье в Видземе и простое желание — не упустить ничего незамеченным.'
+            : 'Documenter ce qui vit autour de nous, saison après saison, pour apprendre à le reconnaître et à le protéger. Quatre observateurs, une propriété en Vidzeme, et une envie simple : ne rien laisser filer sans le noter.'}
+        </p>
+      </div>
+
+      <div style={{ position:'relative', height: wide?300:220, margin: wide?'26px 40px 60px':'20px 16px 44px',
+        borderRadius:18, overflow:'hidden' }}>
+        <PhotoBg target="site:contact" fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,20,12,.6), transparent 55%)' }} />
+        {edit && (
+          <button onClick={()=>onEditCard({ k:'contact', title:lang==='ru'?'Контакты':'Contact' })} style={{ position:'absolute', top:10, right:10, zIndex:6,
+            background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'6px 9px' }}>
+            <i className="ti ti-camera-plus" style={{ fontSize:13 }} aria-hidden="true" />
+          </button>
+        )}
+        <div style={{ position:'absolute', left: wide?24:16, right: wide?24:16, bottom: wide?24:16, borderRadius:16,
+          backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'rgba(237,231,216,.62)',
+          padding: wide?'20px 24px':'16px 18px' }}>
+          <div className="serif" style={{ fontSize: wide?17:15, fontWeight:800, color:'#2B2620', marginBottom:6 }}>
+            {lang==='ru'?'Контакты':'Contact'}
+          </div>
+          <div style={{ fontSize:12.5, color:'#6B6357', lineHeight:1.7 }}>
+            {lang==='ru'?'Email · Телефон · WhatsApp':'Email · Téléphone · WhatsApp'}<br />
+            {lang==='ru'?'(скоро)':'(bientôt disponible)'}
+          </div>
         </div>
       </div>
     </div>
@@ -229,7 +292,8 @@ export default function App() {
   if (screen === 'landing') return (
     <>
       <Landing lang={lang} setLang={setLang} go={setScreen} onQuiz={()=>showToast(t.quizSoon)}
-        edit={edit} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })} />
+        edit={edit} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
+        onEditCard={(c)=>setPhotoTarget({ target:`site:card:${c.k}`, label:c.title })} />
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
       {!edit && (
         <button onClick={()=>setPwOpen(true)} style={{ position:'fixed', bottom:16, right:16, zIndex:20,
@@ -245,6 +309,7 @@ export default function App() {
       {toast && <Toast msg={toast} />}
     </>
   )
+  if (screen === 'experience') return <Experience wide={wide} onBack={()=>setScreen('landing')} />
   if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>setScreen('landing')} /></Shell>
   if (screen === 'territory') return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Territory wide={wide} lang={lang} edit={edit} onBack={()=>setScreen('landing')} /></Shell>
   if (screen === 'gallery')   return (
@@ -456,15 +521,11 @@ export default function App() {
   )
 
   // ═════ PANE HEADER ═════
-  const PaneHeader = ({ title, icon, active, onExpand, expanded }) => (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', borderBottom:`1px solid ${T.line}`, background:T.surface }}>
+  const PaneHeader = ({ title, icon }) => (
+    <div style={{ display:'flex', alignItems:'center', padding:'11px 14px', borderBottom:`1px solid ${T.line}`, background:T.surface }}>
       <div className="serif" style={{ fontSize:14, fontWeight:600, color:T.ink, display:'flex', alignItems:'center', gap:6 }}>
         <i className={`ti ${icon}`} style={{ fontSize:15, color:T.clay }} aria-hidden="true" />{title}
       </div>
-      <button onClick={onExpand} title={expanded?'Réduire':'Agrandir'}
-        style={{ width:26, height:26, borderRadius:8, border:`1px solid ${T.line}`, background:expanded?'#F0DDD0':'transparent', display:'flex', alignItems:'center', justifyContent:'center', color:expanded?T.clayDark:T.soft }}>
-        <i className={`ti ${expanded?'ti-arrows-minimize':'ti-arrows-maximize'}`} style={{ fontSize:13 }} aria-hidden="true" />
-      </button>
     </div>
   )
 
@@ -479,7 +540,7 @@ export default function App() {
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems: wide?'center':'flex-end', justifyContent:'center', padding: wide?24:0 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
         <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius: wide?20:'20px 20px 0 0', width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
-          <div style={{ position:'relative', height: wide?260:180, display:'flex', alignItems:'flex-end', padding:20 }}>
+          <div style={{ position:'relative', height: wide?420:260, display:'flex', alignItems:'flex-end', padding:20 }}>
             <PhotoHeroIndividuals sp={sp} fallback={gradientFor(sp.id)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 65%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:14, right:52, display:'flex', gap:5 }}>
@@ -658,7 +719,7 @@ export default function App() {
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurInd(null)}>
         <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
-          <div style={{ position:'relative', height: wide?230:200, display:'flex', alignItems:'flex-end', padding:18 }}>
+          <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:12, right:80, display:'flex', gap:5 }}>
@@ -972,8 +1033,8 @@ export default function App() {
         <div onMouseEnter={()=>setFocus('map')} onClick={()=>setFocus('map')}
           style={{ flex:mapFlex, minWidth:0, background:T.surface, borderRadius:18, border:`1px solid ${focus==='map'?T.clay:T.line}`,
             overflow:'hidden', display:'flex', flexDirection:'column',
-            transition:'flex .28s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
-          <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" expanded={focus==='map'} onExpand={()=>setFocus(focus==='map'?null:'map')} />
+            transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
+          <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" />
           <div style={{ flex:1, overflow:'hidden' }}>
             <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
           </div>
@@ -981,8 +1042,8 @@ export default function App() {
         <div onMouseEnter={()=>setFocus('matrix')} onClick={()=>setFocus('matrix')}
           style={{ flex:matFlex, minWidth:0, background:T.bg, borderRadius:18, border:`1px solid ${focus==='matrix'?T.clay:T.line}`,
             overflow:'hidden', display:'flex', flexDirection:'column',
-            transition:'flex .28s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
-          <PaneHeader title={t.matrixTitle} icon="ti-layout-grid" expanded={focus==='matrix'} onExpand={()=>setFocus(focus==='matrix'?null:'matrix')} />
+            transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
+          <PaneHeader title={t.matrixTitle} icon="ti-layout-grid" />
           <div style={{ flex:1, overflowY:'auto' }}>
             <MatrixPane compact={focus!=='matrix'} />
           </div>

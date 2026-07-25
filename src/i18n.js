@@ -18,10 +18,14 @@ export const RU = {
   h_dasha:'Даша', h_yanis:'Янис', h_igor:'Игорь', h_natacha:'Наташа', h_natacha2:'Наташа (2)',
   machaon:'Махаон', petit_paon:'Павлиний глаз', lucane:'Жук-олень',
   carabe:'Жужелица', libellule:'Стрекоза', bourdon:'Шмель',
+  mesange:'Большая синица', rougegorge:'Малиновка', buse:'Канюк обыкновенный',
+  martin_pecheur:'Зимородок обыкновенный', cygne:'Лебедь-шипун', pinson:'Зяблик',
+  argousier:'Облепиха крушиновидная', myrtille:'Черника', noisetier:'Лещина обыкновенная',
+  eglantier:'Шиповник собачий', sureau:'Бузина чёрная', genevrier:'Можжевельник обыкновенный',
 }
 
 export const CAT_RU = {
-  mammiferes:'Млекопитающие', oiseaux:'Птицы', arbres:'Деревья',
+  mammiferes:'Млекопитающие', oiseaux:'Птицы', arbres:'Деревья', arbustes:'Кустарники',
   champignons:'Грибы', lichens:'Лишайники и мхи', insectes:'Насекомые',
 }
 
