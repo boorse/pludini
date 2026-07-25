@@ -1,4 +1,4 @@
-# Comment reprendre Pluduni avec Claude Code
+# Comment reprendre Pludini avec Claude Code
 
 ## 1. Installer Claude Code (une seule fois)
 Ouvrir le Terminal (Applications → Utilitaires → Terminal) et coller :
@@ -12,12 +12,12 @@ Puis lancer, pour se connecter (ouvre le navigateur) :
 Il faut un abonnement Claude Pro (20 €/mois minimum).
 
 ## 2. Décompresser ce dossier
-Mettre le contenu du zip dans un dossier, par exemple ~/pluduni
+Mettre le contenu du zip dans un dossier, par exemple ~/pludini
 
 ## 3. Ouvrir Claude Code dans le dossier
 Dans le Terminal :
 
-    cd ~/pluduni
+    cd ~/pludini
     claude
 
 ## 4. Première demande à taper (copier-coller)

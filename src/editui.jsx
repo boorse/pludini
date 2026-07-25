@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, setObservation, addSighting, getMe, setMe } from './store.js'
+import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, setObservation, addSighting, getMe, setMe,
+         individualCovers, setCover, clearCover } from './store.js'
 import { RARITY, METHODS, SIZE_MULT } from './data'
+import { LUT } from './photoui.jsx'
 
 const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
   mute:'#9A9081', line:'#D3C7AE', clay:'#B5602F', sageDark:'#4A5D32', gold:'#C9A046' }
@@ -85,6 +87,10 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [dng, setDng] = useState(initial?.dng || '')
   const [busy, setBusy] = useState(false)
   const catObj = cats.find(c=>c.id===cat) || cats[0]
+  const covers = isEdit ? individualCovers(initial) : []
+  const [cover, setCoverLocal] = useState(initial?.cover || null)
+  const pickCover = (c) => { setCoverLocal({ ind:c.ind, photoId:c.photo.id }); setCover(initial.id, c.ind, c.photo.id) }
+  const resetCover = () => { setCoverLocal(null); clearCover(initial.id) }
 
   const save = async () => {
     if (!n.trim()) return
@@ -119,6 +125,31 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
               border:`1px solid ${e===x?T.clay:T.line}`, background:e===x?'#F0DDD0':'transparent' }}>{x}</button>
           ))}
         </div>
+
+        {isEdit && covers.length>0 && <>
+          <label style={label}>{lang==='ru'?'Обложка':'Vignette'}</label>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            <button onClick={resetCover} style={{ width:52, height:52, borderRadius:10, fontSize:9.5,
+              color:T.soft, textAlign:'center', padding:2, border:`1px solid ${!cover?T.clay:T.line}`,
+              background: !cover?'#F0DDD0':T.card }}>
+              {lang==='ru'?'Авто':'Auto'}
+            </button>
+            {covers.map(c=>{
+              const on = cover && cover.ind===c.ind && cover.photoId===c.photo.id
+              return (
+                <button key={c.ind} onClick={()=>pickCover(c)} style={{ width:52, height:52, borderRadius:10,
+                  overflow:'hidden', padding:0, position:'relative', border:`2px solid ${on?T.clay:'transparent'}` }}
+                  title={c.displayName}>
+                  <img src={c.photo.thumbUrl||c.photo.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize:10.5, color:T.mute, marginTop:4, lineHeight:1.4 }}>
+            {lang==='ru'?'Эта фотография используется как миниатюра вида.'
+                       :'Cette photo sert de vignette pour l’espèce partout dans l’appli.'}
+          </div>
+        </>}
 
         <label style={label}>{lang==='ru'?'Царство':'Règne'}</label>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>

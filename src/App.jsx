@@ -4,7 +4,7 @@ import MindMap from './mindmap.jsx'
 import { gradientFor, gradientForCat } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
-import { PhotoManager, PhotoBg, PhotoHero, PhotoButton, usePhotos, LUT } from './photoui.jsx'
+import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroIndividuals, PhotoButton, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive } from './store.js'
 import { IdentityPicker, SpeciesEditor, ObservationEditor, SightingEditor } from './editui.jsx'
@@ -15,6 +15,18 @@ const T = {
   line:'#D3C7AE', lineSoft:'#DAD0BA',
   clay:'#B5602F', clayDark:'#8F4A22', sage:'#7A8B5C', sageDark:'#4A5D32',
   leaf:'#C8DBA4',
+}
+
+function BobberIcon({ size = 20, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={style} aria-hidden="true">
+      <ellipse cx="12" cy="20.5" rx="7.5" ry="1.4" fill="none" stroke="#7A8B5C" strokeOpacity="0.4" strokeWidth="1.2"/>
+      <line x1="12" y1="2.5" x2="12" y2="7" stroke="#2B2620" strokeWidth="1.2" strokeLinecap="round"/>
+      <circle cx="12" cy="2.3" r="1.2" fill="#B5602F"/>
+      <path d="M6.5 13.5 A5.5 6.5 0 0 1 17.5 13.5 Z" fill="#B5602F"/>
+      <path d="M6.5 13.5 A5.5 6.5 0 0 0 17.5 13.5 Z" fill="#F2EEE2" stroke="#B5602F" strokeWidth="0.5"/>
+    </svg>
+  )
 }
 
 function useWide() {
@@ -31,8 +43,8 @@ function LangPicker({ onPick }) {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(155deg,#22301C 0%,#3E5233 45%,#6E8557 100%)',
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24 }}>
-      <div style={{ fontSize:44, marginBottom:14 }}>🌿</div>
-      <div className="serif" style={{ fontSize:34, fontWeight:900, color:'#F2EEE2', letterSpacing:'-1px', marginBottom:6 }}>Pluduni</div>
+      <div style={{ marginBottom:14 }}><BobberIcon size={48} /></div>
+      <div className="serif" style={{ fontSize:34, fontWeight:900, color:'#F2EEE2', letterSpacing:'-1px', marginBottom:6 }}>Pludini</div>
       <div style={{ fontSize:13, color:'rgba(237,231,216,.7)', marginBottom:30 }}>Vidzeme · Latvija</div>
       <div style={{ display:'flex', gap:12, flexWrap:'wrap', justifyContent:'center' }}>
         {[['fr','Français','Continuer en français'],['ru','Русский','Продолжить по-русски']].map(([code,label,sub])=>(
@@ -76,7 +88,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero }) {
           </button>
         )}
         <div style={{ position:'absolute', top:0, left:0, right:0, padding: wide?'22px 40px':'18px 22px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span className="serif" style={{ fontSize: wide?26:21, fontWeight:900, color:'#EDE7D8' }}>Pluduni</span>
+          <span className="serif" style={{ fontSize: wide?26:21, fontWeight:900, color:'#EDE7D8' }}>Pludini</span>
           <div style={{ display:'flex', gap:5 }}>
             {['fr','ru'].map(c=>(
               <button key={c} onClick={()=>setLang(c)} style={{ fontSize:11, padding:'4px 10px', borderRadius:12,
@@ -160,7 +172,7 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
 export default function App() {
   const wide = useWide()
   const [screen, setScreen] = useState(() => {
-    try { return localStorage.getItem('pluduni_screen') || 'landing' } catch { return 'landing' }
+    try { return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing' } catch { return 'landing' }
   })
   const [lang, setLang] = useState('fr')
   const [nav, setNav] = useState('explore')
@@ -170,7 +182,7 @@ export default function App() {
   const [detTab, setDetTab] = useState('obs')
   const [pane, setPane] = useState('split')      // split | map | matrix
   const [edit, setEdit] = useState(() => {
-    try { return localStorage.getItem('pluduni_edit') === '1' } catch { return false }
+    try { return localStorage.getItem('pludini_edit') === '1' || localStorage.getItem('pluduni_edit') === '1' } catch { return false }
   })
   const [pwOpen, setPwOpen] = useState(false)
   const [pw, setPw] = useState('')
@@ -195,8 +207,8 @@ export default function App() {
     return subscribe(()=>setRefresh(r=>r+1))
   }, [])
 
-  useEffect(() => { try { localStorage.setItem('pluduni_screen', screen) } catch {} }, [screen])
-  useEffect(() => { try { localStorage.setItem('pluduni_edit', edit ? '1' : '0') } catch {} }, [edit])
+  useEffect(() => { try { localStorage.setItem('pludini_screen', screen) } catch {} }, [screen])
+  useEffect(() => { try { localStorage.setItem('pludini_edit', edit ? '1' : '0') } catch {} }, [edit])
 
   const SPECIES = allSpecies()
   const CATS = allCats()
@@ -468,10 +480,9 @@ export default function App() {
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems: wide?'center':'flex-end', justifyContent:'center', padding: wide?24:0 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
         <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius: wide?20:'20px 20px 0 0', width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
           <div style={{ position:'relative', height: wide?260:180, display:'flex', alignItems:'flex-end', padding:20 }}>
-            <PhotoHero target={`sp:${sp.id}`} fallback={gradientFor(sp.id)} />
+            <PhotoHeroIndividuals sp={sp} fallback={gradientFor(sp.id)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 65%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:14, right:52, display:'flex', gap:5 }}>
-              <PhotoButton onClick={()=>setPhotoTarget({ target:`sp:${sp.id}`, label:sp.n })} />
               <button onClick={(e)=>{ e.stopPropagation(); setSpEditor({ initial:sp }) }}
                 style={{ background:'rgba(0,0,0,.45)', color:'#fff', borderRadius:12, padding:'5px 10px', fontSize:11.5 }}>
                 <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
@@ -985,7 +996,7 @@ export default function App() {
       {/* HEADER */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: wide?'12px 24px':'11px 16px', borderBottom:`1px solid ${T.line}`, background:T.surface, position:'sticky', top:0, zIndex:30 }}>
         <button onClick={()=>setScreen('landing')} className="serif" style={{ fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:7 }}>
-          <i className="ti ti-leaf" style={{ fontSize:19, color:T.sageDark }} aria-hidden="true" />Pluduni
+          <BobberIcon size={19} style={{ marginRight: -2 }} />Pludini
         </button>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <div style={{ display:'flex', gap:3 }}>
@@ -1176,7 +1187,7 @@ function Shell({ children, lang, setLang, onHome }) {
         padding:'12px 24px', borderBottom:'1px solid #D3C7AE', background:'#E3DAC5', position:'sticky', top:0, zIndex:30 }}>
         <button onClick={onHome} className="serif" style={{ fontSize:20, fontWeight:900, color:'#2B2620',
           display:'flex', alignItems:'center', gap:7 }}>
-          <i className="ti ti-leaf" style={{ fontSize:19, color:'#4A5D32' }} aria-hidden="true" />Pluduni
+          <BobberIcon size={19} style={{ marginRight: -2 }} />Pludini
         </button>
         <div style={{ display:'flex', gap:5 }}>
           {['fr','ru'].map(c=>(

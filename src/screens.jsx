@@ -8,7 +8,7 @@ import { LUT } from './photoui.jsx'
 import { allPhotos, allSpecies, allPlayers, subscribe } from './store.js'
 import { getTodos, saveTodo, deleteTodo, getPins, savePin, deletePin,
          getZones, saveZone, deleteZone, getPinTypes, savePinType } from './cloud.js'
-import { PhotoBg } from './photoui.jsx'
+import { CoverBg } from './photoui.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -561,7 +561,7 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
               return (
                 <button key={sp.id} onClick={()=>onSelectSpecies(sp.id)} style={{ textAlign:'left', borderRadius:12,
                   overflow:'hidden', border:`1px solid ${T.line}`, padding:0, position:'relative', minHeight:86 }}>
-                  <PhotoBg target={`sp:${sp.id}`} fallback={gradientFor(sp.id)} />
+                  <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
                   <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.72), transparent 58%)' }} />
                   <div style={{ position:'relative', minHeight:86, display:'flex', flexDirection:'column', justifyContent:'space-between', padding:9 }}>
                     <span style={{ fontSize:19 }}>{sp.e}</span>

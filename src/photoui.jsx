@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { sb } from './supabase.js'
-import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe } from './store.js'
+import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe, coverPhoto, individualCovers } from './store.js'
 
 export const LUT = 'sepia(0.28) saturate(1.22) hue-rotate(342deg) brightness(0.97) contrast(1.06)'
 
@@ -55,6 +55,28 @@ export function PhotoBg({ target, fallback, rounded = 0, thumb = true }) {
   )
 }
 
+// re-rendu forcé quand le magasin change — utilisé par les vignettes dérivées (pas de snapshot figé possible)
+function useStoreTick() {
+  const [, tick] = useState(0)
+  useEffect(() => subscribe(() => tick(x => x + 1)), [])
+}
+
+// ── Fond vignette d'espèce : reprend la photo choisie en réglages (ou la 1ère dispo) ──
+export function CoverBg({ sp, fallback, rounded = 0, thumb = true }) {
+  useStoreTick()
+  const cover = coverPhoto(sp)
+  const src = cover ? (thumb && cover.thumbUrl ? cover.thumbUrl : cover.url) : null
+  return (
+    <div style={{ position:'absolute', inset:0, borderRadius:rounded, overflow:'hidden',
+      background: cover ? '#1E2418' : fallback }}>
+      {src && (
+        <img src={src} alt="" loading="lazy" decoding="async" draggable={false}
+          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block' }} />
+      )}
+    </div>
+  )
+}
+
 const navBtn = (side) => ({
   position:'absolute', top:'50%', [side]:8, transform:'translateY(-50%)', zIndex:2,
   width:30, height:30, borderRadius:'50%', background:'rgba(0,0,0,.4)', color:'#fff',
@@ -89,6 +111,44 @@ export function PhotoHero({ target, fallback }) {
         </div>
       </>}
       {open && cover && <Lightbox photos={photos} index={idx} onIndex={setIdx} onClose={()=>setOpen(false)} />}
+    </>
+  )
+}
+
+// ── Bannière de fiche espèce : une image par individu répertorié, parcourue aux flèches ──
+export function PhotoHeroIndividuals({ sp, fallback }) {
+  useStoreTick()
+  const covers = individualCovers(sp)
+  const [idx, setIdx] = useState(0)
+  const [open, setOpen] = useState(false)
+  useEffect(() => { if (idx >= covers.length) setIdx(0) }, [covers.length, idx])
+  const current = covers[idx]
+  const many = covers.length > 1
+  const photos = covers.map(c => c.photo)
+  return (
+    <>
+      <div onClick={()=>current && setOpen(true)} style={{ position:'absolute', inset:0, overflow:'hidden',
+        background: current ? '#1E2418' : fallback, cursor: current ? 'zoom-in' : 'default' }}>
+        {current && (
+          <img src={current.photo.url} alt="" loading="lazy" decoding="async" draggable={false}
+            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:current.photo.pos||'50% 50%', filter:LUT, display:'block' }} />
+        )}
+      </div>
+      {current && (
+        <div style={{ position:'absolute', bottom:8, left:10, zIndex:2, background:'rgba(0,0,0,.4)', color:'#F2EEE2',
+          fontSize:10.5, fontWeight:600, padding:'3px 9px', borderRadius:10 }}>{current.displayName}</div>
+      )}
+      {many && <>
+        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+covers.length)%covers.length) }} style={navBtn('left')}>‹</button>
+        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%covers.length) }} style={navBtn('right')}>›</button>
+        <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:2 }}>
+          {covers.map((_,i)=>(
+            <span key={i} style={{ width:i===idx?14:5, height:5, borderRadius:3,
+              background: i===idx?'#F2EEE2':'rgba(242,238,226,.45)', transition:'width .15s' }} />
+          ))}
+        </div>
+      </>}
+      {open && current && <Lightbox photos={photos} index={idx} onIndex={setIdx} onClose={()=>setOpen(false)} />}
     </>
   )
 }

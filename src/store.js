@@ -92,6 +92,29 @@ export function splitInds(sp) {
   return { named: all.filter(i => i.named), sightings: all.filter(i => !i.named) }
 }
 
+// ══════ COUVERTURE D'ESPÈCE (issue des photos de ses individus) ══════
+// une entrée par individu qui a au moins une photo — sert au carrousel de la fiche et au sélecteur de vignette
+export function individualCovers(sp) {
+  return (sp.inds || []).map(ind => {
+    const ov = S.named[`${sp.id}::${ind.n}`]
+    const photos = photosFor(`ind:${sp.id}:${ind.n}`)
+    return photos.length ? { ind: ind.n, displayName: ov ? ov.name : ind.n, photo: photos[0] } : null
+  }).filter(Boolean)
+}
+// la vignette choisie manuellement (réglages), sinon la première photo d'individu disponible
+export function coverPhoto(sp) {
+  const covers = individualCovers(sp)
+  if (!covers.length) return null
+  const chosen = sp.cover
+  if (chosen) {
+    const found = covers.find(c => c.ind === chosen.ind && c.photo.id === chosen.photoId)
+    if (found) return found.photo
+  }
+  return covers[0].photo
+}
+export async function setCover(spId, ind, photoId) { await editSpecies(spId, { cover: { ind, photoId } }) }
+export async function clearCover(spId) { await editSpecies(spId, { cover: null }) }
+
 // ══════ ESPÈCES ══════
 export function allSpecies() {
   const custom = S.species.map(c => ({
@@ -115,7 +138,7 @@ export async function addSpecies(sp) {
   return id
 }
 export async function editSpecies(id, fields) {
-  const value = { id, fields }
+  const value = { id, fields: { ...(S.edits[id]?.fields || {}), ...fields } }
   S.edits[id] = value; notify()
   await sb.from('overrides').upsert({ kind: 'spedit', key: 'edit_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
@@ -194,5 +217,5 @@ export function allCats() {
 }
 
 // ══════ IDENTITÉ ══════
-export function getMe() { try { return localStorage.getItem('pluduni_me') || '' } catch { return '' } }
-export function setMe(n) { try { localStorage.setItem('pluduni_me', n) } catch {} ; notify() }
+export function getMe() { try { return localStorage.getItem('pludini_me') || localStorage.getItem('pluduni_me') || '' } catch { return '' } }
+export function setMe(n) { try { localStorage.setItem('pludini_me', n) } catch {} ; notify() }

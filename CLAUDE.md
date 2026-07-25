@@ -1,4 +1,4 @@
-# Pluduni — inventaire naturaliste collaboratif
+# Pludini — inventaire naturaliste collaboratif
 
 Application web (React + Vite) pour recenser la faune et la flore d'une propriété
 en Lettonie (Vidzeme, près de Cēsis). Quatre contributeurs partagent leurs
@@ -16,7 +16,7 @@ la plupart des bugs sont des erreurs d'exécution (composant hors portée, donn�
 manquante) que seul le navigateur révèle. Ouvrir la console (Cmd+Option+J).
 
 ## Déploiement
-GitHub (boorse/pluduni) → Vercel déploie automatiquement à chaque push sur main.
+GitHub (boorse/pludini) → Vercel déploie automatiquement à chaque push sur main.
 IMPORTANT : dans index.html le script doit être "./src/main.jsx" (chemin relatif),
 jamais "/src/main.jsx" — une barre initiale casse le build Vercel.
 

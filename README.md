@@ -1,4 +1,4 @@
-# 🌿 Pluduni — Inventaire naturaliste collaboratif
+# 🌿 Pludini — Inventaire naturaliste collaboratif
 
 Application web pour répertorier la faune et la flore de la propriété (Vidzeme, Lettonie).
 
@@ -12,7 +12,7 @@ Ouvre http://localhost:5173
 ## Déployer sur Vercel (gratuit)
 1. Pousse ce dossier sur un repo GitHub
 2. Sur vercel.com : Import Project → sélectionne le repo → Framework "Vite" → Deploy
-3. L'URL générée (ex. pluduni.vercel.app) est partageable sur téléphone et PC
+3. L'URL générée (ex. pludini.vercel.app) est partageable sur téléphone et PC
 
 ## Modifier les données
 Tout est dans `src/data.js` : espèces, joueurs, badges, règles de points.

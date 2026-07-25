@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-//  PLUDUNI — Données · Espèces réelles de Lettonie / Vidzeme
+//  PLUDINI — Données · Espèces réelles de Lettonie / Vidzeme
 // ═══════════════════════════════════════════════════════════════════
 
 export const RARITY = {
