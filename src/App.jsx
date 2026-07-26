@@ -108,7 +108,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
   const bleed = wide ? 80 : 60
   return (
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
-      <div style={{ position:'relative', height:`calc(${heroH}vh + ${bleed}px)`, minHeight:460, overflow:'hidden' }}>
+      <div style={{ position:'relative', height:`calc(${heroH}dvh + ${bleed}px)`, minHeight:460, overflow:'hidden' }}>
         <PhotoBg target="site:hero" thumb={false} fallback="linear-gradient(155deg,#22301C 0%,#3E5233 42%,#6E8557 78%,#94A874 100%)" />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,20,12,.55) 0%, rgba(16,20,12,.12) 40%, rgba(16,20,12,.4) 75%, rgba(16,20,12,.58) 100%)' }} />
         {edit && (
@@ -132,7 +132,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
             ))}
           </div>
         </div>
-        <div style={{ position:'relative', height:`${heroH}vh`, display:'flex', flexDirection:'column', alignItems:'center',
+        <div style={{ position:'relative', height:`${heroH}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
           justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
           <h1 className="serif" style={{ fontSize: wide?60:33, lineHeight:1.05, fontWeight:600, color:'#F2EEE2', letterSpacing:'-1.3px', marginBottom:16, whiteSpace:'pre-line' }}>
             {t.heroTitle}

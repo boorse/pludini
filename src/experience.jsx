@@ -423,12 +423,12 @@ export default function Experience({ wide, onBack }) {
           onBack={()=>goView('home')} onEditPhoto={openPhoto} />
       ) : (
         <>
-          <div style={{ position:'relative', height:`calc(${wide?92:70}vh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
+          <div style={{ position:'relative', height:`calc(${wide?92:70}dvh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
             <AutoSlideshow target="exp:hero" fallback="linear-gradient(160deg,#2A2118 0%,#5C4A2E 45%,#A88B5C 100%)" arrows />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,14,10,.5) 0%, rgba(16,14,10,.1) 38%, rgba(16,14,10,.6) 100%)' }} />
             <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" />
             {edit && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
-            <div style={{ position:'relative', height:`${wide?92:70}vh`, display:'flex', flexDirection:'column', alignItems:'center',
+            <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
               justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
               <span style={{ fontSize:11, letterSpacing:'2px', textTransform:'uppercase', color:'#E0B98A', fontWeight:700, marginBottom:14 }}>{l.tag}</span>
               <h1 className="serif" style={{ fontSize: wide?68:36, fontWeight:600, color:'#F2EEE2',
