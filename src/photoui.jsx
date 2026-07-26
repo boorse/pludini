@@ -86,7 +86,7 @@ export function CoverBg({ sp, fallback, rounded = 0, thumb = true }) {
       background: cover ? '#1E2418' : fallback }}>
       {src && (
         <img src={src} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block' }} />
+          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block', WebkitTouchCallout:'none' }} />
       )}
     </div>
   )

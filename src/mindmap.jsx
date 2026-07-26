@@ -110,7 +110,10 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   const computeView = useCallback(() => {
     const el = wrapRef.current; if (!el) return
     const { x, y, k } = liveRef.current
-    const M = 400 / k   // marge : on garde de quoi voir venir
+    // marge plafonnée : au-delà, à faible zoom (règne déployé avec beaucoup
+    // d'espèces), 400/k explose et annule le culling — tout reste monté et
+    // le geste rame sur mobile
+    const M = Math.min(400 / k, 500)
     setView({
       x0: (-x) / k - M, x1: (-x + el.clientWidth) / k + M,
       y0: (-y) / k - M, y1: (-y + el.clientHeight) / k + M,
@@ -139,14 +142,22 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   // ── Pointer Events : un seul chemin pour souris, stylet et doigts ──
   const ptrs = useRef(new Map())
   const gest = useRef(null)
+  const tapRef = useRef(null)   // cible du tap, résolue au pointerdown avant toute capture
 
   const onDown = (e) => {
     const el = wrapRef.current; if (!el) return
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     G.moved = false
     if (ptrs.current.size === 1) {
+      const btn = e.target.closest?.('button[data-tap-kind]')
+      tapRef.current = btn ? { kind: btn.dataset.tapKind, id: btn.dataset.tapId, cat: btn.dataset.tapCat, sub: btn.dataset.tapSub } : null
       gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, ox:liveRef.current.x, oy:liveRef.current.y }
+      // capture immédiate (comme pour le zoom) : évite la fenêtre de hit-testing
+      // non capturée qui, sur une grille dense (règne déployé), fait perdre le
+      // geste sur mobile dès que le doigt traverse une carte voisine
+      try { el.setPointerCapture?.(e.pointerId) } catch {}
     } else if (ptrs.current.size === 2) {
+      tapRef.current = null
       try { el.setPointerCapture?.(e.pointerId) } catch {}
       const [a,b] = [...ptrs.current.values()]
       const r = el.getBoundingClientRect()
@@ -163,10 +174,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
 
     if (g.mode === 'pan' && ptrs.current.size === 1) {
       const dx = e.clientX - g.sx, dy = e.clientY - g.sy
-      if (!G.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-        G.moved = true
-        wrapRef.current?.setPointerCapture?.(e.pointerId)   // capture seulement en glissant
-      }
+      if (!G.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) G.moved = true
       if (!G.moved) return
       liveRef.current = { ...liveRef.current, x: g.ox + dx, y: g.oy + dy }
       applyLive()
@@ -187,8 +195,19 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       gest.current = null
       // ne toucher à React que si l'on a vraiment bougé :
       // sinon le re-rendu détruit le bouton avant que le clic n'arrive
-      if (G.moved) { setTf({ ...liveRef.current }); computeView() }
-      setTimeout(()=>{ G.moved = false }, 0)
+      if (G.moved) {
+        setTf({ ...liveRef.current }); computeView()
+      } else if (e.type === 'pointerup' && tapRef.current) {
+        // dispatch explicite : la capture immédiate ci-dessus rend le clic natif
+        // ambigu sur mobile, donc on ne compte plus dessus pour agir
+        const t = tapRef.current
+        if (t.kind === 'toggle') toggle(t.id)
+        else if (t.kind === 'sp') onSelectSpecies(t.id)
+        else if (t.kind === 'add') onAddSpecies?.(t.cat, t.sub)
+        G.tapDispatched = true
+      }
+      tapRef.current = null
+      setTimeout(()=>{ G.moved = false; G.tapDispatched = false }, 0)
     } else if (ptrs.current.size === 1) {
       const [p] = [...ptrs.current.values()]
       gest.current = { mode:'pan', sx:p.x, sy:p.y, ox:liveRef.current.x, oy:liveRef.current.y }
@@ -252,9 +271,9 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           transform:`translate3d(${tf.x}px,${tf.y}px,0) scale(${tf.k})`, willChange:'transform' }}>
           <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
             view={view}
-            expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
-            onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
-            onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+            expanded={expanded} onToggle={(id)=>{ if(!G.moved && !G.tapDispatched) toggle(id) }}
+            onSp={(sp)=>{ if(!G.moved && !G.tapDispatched) onSelectSpecies(sp.id) }}
+            onAdd={(c,sv)=>{ if(!G.moved && !G.tapDispatched) onAddSpecies?.(c,sv) }} />
         </div>
       </div>
 
@@ -316,7 +335,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   }
 
   if (n.kind === 'root') return (
-    <button onClick={toggle} style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
+    <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
       <span style={{ position:'absolute', top:7, left:9, fontSize:19 }}>{n.e}</span>
       <span className="serif" style={{ fontSize:14, fontWeight:900, color:'#F2EEE2' }}>{n.label}</span>
     </button>
@@ -326,7 +345,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     const all = allSpecies().filter(s=>s.cat===n.cat.id)
     const obs = all.filter(isObserved).length
     return (
-      <button onClick={toggle} style={{ ...base, background:gradientForCat(n.cat.id) }}>
+      <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, background:gradientForCat(n.cat.id) }}>
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.62), transparent 58%)' }} />
         <span style={{ position:'absolute', top:6, left:8, fontSize:17 }}>{n.e}</span>
         {hasKids && <Chev open={open} />}
@@ -341,7 +360,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     const m = n.members || []
     const obs = m.filter(isObserved).length
     return (
-      <button onClick={toggle} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
+      <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
         <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{n.label}</span>
         <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
@@ -351,7 +370,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   }
 
   if (n.kind === 'add') return (
-    <button onClick={onSp} style={{ ...base, background:'transparent', border:'2px dashed #B5602F',
+    <button onClick={onSp} data-tap-kind="add" data-tap-cat={n.cat} data-tap-sub={n.sub} style={{ ...base, background:'transparent', border:'2px dashed #B5602F',
       alignItems:'center', justifyContent:'center', boxShadow:'none' }}>
       <span style={{ fontSize:20, color:'#B5602F', lineHeight:1 }}>+</span>
       <span style={{ fontSize:8, color:'#B5602F', marginTop:3, fontWeight:600 }}>
@@ -362,7 +381,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
 
   const sp = n.sp, o = isObserved(sp), r = RARITY[sp.r] || RARITY.commun
   return (
-    <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
+    <button onClick={onSp} data-tap-kind="sp" data-tap-id={sp.id} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
       {o
         ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
