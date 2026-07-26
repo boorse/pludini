@@ -105,7 +105,12 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
       <TransformWrapper
         initialScale={tf.k || 1} initialPositionX={tf.x || 0} initialPositionY={tf.y || 0}
-        minScale={K_MIN} maxScale={K_MAX} limitToBounds
+        minScale={K_MIN} maxScale={K_MAX}
+        // limitToBounds désactivé : la contrainte dépend d'une mesure correcte
+        // du wrapper au moment du calcul, ce qui a bloqué le pan (mais pas le
+        // zoom, recalculé indépendamment) sur mobile — comportement d'origine
+        // (pan libre, sans limite) plus sûr
+        limitToBounds={false}
         wheel={{ step: 0.15 }} doubleClick={{ disabled: true }}
       >
         <MapView width={width} height={height} nodes={nodes} links={links} lang={lang}
