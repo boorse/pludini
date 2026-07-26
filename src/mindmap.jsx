@@ -163,18 +163,24 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fit, width, height])
 
-  // synchronise le scroll natif vers l'état React une fois le défilement
-  // stabilisé (survit à un démontage), sans jamais re-rendre pendant le
-  // défilement lui-même — seul le navigateur anime le pan, aucun re-render React
+  // pendant le défilement : le pan lui-même est 100% natif (le navigateur
+  // l'anime seul, sur son propre thread) — recalculer le culling à chaque
+  // frame ne le ralentit pas, contrairement à l'ancien pan piloté par React.
+  // On limite quand même à une fois par frame (rAF) pour rester léger.
+  const scrollRaf = useRef(null)
   const scrollSyncTimer = useRef(null)
   const onScroll = useCallback(() => {
+    if (!scrollRaf.current) {
+      scrollRaf.current = requestAnimationFrame(() => { scrollRaf.current = null; computeView() })
+    }
+    // l'état React (tf), lui, n'a besoin d'être à jour qu'une fois le
+    // défilement stabilisé — seulement utile pour survivre à un démontage
     clearTimeout(scrollSyncTimer.current)
     scrollSyncTimer.current = setTimeout(() => {
       const el = wrapRef.current; if (!el) return
-      computeView()
       setTf(prev => (prev.x === el.scrollLeft && prev.y === el.scrollTop && prev.k === kRef.current)
         ? prev : { x: el.scrollLeft, y: el.scrollTop, k: kRef.current })
-    }, 180)
+    }, 250)
   }, [computeView, setTf])
 
   // ── Le pan à un doigt est un scroll natif du navigateur (fiable, fluide,
@@ -321,7 +327,11 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         onScroll={onScroll}
         onDragStart={e=>e.preventDefault()}
         style={{ flex:1, minHeight:300, overflow:'auto', position:'relative',
-          cursor:'grab', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch',
+          cursor:'grab', touchAction:'pan-x pan-y', overscrollBehavior:'contain',
+          // PAS de WebkitOverflowScrolling:'touch' : ce mode d'accélération hérité
+          // d'iOS <13 est connu pour verrouiller le scroll sur un seul axe et faire
+          // disparaître les fonds/motifs pendant le défilement — le scroll natif
+          // moderne (iOS 13+) est déjà fluide sans lui
           userSelect:'none', WebkitUserSelect:'none', backgroundColor:'#E3DAC5' }}>
         <div ref={sizerRef} style={{ position:'relative',
           backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
