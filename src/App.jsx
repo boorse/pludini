@@ -9,7 +9,7 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting } from './store.js'
+         removeSighting, setObservation, setBlurry } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 
 const T = {
@@ -323,7 +323,19 @@ export default function App() {
   const [screen, setScreen] = useState(() => {
     try { return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing' } catch { return 'landing' }
   })
-  const [lang, setLang] = useState('fr')
+  // langue par défaut à la toute première ouverture : celle du téléphone si
+  // elle est prise en charge (russe), sinon français — puis mémorisée dès
+  // qu'un choix (auto ou manuel) a été fait, pour ne plus jamais redevenir
+  // dépendante de la langue du navigateur ensuite
+  const [lang, setLangRaw] = useState(() => {
+    try {
+      const stored = localStorage.getItem('pludini_lang')
+      if (stored) return stored
+      const nav = (navigator.language || navigator.userLanguage || '').toLowerCase()
+      return nav.startsWith('ru') ? 'ru' : 'fr'
+    } catch { return 'fr' }
+  })
+  const setLang = (l) => { setLangRaw(l); try { localStorage.setItem('pludini_lang', l) } catch {} }
   const [nav, setNav] = useState('explore')
   const [curCat, setCurCat] = useState(null)
   const [curSub, setCurSub] = useState('Tous')
@@ -344,6 +356,7 @@ export default function App() {
   const [photoTarget, setPhotoTarget] = useState(null) // {target,label}
   const [promoting, setPromoting] = useState(null)   // {sp, ind}
   const [confirmDelSighting, setConfirmDelSighting] = useState(null) // {sp, ind}
+  const [confirmClearObs, setConfirmClearObs] = useState(null) // {sp, player}
   const [refresh, setRefresh] = useState(0)
   const [mapExpanded, setMapExpanded] = useState(() => new Set())
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
@@ -378,6 +391,9 @@ export default function App() {
   const selSpFull = (id) => { const s = SPECIES.find(x=>x.id===id); setCurCat(s?.cat); setCurSp(id); setDetTab('obs') }
 
   const submitPw = () => { if (pw==='arbalete'){ setEdit(true); setPwOpen(false); setPw(''); if(!getMe()) setIdPicker(true) } else setPw('') }
+  // seul Ferdinand peut changer les images du fond d'accueil et des menus
+  // (le reste du mode édition — espèces, observations — reste ouvert à tous)
+  const canEditImages = edit && getMe() === 'Ferdinand'
 
   const t = UI[lang]
 
@@ -385,7 +401,7 @@ export default function App() {
   if (screen === 'landing') return (
     <>
       <Landing lang={lang} setLang={setLang} go={goScreen} onQuiz={()=>showToast(t.quizSoon)}
-        edit={edit} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
+        edit={canEditImages} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
         onEditCard={(c)=>setPhotoTarget({ target:`site:card:${c.k}`, label:c.title })} />
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
       {!edit && (
@@ -699,8 +715,20 @@ export default function App() {
                   const m = sp.obs[pl.name]||[]
                   const best = m.length ? m.reduce((b,x)=>(METHODS[x]?.mult||0)>(METHODS[b]?.mult||0)?x:b, m[0]) : null
                   const p2 = calcPtsLive(sp, pl.name)
+                  // observation cochée sans individu associé (souvent un reliquat d'une
+                  // suppression d'individu antérieure à la correction de la cascade) :
+                  // seul cas où on propose de l'effacer directement depuis cette vignette
+                  const hasInd = sp.inds.some(i=>i.by===pl.name)
+                  const orphan = edit && m.length>0 && !hasInd
                   return (
-                    <div key={pl.id} style={{ background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'9px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
+                    <div key={pl.id} style={{ position:'relative', background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'9px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
+                      {orphan && (
+                        <button onClick={()=>setConfirmClearObs({ sp, player:pl.name })}
+                          title={lang==='ru'?'Удалить наблюдение (без особи)':'Effacer cette observation (sans individu)'}
+                          style={{ position:'absolute', top:-6, right:-6, width:18, height:18, borderRadius:'50%',
+                            background:'#8F3A2E', color:'#fff', fontSize:10, lineHeight:1, display:'flex',
+                            alignItems:'center', justifyContent:'center' }}>✕</button>
+                      )}
                       <div style={{ fontSize:15, marginBottom:2 }}>{best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):'—'}</div>
                       <div style={{ fontSize:10, color:T.soft }}>{pl.name}</div>
                       <div className="serif" style={{ fontSize:12, fontWeight:600, color:T.ink }}>{p2?p2+' pts':'—'}</div>
@@ -1243,8 +1271,27 @@ export default function App() {
         title={lang==='ru'?'Удалить это наблюдение?':'Supprimer cette observation ?'}
         message={lang==='ru'?'Это действие необратимо.':'Cette action est irréversible.'}
         onCancel={()=>setConfirmDelSighting(null)}
-        onConfirm={async()=>{ await removeSighting(confirmDelSighting.sp.id, confirmDelSighting.ind.n);
+        onConfirm={async()=>{
+          const { sp, ind } = confirmDelSighting
+          await removeSighting(sp.id, ind.n)
+          // sans ça, la case "qui a observé" (et ses points) reste cochée même
+          // après suppression du dernier individu qui la justifiait
+          if (ind.by) {
+            const after = allSpecies().find(s=>s.id===sp.id)
+            const remaining = [...new Set((after?.inds||[]).filter(i=>i.by===ind.by).map(i=>i.method).filter(Boolean))]
+            await setObservation(sp.id, ind.by, remaining)
+          }
           setConfirmDelSighting(null); setCurInd(null); setRefresh(r=>r+1) }} />}
+      {confirmClearObs && <ConfirmDialog lang={lang}
+        title={lang==='ru'?'Удалить это наблюдение?':'Effacer cette observation ?'}
+        message={lang==='ru'?'Способы наблюдения и очки этого наблюдателя для этого вида будут удалены.'
+          :'Les méthodes d’observation et les points de cet observateur pour cette espèce seront effacés.'}
+        onCancel={()=>setConfirmClearObs(null)}
+        onConfirm={async()=>{
+          const { sp, player } = confirmClearObs
+          await setObservation(sp.id, player, [])
+          await setBlurry(sp.id, player, false)
+          setConfirmClearObs(null); setRefresh(r=>r+1) }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
       {spEditor && <SpeciesEditor lang={lang} initial={spEditor.initial} presetCat={spEditor.cat}
         presetSub={spEditor.sub} onClose={()=>setSpEditor(null)} onSaved={()=>setRefresh(r=>r+1)}

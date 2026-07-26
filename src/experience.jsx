@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { gradientFor } from './gradients.js'
 import { PhotoBg, PhotoHero, PhotoManager, usePhotos, LUT } from './photoui.jsx'
+import { getMe } from './store.js'
 
 const T = {
   bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357', mute:'#9A9081',
@@ -390,6 +391,10 @@ export default function Experience({ wide, onBack }) {
   const [pw, setPw] = useState('')
   const [photoTarget, setPhotoTarget] = useState(null)
   const l = TXT[lang]
+  // seul Ferdinand peut changer les images de Pludini Host (le mode édition
+  // lui-même reste accessible à qui connaît le mot de passe, mais ne révèle
+  // les boutons photo qu'à lui)
+  const canEditImages = edit && getMe() === 'Ferdinand'
 
   // mémorise la position de défilement de chaque vue (accueil/activité/réservation)
   const scrollPos = useRef({})
@@ -413,7 +418,7 @@ export default function Experience({ wide, onBack }) {
   return (
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {view === 'activity' && activity ? (
-        <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} edit={edit}
+        <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} edit={canEditImages}
           onBack={()=>goView('home')} onEditPhoto={openPhoto} />
       ) : (
         <>
@@ -421,7 +426,7 @@ export default function Experience({ wide, onBack }) {
             <AutoSlideshow target="exp:hero" fallback="linear-gradient(160deg,#2A2118 0%,#5C4A2E 45%,#A88B5C 100%)" arrows />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,14,10,.5) 0%, rgba(16,14,10,.1) 38%, rgba(16,14,10,.6) 100%)' }} />
             <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" />
-            {edit && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
+            {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
             <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
               justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
               <span style={{ fontSize:11, letterSpacing:'2px', textTransform:'uppercase', color:'#E0B98A', fontWeight:700, marginBottom:14 }}>{l.tag}</span>
@@ -445,7 +450,7 @@ export default function Experience({ wide, onBack }) {
             <div style={{ display:'flex', flexWrap:'wrap', gap:4,
               padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
               {ALL_ACTIVITIES.map(a => (
-                <ActivityTile key={a.id} a={a} lang={lang} edit={edit} wide={wide}
+                <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages} wide={wide}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
               ))}
               {/* comble la dernière ligne sans étirer une vraie vignette ni laisser un trou visible */}
@@ -467,7 +472,7 @@ export default function Experience({ wide, onBack }) {
           <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 60px':'20px 16px 44px',
             borderRadius:18, overflow:'hidden' }}>
             <PhotoBg target="exp:story" fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
-            {edit && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
+            {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
           </div>
         </>
       )}

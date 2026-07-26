@@ -22,12 +22,30 @@ export const RU = {
   martin_pecheur:'Зимородок обыкновенный', cygne:'Лебедь-шипун', pinson:'Зяблик',
   argousier:'Облепиха крушиновидная', myrtille:'Черника', noisetier:'Лещина обыкновенная',
   eglantier:'Шиповник собачий', sureau:'Бузина чёрная', genevrier:'Можжевельник обыкновенный',
+  d_sem:'Сэм', d_raya:'Рая',
 }
 
 export const CAT_RU = {
   mammiferes:'Млекопитающие', oiseaux:'Птицы', arbres:'Деревья', arbustes:'Кустарники',
   champignons:'Грибы', lichens:'Лишайники и мхи', insectes:'Насекомые', humains:'Люди',
   domestiques:'Домашние животные',
+}
+
+// noms russes des familles (sous-catégories) — utilisés dans la Mind map et l'éditeur d'espèce
+export const SUB_RU = {
+  'Cervidés':'Оленевые', 'Canidés':'Псовые', 'Félidés':'Кошачьи', 'Mustélidés':'Куньи',
+  'Rongeurs':'Грызуны', 'Autres':'Прочие',
+  'Gruidés':'Журавлиные', 'Strigidés':'Совиные', 'Picidés':'Дятловые', 'Accipitridés':'Ястребиные',
+  'Ciconiidés':'Аистовые', 'Corvidés':'Врановые', 'Tétraonidés':'Тетеревиные', 'Paridés':'Синицевые',
+  'Muscicapidés':'Мухоловковые', 'Alcédinidés':'Зимородковые', 'Anatidés':'Утиные', 'Fringillidés':'Вьюрковые',
+  'Fagacées':'Буковые', 'Bétulacées':'Березовые', 'Pinacées':'Сосновые', 'Salicacées':'Ивовые',
+  'Rosacées':'Розоцветные', 'Sapindacées':'Сапиндовые', 'Malvacées':'Мальвовые',
+  'Éléagnacées':'Лоховые', 'Éricacées':'Вересковые', 'Adoxacées':'Адоксовые', 'Cupressacées':'Кипарисовые',
+  'Bolétales':'Болетовые', 'Agaricales':'Агариковые', 'Russulales':'Сыроежковые', 'Cantharellales':'Лисичковые',
+  'Lichens':'Лишайники', 'Mousses':'Мхи',
+  'Résidents':'Резиденты', 'Visiteurs':'Гости',
+  'Chiens':'Собаки', 'Chats':'Кошки',
+  'Lépidoptères':'Чешуекрылые', 'Coléoptères':'Жесткокрылые', 'Odonates':'Стрекозы', 'Hyménoptères':'Перепончатокрылые',
 }
 
 export const UI = {
@@ -98,4 +116,9 @@ export function nameOf(sp, lang) {
 export function catNameOf(cat, lang) {
   if (!cat) return { main: '?', sub: null }
   return lang === 'ru' ? { main: CAT_RU[cat.id] || cat.n, sub: cat.n } : { main: cat.n, sub: CAT_RU[cat.id] || null }
+}
+// nom de famille (sous-catégorie) : id français, sub russe le cas échéant
+export function subNameOf(subId, lang) {
+  if (!subId) return { main: '?', sub: null }
+  return lang === 'ru' ? { main: SUB_RU[subId] || subId, sub: subId } : { main: subId, sub: SUB_RU[subId] || null }
 }

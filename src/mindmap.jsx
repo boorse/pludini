@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { RARITY, isObserved } from './data'
 import { allSpecies, allCats } from './store.js'
 import { gradientFor, gradientForCat } from './gradients.js'
-import { nameOf, catNameOf } from './i18n.js'
+import { nameOf, catNameOf, subNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
 const CARD_W = 92, CARD_H = 68, GAP_X = 14, LEVEL_Y = 118
@@ -343,7 +343,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     return (
       <button onClick={toggle} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
-        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{n.label}</span>
+        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
         <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
         <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3 }}>{obs}/{m.length}</span>
       </button>

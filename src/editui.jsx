@@ -3,6 +3,7 @@ import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies,
          removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry,
          individualCovers, setCover, clearCover } from './store.js'
 import { RARITY, METHODS, SIZE_MULT } from './data'
+import { subNameOf } from './i18n.js'
 import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
 import SatMap from './satmap.jsx'
 import { CENTER } from './territory.js'
@@ -201,7 +202,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
             <button key={sv.id} onClick={()=>{ setSub(sv.id); setNewSub('') }}
               style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
                 border:`1px solid ${!newSub && sub===sv.id?T.clay:T.line}`,
-                background:!newSub && sub===sv.id?'#F0DDD0':'transparent', color:T.soft }}>{sv.id}</button>
+                background:!newSub && sub===sv.id?'#F0DDD0':'transparent', color:T.soft }}>{subNameOf(sv.id, lang).main}</button>
           ))}
         </div>
         <input value={newSub} onChange={ev=>setNewSub(ev.target.value)} style={{ ...input, fontSize:12.5 }}
@@ -302,6 +303,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const [lat, setLat] = useState(editInd?.gps ? String(editInd.gps[0]) : '')
   const [lon, setLon] = useState(editInd?.gps ? String(editInd.gps[1]) : '')
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
   const [mapPick, setMapPick] = useState(false)
   const [stagedFiles, setStagedFiles] = useState([])
   const [blurry, setBlurryLocal] = useState(() => !!editSp?.blurry?.[editInd?.by])
@@ -322,37 +324,46 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
 
   const save = async () => {
     if (!spId) return
-    setBusy(true)
-    const gps = (lat && lon) ? [parseFloat(lat), parseFloat(lon)] : null
+    setBusy(true); setErr(null)
+    try {
+      const gps = (lat && lon) ? [parseFloat(lat), parseFloat(lon)] : null
 
-    if (isEdit) {
-      const fields = { note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'), time, by, method,
-        weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps }
-      await editSighting(spId, editInd.n, fields)
-      const wasNamed = !!namedOf(spId, editInd.n)
-      if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
-      else if (wasNamed) await demote(spId, editInd.n)
-      for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${editInd.n}`, f, '', by)
-      await setBlurry(spId, by, blurry)
-      setBusy(false); onSaved?.(spId); onClose()
-      return
-    }
+      if (isEdit) {
+        const fields = { note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'), time, by, method,
+          weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps }
+        await editSighting(spId, editInd.n, fields)
+        const wasNamed = !!namedOf(spId, editInd.n)
+        if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
+        else if (wasNamed) await demote(spId, editInd.n)
+        for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${editInd.n}`, f, '', by)
+        await setBlurry(spId, by, blurry)
+        onSaved?.(spId); onClose()
+        return
+      }
 
-    const label = named ? (name.trim() || 'Sans nom')
-      : `Passage du ${new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
-    const ind = {
-      n: label, named, note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'),
-      time, by, method, weather: weather.trim(), story: story.trim(),
-      desc: '', b: [], traits: traits.trim(),
-      ...(gps ? { gps } : {}),
+      const label = named ? (name.trim() || 'Sans nom')
+        : `Passage du ${new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
+      const ind = {
+        n: label, named, note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'),
+        time, by, method, weather: weather.trim(), story: story.trim(),
+        desc: '', b: [], traits: traits.trim(),
+        ...(gps ? { gps } : {}),
+      }
+      await addSighting(spId, ind)
+      for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${label}`, f, '', by)
+      // marquer aussi l'espèce comme observée par cette personne
+      const cur = sp?.obs?.[by] || []
+      if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
+      if (blurry) await setBlurry(spId, by, true)
+      onSaved?.(spId); onClose()
+    } catch (e) {
+      // sans ce filet, un échec réseau/upload laissait le bouton bloqué sur
+      // "Enregistrement…" sans aucun message — donnait l'impression que la
+      // photo "ne marchait pas" sans jamais dire pourquoi
+      setErr(e?.message || (lang==='ru'?'Не удалось сохранить. Проверьте соединение и попробуйте снова.'
+        :'Échec de l’enregistrement. Vérifie ta connexion et réessaie.'))
+      setBusy(false)
     }
-    await addSighting(spId, ind)
-    for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${label}`, f, '', by)
-    // marquer aussi l'espèce comme observée par cette personne
-    const cur = sp?.obs?.[by] || []
-    if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
-    if (blurry) await setBlurry(spId, by, true)
-    setBusy(false); onSaved?.(spId); onClose()
   }
 
   return (
@@ -543,6 +554,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         <textarea value={story} onChange={e=>setStory(e.target.value)} rows={4}
           style={{ ...input, fontSize:12.5, resize:'vertical' }}
           placeholder={lang==='ru'?'Что произошло…':'Raconte la rencontre…'} />
+        {err && <div style={{ fontSize:12, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
+          borderRadius:9, padding:'8px 11px', marginTop:11 }}>{err}</div>}
       </div>
       <ValidateBar lang={lang} onCancel={onClose} onSave={save} busy={busy} disabled={!spId} />
       {mapPick && <GpsMapPicker lat={lat} lon={lon} lang={lang}
