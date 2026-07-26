@@ -63,12 +63,6 @@ const CATEGORIES = [
       ru:{ title:'Звёздное небо', text:'По-настоящему тёмное небо у озёр, без единого постороннего огня — телескоп по запросу.' },
       en:{ title:'Starry sky', text:'A truly dark sky by the lakes, with zero light pollution — telescope on request.' } },
   ]},
-  { key:'cueillette', items:[
-    { id:'cueillette', icon:'🧺', seasons:['summer','autumn'],
-      fr:{ title:'Cueillette & saisons', text:'Cèpes, girolles et bolets en forêt ; myrtilles, airelles et canneberges dans les sous-bois et tourbières ; argousier acidulé à l’automne ; tilleul et plantes sauvages comestibles pour la tisane.' },
-      ru:{ title:'Сбор даров природы', text:'Белые грибы, лисички и подосиновики в лесу; черника, брусника и клюква в лесу и на болотах; кислая облепиха осенью; липа и дикорастущие травы для чая.' },
-      en:{ title:'Foraging & seasons', text:'Ceps, chanterelles and boletes in the forest; blueberries, lingonberries and cranberries in the woods and bogs; tart sea buckthorn in autumn; linden blossom and wild herbs for tea.' } },
-  ]},
   { key:'ferme', items:[
     { id:'ferme_fromage', icon:'🐐', seasons:['all'],
       fr:{ title:'Ferme & fromage', text:'Poules, dindes, lapins et chèvres à nourrir et câliner, miel récolté aux côtés des abeilles, et un après-midi à faire son propre fromage de chèvre.' },
