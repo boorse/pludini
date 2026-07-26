@@ -6,14 +6,18 @@ import { nameOf, catNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
 const CARD_W = 92, CARD_H = 68, GAP_X = 14, LEVEL_Y = 118
+const GRID_STEP = 34
+const K_MIN = 0.22, K_MAX = 2.6
 // décalage vertical par colonne — évite une map trop horizontale
 const STAGGER = [0, 46, 16, 62, 30, 74]
 
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
-const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
+const G = { moved: false }
 
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, edit, onAddSpecies }) {
-  const wrapRef = useRef(null)
+  const wrapRef = useRef(null)    // fenêtre visible — scroll natif du téléphone/navigateur
+  const sizerRef = useRef(null)   // dimensionné à width*k / height*k : définit l'étendue défilable
+  const stageRef = useRef(null)   // contenu non mis à l'échelle, agrandi via transform:scale(k)
 
   const toggle = useCallback((id) => {
     setExpanded(prev => {
@@ -103,92 +107,126 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     return { nodes, links, width, height }
   }, [expanded, edit, SPECIES.length, CATS.length])
 
-  const stageRef = useRef(null)
-  const liveRef = useRef({ ...tf })
+  const kRef = useRef(tf.k || 1)   // niveau de zoom réel affiché (muté en direct pendant un pincement)
   const [view, setView] = useState(null)
+
+  // applique le zoom directement au DOM (pas de re-render React pendant un geste) :
+  // agrandit visuellement le contenu (stageRef) et redimensionne réellement le
+  // conteneur (sizerRef) pour que le scroll natif connaisse la bonne étendue
+  const applyScale = useCallback((k) => {
+    if (stageRef.current) stageRef.current.style.transform = `scale(${k})`
+    if (sizerRef.current) {
+      sizerRef.current.style.width = Math.round(width * k) + 'px'
+      sizerRef.current.style.height = Math.round(height * k) + 'px'
+      sizerRef.current.style.backgroundSize = `${GRID_STEP * k}px ${GRID_STEP * k}px`
+    }
+  }, [width, height])
 
   const computeView = useCallback(() => {
     const el = wrapRef.current; if (!el) return
-    const { x, y, k } = liveRef.current
+    const k = kRef.current
     // marge plafonnée : au-delà, à faible zoom (règne déployé avec beaucoup
-    // d'espèces), 400/k explose et annule le culling — tout reste monté et
-    // le geste rame sur mobile
+    // d'espèces), une marge proportionnelle à 1/k exploserait et annulerait
+    // le culling — tout resterait monté et alourdirait le scroll natif
     const M = Math.min(400 / k, 500)
     setView({
-      x0: (-x) / k - M, x1: (-x + el.clientWidth) / k + M,
-      y0: (-y) / k - M, y1: (-y + el.clientHeight) / k + M,
+      x0: el.scrollLeft / k - M, x1: (el.scrollLeft + el.clientWidth) / k + M,
+      y0: el.scrollTop / k - M, y1: (el.scrollTop + el.clientHeight) / k + M,
     })
   }, [])
 
-  const applyLive = () => {
-    const el = stageRef.current
-    if (el) el.style.transform = `translate3d(${liveRef.current.x}px,${liveRef.current.y}px,0) scale(${liveRef.current.k})`
-  }
-  useEffect(() => { liveRef.current = { ...tf }; applyLive(); computeView() }, [tf.x, tf.y, tf.k, computeView])
+  // (re)synchronise l'affichage avec l'état React : montage, retour sur l'écran
+  // (l'onglet Mindmap est démonté/remonté sur mobile), ou après une action de
+  // zoom explicite (boutons, molette, pincement relâché)
+  useEffect(() => {
+    kRef.current = tf.k
+    applyScale(tf.k)
+    const el = wrapRef.current
+    if (el) { el.scrollLeft = tf.x; el.scrollTop = tf.y }
+    computeView()
+  }, [tf.x, tf.y, tf.k, applyScale, computeView])
 
   const fit = useCallback(() => {
     const el = wrapRef.current; if (!el) return
     const vw = el.clientWidth, vh = el.clientHeight
     const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
-    const next = { x: (vw - width * k) / 2, y: 14, k }
-    liveRef.current = next; applyLive(); setTf(next)
-  }, [width, height, setTf])
+    kRef.current = k
+    applyScale(k)
+    el.scrollLeft = 0; el.scrollTop = 0
+    computeView()
+    setTf({ x: 0, y: 0, k })
+  }, [width, height, applyScale, computeView, setTf])
 
   useEffect(() => {
     if (tf.k === 1 && tf.x === 0 && tf.y === 0) fit()
     else computeView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fit, width, height])
 
-  // ── Pointer Events : un seul chemin pour souris, stylet et doigts ──
+  // synchronise le scroll natif vers l'état React une fois le défilement
+  // stabilisé (survit à un démontage), sans jamais re-rendre pendant le
+  // défilement lui-même — seul le navigateur anime le pan, aucun re-render React
+  const scrollSyncTimer = useRef(null)
+  const onScroll = useCallback(() => {
+    clearTimeout(scrollSyncTimer.current)
+    scrollSyncTimer.current = setTimeout(() => {
+      const el = wrapRef.current; if (!el) return
+      computeView()
+      setTf(prev => (prev.x === el.scrollLeft && prev.y === el.scrollTop && prev.k === kRef.current)
+        ? prev : { x: el.scrollLeft, y: el.scrollTop, k: kRef.current })
+    }, 180)
+  }, [computeView, setTf])
+
+  // ── Le pan à un doigt est un scroll natif du navigateur (fiable, fluide,
+  // géré entièrement par l'OS). On ne pilote nous-mêmes que : le clic-glissé
+  // souris (pas d'équivalent natif) et le pincement à deux doigts (idem). ──
   const ptrs = useRef(new Map())
   const gest = useRef(null)
-  const tapRef = useRef(null)   // cible du tap, résolue au pointerdown avant toute capture
 
   const onDown = (e) => {
     const el = wrapRef.current; if (!el) return
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    G.moved = false
-    if (ptrs.current.size === 1) {
-      const btn = e.target.closest?.('button[data-tap-kind]')
-      tapRef.current = btn ? { kind: btn.dataset.tapKind, id: btn.dataset.tapId, cat: btn.dataset.tapCat, sub: btn.dataset.tapSub } : null
-      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, ox:liveRef.current.x, oy:liveRef.current.y }
-      // capture immédiate (comme pour le zoom) : évite la fenêtre de hit-testing
-      // non capturée qui, sur une grille dense (règne déployé), fait perdre le
-      // geste sur mobile dès que le doigt traverse une carte voisine
+    if (e.pointerType === 'mouse' && ptrs.current.size === 1) {
+      G.moved = false
+      gest.current = { mode:'drag', sx:e.clientX, sy:e.clientY, sl:el.scrollLeft, st:el.scrollTop }
       try { el.setPointerCapture?.(e.pointerId) } catch {}
     } else if (ptrs.current.size === 2) {
-      tapRef.current = null
+      G.moved = false
       try { el.setPointerCapture?.(e.pointerId) } catch {}
       const [a,b] = [...ptrs.current.values()]
       const r = el.getBoundingClientRect()
-      gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), k:liveRef.current.k,
-        x:liveRef.current.x, y:liveRef.current.y,
-        mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top, rl:r.left, rt:r.top }
+      gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), k:kRef.current, rl:r.left, rt:r.top }
     }
+    // un seul doigt tactile : on ne fait rien, le navigateur défile nativement
   }
 
   const onMove = (e) => {
     if (!ptrs.current.has(e.pointerId)) return
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const g = gest.current; if (!g) return
+    const el = wrapRef.current; if (!el) return
 
-    if (g.mode === 'pan' && ptrs.current.size === 1) {
+    if (g.mode === 'drag' && ptrs.current.size === 1) {
       const dx = e.clientX - g.sx, dy = e.clientY - g.sy
       if (!G.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) G.moved = true
       if (!G.moved) return
-      liveRef.current = { ...liveRef.current, x: g.ox + dx, y: g.oy + dy }
-      applyLive()
+      el.scrollLeft = g.sl - dx
+      el.scrollTop = g.st - dy
     } else if (g.mode === 'zoom' && ptrs.current.size >= 2) {
       const [a,b] = [...ptrs.current.values()]
       const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
-      const k2 = Math.min(2.6, Math.max(0.22, g.k * ratio))
-      const r = k2 / g.k
-      // ancrage sur le milieu ACTUEL des deux doigts (pas celui du début du
-      // geste) : sinon le zoom dérive dès que la main bouge en pinçant, ce
-      // qui donnait l'impression que le pincement "ne marchait pas vraiment"
+      const k2 = Math.min(K_MAX, Math.max(K_MIN, g.k * ratio))
+      // ancrage sur le milieu ACTUEL des deux doigts (recalculé à chaque
+      // déplacement) : sinon le zoom dérive dès que la main bouge en pinçant
       const curMx = (a.x+b.x)/2 - g.rl, curMy = (a.y+b.y)/2 - g.rt
-      liveRef.current = { k:k2, x: curMx - (g.mx - g.x) * r, y: curMy - (g.my - g.y) * r }
-      applyLive(); G.moved = true
+      const curK = kRef.current
+      const worldX = (el.scrollLeft + curMx) / curK
+      const worldY = (el.scrollTop + curMy) / curK
+      kRef.current = k2
+      applyScale(k2)
+      el.scrollLeft = worldX * k2 - curMx
+      el.scrollTop = worldY * k2 - curMy
+      G.moved = true
     }
   }
 
@@ -196,25 +234,18 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     try { wrapRef.current?.releasePointerCapture?.(e.pointerId) } catch {}
     ptrs.current.delete(e.pointerId)
     if (ptrs.current.size === 0) {
+      const wasGesture = !!gest.current
       gest.current = null
-      // ne toucher à React que si l'on a vraiment bougé :
-      // sinon le re-rendu détruit le bouton avant que le clic n'arrive
-      if (G.moved) {
-        setTf({ ...liveRef.current }); computeView()
-      } else if (e.type === 'pointerup' && tapRef.current) {
-        // dispatch explicite : la capture immédiate ci-dessus rend le clic natif
-        // ambigu sur mobile, donc on ne compte plus dessus pour agir
-        const t = tapRef.current
-        if (t.kind === 'toggle') toggle(t.id)
-        else if (t.kind === 'sp') onSelectSpecies(t.id)
-        else if (t.kind === 'add') onAddSpecies?.(t.cat, t.sub)
-        G.tapDispatched = true
+      if (wasGesture && G.moved) {
+        const el = wrapRef.current
+        if (el) setTf({ x: el.scrollLeft, y: el.scrollTop, k: kRef.current })
+        computeView()
       }
-      tapRef.current = null
-      setTimeout(()=>{ G.moved = false; G.tapDispatched = false }, 0)
+      setTimeout(()=>{ G.moved = false }, 0)
     } else if (ptrs.current.size === 1) {
-      const [p] = [...ptrs.current.values()]
-      gest.current = { mode:'pan', sx:p.x, sy:p.y, ox:liveRef.current.x, oy:liveRef.current.y }
+      // il reste un doigt après un pincement à deux : on arrête le geste
+      // custom, ce doigt redevient un scroll natif normal
+      gest.current = null
     }
   }
 
@@ -223,23 +254,27 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const el = wrapRef.current; if (!el) return
     const r = el.getBoundingClientRect()
     const mx = e.clientX - r.left, my = e.clientY - r.top
-    const cur = liveRef.current
-    const k2 = Math.min(2.6, Math.max(0.22, cur.k * (1 - e.deltaY * 0.0014)))
-    const ratio = k2 / cur.k
-    liveRef.current = { k:k2, x: mx - (mx - cur.x) * ratio, y: my - (my - cur.y) * ratio }
-    applyLive()
+    const curK = kRef.current
+    const k2 = Math.min(K_MAX, Math.max(K_MIN, curK * (1 - e.deltaY * 0.0014)))
+    const worldX = (el.scrollLeft + mx) / curK
+    const worldY = (el.scrollTop + my) / curK
+    kRef.current = k2
+    applyScale(k2)
+    el.scrollLeft = worldX * k2 - mx
+    el.scrollTop = worldY * k2 - my
     clearTimeout(onWheel._t)
-    onWheel._t = setTimeout(()=>setTf({ ...liveRef.current }), 140)
-  }, [setTf])
+    onWheel._t = setTimeout(() => {
+      computeView()
+      setTf({ x: el.scrollLeft, y: el.scrollTop, k: k2 })
+    }, 140)
+  }, [applyScale, computeView, setTf])
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
     el.addEventListener('wheel', onWheel, { passive: false })
     // Safari (iOS) déclenche son propre zoom de page au pincement via des
-    // événements "gesture*" indépendants des pointer events — touch-action:none
-    // ne les bloque pas toujours ; sans ce preventDefault, le pincement zoome
-    // la page entière en même temps que notre geste JS, et donne l'impression
-    // que le pincement sur la carte "ne marche pas vraiment"
+    // événements "gesture*" indépendants des pointer events — on les bloque
+    // pour que seul notre pincement (géré ci-dessus) ne s'applique
     const preventGesture = (e) => e.preventDefault()
     el.addEventListener('gesturestart', preventGesture)
     el.addEventListener('gesturechange', preventGesture)
@@ -254,14 +289,19 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
 
   const zoomBy = (f) => {
     const el = wrapRef.current; if (!el) return
-    const cx2 = el.clientWidth/2, cy2 = el.clientHeight/2
-    const cur = liveRef.current
-    const k2 = Math.min(2.6, Math.max(0.22, cur.k * f)), r = k2/cur.k
-    liveRef.current = { k:k2, x: cx2-(cx2-cur.x)*r, y: cy2-(cy2-cur.y)*r }
-    applyLive(); setTf({ ...liveRef.current })
+    const cx = el.clientWidth/2, cy = el.clientHeight/2
+    const curK = kRef.current
+    const k2 = Math.min(K_MAX, Math.max(K_MIN, curK * f))
+    const worldX = (el.scrollLeft + cx) / curK
+    const worldY = (el.scrollTop + cy) / curK
+    kRef.current = k2
+    applyScale(k2)
+    el.scrollLeft = worldX * k2 - cx
+    el.scrollTop = worldY * k2 - cy
+    computeView()
+    setTf({ x: el.scrollLeft, y: el.scrollTop, k: k2 })
   }
 
-  const gridStep = 34
   return (
     <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
       <div style={{ position:'absolute', top:9, right:10, zIndex:5, display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
@@ -278,20 +318,22 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       <div ref={wrapRef}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
         onPointerCancel={onUp} onPointerLeave={onUp} onLostPointerCapture={onUp}
+        onScroll={onScroll}
         onDragStart={e=>e.preventDefault()}
-        style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative',
-          cursor:'grab', touchAction:'none', userSelect:'none', WebkitUserSelect:'none',
+        style={{ flex:1, minHeight:300, overflow:'auto', position:'relative',
+          cursor:'grab', touchAction:'pan-x pan-y', WebkitOverflowScrolling:'touch',
+          userSelect:'none', WebkitUserSelect:'none', backgroundColor:'#E3DAC5' }}>
+        <div ref={sizerRef} style={{ position:'relative',
           backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
-          backgroundSize:`${gridStep*tf.k}px ${gridStep*tf.k}px`,
-          backgroundPosition:`${tf.x}px ${tf.y}px`,
-          backgroundColor:'#E3DAC5' }}>
-        <div ref={stageRef} style={{ position:'absolute', transformOrigin:'0 0',
-          transform:`translate3d(${tf.x}px,${tf.y}px,0) scale(${tf.k})`, willChange:'transform' }}>
-          <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
-            view={view}
-            expanded={expanded} onToggle={(id)=>{ if(!G.moved && !G.tapDispatched) toggle(id) }}
-            onSp={(sp)=>{ if(!G.moved && !G.tapDispatched) onSelectSpecies(sp.id) }}
-            onAdd={(c,sv)=>{ if(!G.moved && !G.tapDispatched) onAddSpecies?.(c,sv) }} />
+          backgroundSize:`${GRID_STEP*tf.k}px ${GRID_STEP*tf.k}px` }}>
+          <div ref={stageRef} style={{ position:'absolute', top:0, left:0, transformOrigin:'0 0',
+            transform:`scale(${tf.k})`, willChange:'transform' }}>
+            <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
+              view={view}
+              expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+              onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
+              onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+          </div>
         </div>
       </div>
 
@@ -355,7 +397,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   }
 
   if (n.kind === 'root') return (
-    <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
+    <button onClick={toggle} style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
       <span style={{ position:'absolute', top:7, left:9, fontSize:19 }}>{n.e}</span>
       <span className="serif" style={{ fontSize:14, fontWeight:900, color:'#F2EEE2' }}>{n.label}</span>
     </button>
@@ -365,7 +407,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     const all = allSpecies().filter(s=>s.cat===n.cat.id)
     const obs = all.filter(isObserved).length
     return (
-      <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, background:gradientForCat(n.cat.id) }}>
+      <button onClick={toggle} style={{ ...base, background:gradientForCat(n.cat.id) }}>
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.62), transparent 58%)' }} />
         <span style={{ position:'absolute', top:6, left:8, fontSize:17 }}>{n.e}</span>
         {hasKids && <Chev open={open} />}
@@ -380,7 +422,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     const m = n.members || []
     const obs = m.filter(isObserved).length
     return (
-      <button onClick={toggle} data-tap-kind="toggle" data-tap-id={n.id} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
+      <button onClick={toggle} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
         <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{n.label}</span>
         <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
@@ -390,7 +432,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   }
 
   if (n.kind === 'add') return (
-    <button onClick={onSp} data-tap-kind="add" data-tap-cat={n.cat} data-tap-sub={n.sub} style={{ ...base, background:'transparent', border:'2px dashed #B5602F',
+    <button onClick={onSp} style={{ ...base, background:'transparent', border:'2px dashed #B5602F',
       alignItems:'center', justifyContent:'center', boxShadow:'none' }}>
       <span style={{ fontSize:20, color:'#B5602F', lineHeight:1 }}>+</span>
       <span style={{ fontSize:8, color:'#B5602F', marginTop:3, fontWeight:600 }}>
@@ -401,7 +443,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
 
   const sp = n.sp, o = isObserved(sp), r = RARITY[sp.r] || RARITY.commun
   return (
-    <button onClick={onSp} data-tap-kind="sp" data-tap-id={sp.id} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
+    <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
       {o
         ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} plain />
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
