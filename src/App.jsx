@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
@@ -276,6 +276,12 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem('pludini_screen', screen) } catch {} }, [screen])
   useEffect(() => { try { localStorage.setItem('pludini_edit', edit ? '1' : '0') } catch {} }, [edit])
 
+  // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
+  // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
+  const scrollPos = useRef({})
+  const goScreen = (s) => { scrollPos.current[screen] = window.scrollY; setScreen(s) }
+  useEffect(() => { window.scrollTo(0, scrollPos.current[screen] || 0) }, [screen])
+
   const SPECIES = allSpecies()
   const CATS = allCats()
   const PLAYERS = allPlayers().filter(p=>!p.demo)
@@ -294,7 +300,7 @@ export default function App() {
   if (screen === 'lang') return <LangPicker onPick={(c)=>{ setLang(c); setScreen('landing') }} />
   if (screen === 'landing') return (
     <>
-      <Landing lang={lang} setLang={setLang} go={setScreen} onQuiz={()=>showToast(t.quizSoon)}
+      <Landing lang={lang} setLang={setLang} go={goScreen} onQuiz={()=>showToast(t.quizSoon)}
         edit={edit} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
         onEditCard={(c)=>setPhotoTarget({ target:`site:card:${c.k}`, label:c.title })} />
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
@@ -312,12 +318,12 @@ export default function App() {
       {toast && <Toast msg={toast} />}
     </>
   )
-  if (screen === 'experience') return <Experience wide={wide} onBack={()=>setScreen('landing')} />
-  if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>setScreen('landing')} edit={edit} /></Shell>
-  if (screen === 'territory') return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Territory wide={wide} lang={lang} edit={edit} onBack={()=>setScreen('landing')} /></Shell>
+  if (screen === 'experience') return <Experience wide={wide} onBack={()=>goScreen('landing')} />
+  if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} /></Shell>
+  if (screen === 'territory') return <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}><Territory wide={wide} lang={lang} edit={edit} onBack={()=>goScreen('landing')} /></Shell>
   if (screen === 'gallery')   return (
-    <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}>
-      <Gallery wide={wide} lang={lang} onBack={()=>setScreen('landing')} />
+    <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}>
+      <Gallery wide={wide} lang={lang} onBack={()=>goScreen('landing')} />
     </Shell>
   )
 
@@ -1084,7 +1090,7 @@ export default function App() {
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {/* HEADER */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: wide?'12px 24px':'11px 16px', borderBottom:`1px solid ${T.line}`, background:T.surface, position:'sticky', top:0, zIndex:30 }}>
-        <button onClick={()=>setScreen('landing')} className="serif" style={{ fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:7 }}>
+        <button onClick={()=>goScreen('landing')} className="serif" style={{ fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:7 }}>
           <BobberIcon size={19} style={{ marginRight: -2 }} />Pludini
         </button>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
