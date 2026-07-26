@@ -163,7 +163,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       const r = el.getBoundingClientRect()
       gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), k:liveRef.current.k,
         x:liveRef.current.x, y:liveRef.current.y,
-        mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top }
+        mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top, rl:r.left, rt:r.top }
     }
   }
 
@@ -183,7 +183,11 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
       const k2 = Math.min(2.6, Math.max(0.22, g.k * ratio))
       const r = k2 / g.k
-      liveRef.current = { k:k2, x: g.mx - (g.mx - g.x) * r, y: g.my - (g.my - g.y) * r }
+      // ancrage sur le milieu ACTUEL des deux doigts (pas celui du début du
+      // geste) : sinon le zoom dérive dès que la main bouge en pinçant, ce
+      // qui donnait l'impression que le pincement "ne marchait pas vraiment"
+      const curMx = (a.x+b.x)/2 - g.rl, curMy = (a.y+b.y)/2 - g.rt
+      liveRef.current = { k:k2, x: curMx - (g.mx - g.x) * r, y: curMy - (g.my - g.y) * r }
       applyLive(); G.moved = true
     }
   }
@@ -231,7 +235,21 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    // Safari (iOS) déclenche son propre zoom de page au pincement via des
+    // événements "gesture*" indépendants des pointer events — touch-action:none
+    // ne les bloque pas toujours ; sans ce preventDefault, le pincement zoome
+    // la page entière en même temps que notre geste JS, et donne l'impression
+    // que le pincement sur la carte "ne marche pas vraiment"
+    const preventGesture = (e) => e.preventDefault()
+    el.addEventListener('gesturestart', preventGesture)
+    el.addEventListener('gesturechange', preventGesture)
+    el.addEventListener('gestureend', preventGesture)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', preventGesture)
+      el.removeEventListener('gesturechange', preventGesture)
+      el.removeEventListener('gestureend', preventGesture)
+    }
   }, [onWheel])
 
   const zoomBy = (f) => {
