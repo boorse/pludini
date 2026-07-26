@@ -41,6 +41,33 @@ function useWide() {
   return wide
 }
 
+// ── Installation sur l'écran d'accueil (PWA) : capte l'invite native quand le navigateur la propose ──
+function useInstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [installed, setInstalled] = useState(() => {
+    try { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true } catch { return false }
+  })
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e) }
+    const onInstalled = () => { setInstalled(true); setDeferredPrompt(null) }
+    window.addEventListener('beforeinstallprompt', onPrompt)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled) }
+  }, [])
+  const install = async () => {
+    if (!deferredPrompt) return false
+    try {
+      await deferredPrompt.prompt()
+      await deferredPrompt.userChoice
+      setDeferredPrompt(null)
+      return true
+    } catch {
+      return false
+    }
+  }
+  return { deferredPrompt, installed, install }
+}
+
 // ══════════════════ CHOIX DE LANGUE ══════════════════
 function LangPicker({ onPick }) {
   return (
@@ -97,6 +124,13 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
   const SPECIES = allSpecies(), CATS = allCats(), PLAYERS = allPlayers().filter(p=>!p.demo)
   const t = UI[lang]
   const obs = SPECIES.filter(isObserved).length
+  const { deferredPrompt, installed, install } = useInstallPrompt()
+  const [installHint, setInstallHint] = useState(false)
+  const isIOS = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent)
+  const onInstallClick = async () => {
+    if (deferredPrompt) { const did = await install(); if (!did) setInstallHint(true) }
+    else setInstallHint(true)
+  }
   const cards = [
     { k:'app',       tag:t.consult, title:t.pokedex,   sub: lang==='ru'?'Карта живого, матрица, очки и значки':'Map du vivant, matrice, scores et badges' },
     { k:'territory', tag:t.locate,  title:t.territory, sub: lang==='ru'?'Камеры, норы, грибные места, проекты':'Caméras, terriers, coins à champignons, projets' },
@@ -196,6 +230,56 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
             {lang==='ru'?'(скоро)':'(bientôt disponible)'}
           </div>
         </div>
+      </div>
+
+      {!installed && (
+        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', justifyContent:'space-between',
+          margin: wide?'0 40px 40px':'0 16px 30px', padding: wide?'16px 22px':'14px 16px',
+          borderRadius:16, border:'1px solid #D3C7AE', background:'#E6DDC8' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <i className="ti ti-device-mobile-plus" style={{ fontSize:20, color:'#B5602F' }} aria-hidden="true" />
+            <div style={{ fontSize:12.5, color:'#6B6357', lineHeight:1.5 }}>
+              {lang==='ru'?'Добавьте Pludini на главный экран телефона.':'Ajoute Pludini à l’écran d’accueil de ton téléphone.'}
+            </div>
+          </div>
+          <button onClick={onInstallClick} className="serif" style={{ flexShrink:0, padding:'9px 16px', borderRadius:12,
+            background:'#B5602F', color:'#fff', fontSize:12.5, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+            <i className="ti ti-download" style={{ fontSize:14 }} aria-hidden="true" />
+            {lang==='ru'?'Установить':'Installer l’app'}
+          </button>
+        </div>
+      )}
+      {installHint && <InstallHint lang={lang} isIOS={isIOS} onClose={()=>setInstallHint(false)} />}
+    </div>
+  )
+}
+
+function InstallHint({ lang, isIOS, onClose }) {
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', display:'flex',
+      alignItems:'center', justifyContent:'center', zIndex:80, padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#EDE7D8', borderRadius:18, padding:22,
+        width:'100%', maxWidth:360, border:'1px solid #D3C7AE' }}>
+        <div className="serif" style={{ fontSize:17, fontWeight:900, color:'#2B2620', marginBottom:10 }}>
+          {lang==='ru'?'Установить на главный экран':'Ajouter à l’écran d’accueil'}
+        </div>
+        {isIOS ? (
+          <div style={{ fontSize:13, color:'#6B6357', lineHeight:1.7 }}>
+            {lang==='ru'
+              ? <>Нажмите <i className="ti ti-upload" style={{ fontSize:14 }} aria-hidden="true" /> «Поделиться» внизу экрана Safari, затем «На экран Домой».</>
+              : <>Appuie sur <i className="ti ti-upload" style={{ fontSize:14 }} aria-hidden="true" /> « Partager » en bas de Safari, puis « Sur l’écran d’accueil ».</>}
+          </div>
+        ) : (
+          <div style={{ fontSize:13, color:'#6B6357', lineHeight:1.7 }}>
+            {lang==='ru'
+              ? 'Откройте меню браузера (⋮) и выберите «Установить приложение» или «Добавить на главный экран».'
+              : 'Ouvre le menu de ton navigateur (⋮) et choisis « Installer l’application » ou « Ajouter à l’écran d’accueil ».'}
+          </div>
+        )}
+        <button onClick={onClose} className="serif" style={{ marginTop:16, width:'100%', padding:'11px', borderRadius:12,
+          background:'#B5602F', color:'#fff', fontSize:13.5, fontWeight:700 }}>
+          {lang==='ru'?'Понятно':'Compris'}
+        </button>
       </div>
     </div>
   )
