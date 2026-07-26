@@ -539,6 +539,7 @@ export default function App() {
     const allM = new Set(Object.values(sp.obs).flat())
     const baseP = Math.round(r.p * SIZE_MULT[sp.sz])
     const seasons = sp.saisons
+    const isPerson = sp.cat === 'humains' || sp.cat === 'domestiques'
     const tabs = [['obs',t.obs],['infos',t.infos],...(seasons?[['saisons',t.seasons]]:[])]
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
@@ -560,22 +561,38 @@ export default function App() {
               <div className="serif" style={{ fontSize:26, fontWeight:900, color:'#F2EEE2', lineHeight:1.05 }}>{nameOf(sp,lang).main}</div>
               {nameOf(sp,lang).sub && <div style={{ fontSize:13, color:'rgba(242,238,226,.5)', marginTop:1 }}>{nameOf(sp,lang).sub}</div>}
               <div style={{ fontSize:12, color:'rgba(242,238,226,.78)', fontStyle:'italic', marginTop:2 }}>{sp.lat}</div>
-              <div style={{ display:'flex', gap:5, marginTop:8, flexWrap:'wrap' }}>
+              {!isPerson && <div style={{ display:'flex', gap:5, marginTop:8, flexWrap:'wrap' }}>
                 <span style={{ fontSize:10.5, fontWeight:600, padding:'3px 9px', borderRadius:12, background:r.c, color:'#fff' }}>{r.l}</span>
                 {[...allM].map(m => (METHODS[m]||METHODS.eye) && <span key={m} style={{ fontSize:10.5, padding:'3px 9px', borderRadius:12, background:METHODS[m].c, color:METHODS[m].on }}>{METHODS[m].l}</span>)}
                 {!o && <span style={{ fontSize:10.5, padding:'3px 9px', borderRadius:12, background:'rgba(255,255,255,.22)', color:'#F2EEE2' }}>{t.notObserved}</span>}
-              </div>
+              </div>}
             </div>
           </div>
           <div style={{ padding:'14px 18px 22px' }}>
-            <div className="serif" style={{ fontSize:15, fontWeight:600, color:T.clay, marginBottom:12 }}>{baseP} pts base · max {baseP*3+50} pts</div>
-            <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:14 }}>
+            {isPerson && <>
+              {[['Alimentation',sp.alim],['Habitat & territoire',sp.hab],['Danger',sp.dng]].map(([tt,v])=>(
+                <div key={tt} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
+                  <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{tt}</div>
+                  <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
+                </div>
+              ))}
+              {sp.anecdote && (
+                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4 }}>
+                  <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
+                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />Le saviez-vous
+                  </div>
+                  <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>
+                </div>
+              )}
+            </>}
+            {!isPerson && <div className="serif" style={{ fontSize:15, fontWeight:600, color:T.clay, marginBottom:12 }}>{baseP} pts base · max {baseP*3+50} pts</div>}
+            {!isPerson && <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:14 }}>
               {tabs.map(([id,l])=>(
                 <button key={id} onClick={()=>setDetTab(id)} style={{ fontSize:12.5, padding:'8px 14px', color:detTab===id?T.clayDark:T.soft, borderBottom:`2px solid ${detTab===id?T.clay:'transparent'}`, marginBottom:-1, fontWeight:detTab===id?600:400 }}>{l}</button>
               ))}
-            </div>
+            </div>}
 
-            {detTab==='obs' && <>
+            {!isPerson && detTab==='obs' && <>
               <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
                 {edit && <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
@@ -656,7 +673,7 @@ export default function App() {
               )}
             </>}
 
-            {detTab==='infos' && <>
+            {!isPerson && detTab==='infos' && <>
               {[['Alimentation',sp.alim],['Habitat & territoire',sp.hab],['Danger',sp.dng]].map(([t,v])=>(
                 <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
@@ -677,7 +694,7 @@ export default function App() {
               </div>
             </>}
 
-            {detTab==='saisons' && seasons && (
+            {!isPerson && detTab==='saisons' && seasons && (
               <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:9 }}>
                 {[['printemps','Printemps','🌱','#8FA96B'],['ete','Été','☀️','#C0913E'],['automne','Automne','🍂','#B5602F'],['hiver','Hiver','❄️','#7C8B95']].map(([k,l,e,c])=>(
                   <div key={k} style={{ borderRadius:12, overflow:'hidden', border:`1px solid ${T.line}` }}>
