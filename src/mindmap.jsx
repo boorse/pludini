@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { TransformWrapper, TransformComponent, Virtualize, useControls, useTransformEffect } from 'react-zoom-pan-pinch'
 import { RARITY, isObserved } from './data'
 import { allSpecies, allCats } from './store.js'
 import { gradientFor, gradientForCat } from './gradients.js'
@@ -11,14 +12,7 @@ const K_MIN = 0.22, K_MAX = 2.6
 // décalage vertical par colonne — évite une map trop horizontale
 const STAGGER = [0, 46, 16, 62, 30, 74]
 
-// état du geste au niveau module : ne disparaît pas si le composant se reconstruit
-const G = { moved: false }
-
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, edit, onAddSpecies }) {
-  const wrapRef = useRef(null)    // fenêtre visible — scroll natif du téléphone/navigateur
-  const sizerRef = useRef(null)   // dimensionné à width*k / height*k : définit l'étendue défilable
-  const stageRef = useRef(null)   // contenu non mis à l'échelle, agrandi via transform:scale(k)
-
   const toggle = useCallback((id) => {
     setExpanded(prev => {
       const n = new Set(prev)
@@ -86,7 +80,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           c.y = n.y + CARD_H / 2 + 44 + row * rowH
           c.units = 1
           nodes.push(c)
-          links.push({ x1: n.x, y1: n.y + CARD_H / 2, x2: c.x, y2: c.y - CARD_H / 2, depth, leaf: true })
+          links.push({ x1: n.x, y1: n.y + CARD_H / 2, x2: c.x, y2: c.y - CARD_H / 2 })
         })
         return
       }
@@ -107,245 +101,78 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     return { nodes, links, width, height }
   }, [expanded, edit, SPECIES.length, CATS.length])
 
-  const kRef = useRef(tf.k || 1)   // niveau de zoom réel affiché (muté en direct pendant un pincement)
-  const [view, setView] = useState(null)
-
-  // applique le zoom directement au DOM (pas de re-render React pendant un geste) :
-  // agrandit visuellement le contenu (stageRef) et redimensionne réellement le
-  // conteneur (sizerRef) pour que le scroll natif connaisse la bonne étendue
-  const applyScale = useCallback((k) => {
-    if (stageRef.current) stageRef.current.style.transform = `scale(${k})`
-    if (sizerRef.current) {
-      sizerRef.current.style.width = Math.round(width * k) + 'px'
-      sizerRef.current.style.height = Math.round(height * k) + 'px'
-      sizerRef.current.style.backgroundSize = `${GRID_STEP * k}px ${GRID_STEP * k}px`
-    }
-  }, [width, height])
-
-  const computeView = useCallback(() => {
-    const el = wrapRef.current; if (!el) return
-    const k = kRef.current
-    // marge plafonnée : au-delà, à faible zoom (règne déployé avec beaucoup
-    // d'espèces), une marge proportionnelle à 1/k exploserait et annulerait
-    // le culling — tout resterait monté et alourdirait le scroll natif
-    const M = Math.min(400 / k, 500)
-    setView({
-      x0: el.scrollLeft / k - M, x1: (el.scrollLeft + el.clientWidth) / k + M,
-      y0: el.scrollTop / k - M, y1: (el.scrollTop + el.clientHeight) / k + M,
-    })
-  }, [])
-
-  // (re)synchronise l'affichage avec l'état React : montage, retour sur l'écran
-  // (l'onglet Mindmap est démonté/remonté sur mobile), ou après une action de
-  // zoom explicite (boutons, molette, pincement relâché)
-  useEffect(() => {
-    kRef.current = tf.k
-    applyScale(tf.k)
-    const el = wrapRef.current
-    if (el) { el.scrollLeft = tf.x; el.scrollTop = tf.y }
-    computeView()
-  }, [tf.x, tf.y, tf.k, applyScale, computeView])
-
-  const fit = useCallback(() => {
-    const el = wrapRef.current; if (!el) return
-    const vw = el.clientWidth, vh = el.clientHeight
-    const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
-    kRef.current = k
-    applyScale(k)
-    el.scrollLeft = 0; el.scrollTop = 0
-    computeView()
-    setTf({ x: 0, y: 0, k })
-  }, [width, height, applyScale, computeView, setTf])
-
-  useEffect(() => {
-    if (tf.k === 1 && tf.x === 0 && tf.y === 0) fit()
-    else computeView()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fit, width, height])
-
-  // pendant le défilement : le pan lui-même est 100% natif (le navigateur
-  // l'anime seul, sur son propre thread) — recalculer le culling à chaque
-  // frame ne le ralentit pas, contrairement à l'ancien pan piloté par React.
-  // On limite quand même à une fois par frame (rAF) pour rester léger.
-  const scrollRaf = useRef(null)
-  const scrollSyncTimer = useRef(null)
-  const onScroll = useCallback(() => {
-    if (!scrollRaf.current) {
-      scrollRaf.current = requestAnimationFrame(() => { scrollRaf.current = null; computeView() })
-    }
-    // l'état React (tf), lui, n'a besoin d'être à jour qu'une fois le
-    // défilement stabilisé — seulement utile pour survivre à un démontage
-    clearTimeout(scrollSyncTimer.current)
-    scrollSyncTimer.current = setTimeout(() => {
-      const el = wrapRef.current; if (!el) return
-      setTf(prev => (prev.x === el.scrollLeft && prev.y === el.scrollTop && prev.k === kRef.current)
-        ? prev : { x: el.scrollLeft, y: el.scrollTop, k: kRef.current })
-    }, 250)
-  }, [computeView, setTf])
-
-  // ── Le pan à un doigt est un scroll natif du navigateur (fiable, fluide,
-  // géré entièrement par l'OS). On ne pilote nous-mêmes que : le clic-glissé
-  // souris (pas d'équivalent natif) et le pincement à deux doigts (idem). ──
-  const ptrs = useRef(new Map())
-  const gest = useRef(null)
-
-  const onDown = (e) => {
-    const el = wrapRef.current; if (!el) return
-    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    if (e.pointerType === 'mouse' && ptrs.current.size === 1) {
-      G.moved = false
-      gest.current = { mode:'drag', sx:e.clientX, sy:e.clientY, sl:el.scrollLeft, st:el.scrollTop }
-      try { el.setPointerCapture?.(e.pointerId) } catch {}
-    } else if (ptrs.current.size === 2) {
-      G.moved = false
-      try { el.setPointerCapture?.(e.pointerId) } catch {}
-      const [a,b] = [...ptrs.current.values()]
-      const r = el.getBoundingClientRect()
-      gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), k:kRef.current, rl:r.left, rt:r.top }
-    }
-    // un seul doigt tactile : on ne fait rien, le navigateur défile nativement
-  }
-
-  const onMove = (e) => {
-    if (!ptrs.current.has(e.pointerId)) return
-    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    const g = gest.current; if (!g) return
-    const el = wrapRef.current; if (!el) return
-
-    if (g.mode === 'drag' && ptrs.current.size === 1) {
-      const dx = e.clientX - g.sx, dy = e.clientY - g.sy
-      if (!G.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) G.moved = true
-      if (!G.moved) return
-      el.scrollLeft = g.sl - dx
-      el.scrollTop = g.st - dy
-    } else if (g.mode === 'zoom' && ptrs.current.size >= 2) {
-      const [a,b] = [...ptrs.current.values()]
-      const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
-      const k2 = Math.min(K_MAX, Math.max(K_MIN, g.k * ratio))
-      // ancrage sur le milieu ACTUEL des deux doigts (recalculé à chaque
-      // déplacement) : sinon le zoom dérive dès que la main bouge en pinçant
-      const curMx = (a.x+b.x)/2 - g.rl, curMy = (a.y+b.y)/2 - g.rt
-      const curK = kRef.current
-      const worldX = (el.scrollLeft + curMx) / curK
-      const worldY = (el.scrollTop + curMy) / curK
-      kRef.current = k2
-      applyScale(k2)
-      el.scrollLeft = worldX * k2 - curMx
-      el.scrollTop = worldY * k2 - curMy
-      G.moved = true
-    }
-  }
-
-  const onUp = (e) => {
-    try { wrapRef.current?.releasePointerCapture?.(e.pointerId) } catch {}
-    ptrs.current.delete(e.pointerId)
-    if (ptrs.current.size === 0) {
-      const wasGesture = !!gest.current
-      gest.current = null
-      if (wasGesture && G.moved) {
-        const el = wrapRef.current
-        if (el) setTf({ x: el.scrollLeft, y: el.scrollTop, k: kRef.current })
-        computeView()
-      }
-      setTimeout(()=>{ G.moved = false }, 0)
-    } else if (ptrs.current.size === 1) {
-      // il reste un doigt après un pincement à deux : on arrête le geste
-      // custom, ce doigt redevient un scroll natif normal
-      gest.current = null
-    }
-  }
-
-  const onWheel = useCallback((e) => {
-    e.preventDefault()
-    const el = wrapRef.current; if (!el) return
-    const r = el.getBoundingClientRect()
-    const mx = e.clientX - r.left, my = e.clientY - r.top
-    const curK = kRef.current
-    const k2 = Math.min(K_MAX, Math.max(K_MIN, curK * (1 - e.deltaY * 0.0014)))
-    const worldX = (el.scrollLeft + mx) / curK
-    const worldY = (el.scrollTop + my) / curK
-    kRef.current = k2
-    applyScale(k2)
-    el.scrollLeft = worldX * k2 - mx
-    el.scrollTop = worldY * k2 - my
-    clearTimeout(onWheel._t)
-    onWheel._t = setTimeout(() => {
-      computeView()
-      setTf({ x: el.scrollLeft, y: el.scrollTop, k: k2 })
-    }, 140)
-  }, [applyScale, computeView, setTf])
-
-  useEffect(() => {
-    const el = wrapRef.current; if (!el) return
-    el.addEventListener('wheel', onWheel, { passive: false })
-    // Safari (iOS) déclenche son propre zoom de page au pincement via des
-    // événements "gesture*" indépendants des pointer events — on les bloque
-    // pour que seul notre pincement (géré ci-dessus) ne s'applique
-    const preventGesture = (e) => e.preventDefault()
-    el.addEventListener('gesturestart', preventGesture)
-    el.addEventListener('gesturechange', preventGesture)
-    el.addEventListener('gestureend', preventGesture)
-    return () => {
-      el.removeEventListener('wheel', onWheel)
-      el.removeEventListener('gesturestart', preventGesture)
-      el.removeEventListener('gesturechange', preventGesture)
-      el.removeEventListener('gestureend', preventGesture)
-    }
-  }, [onWheel])
-
-  const zoomBy = (f) => {
-    const el = wrapRef.current; if (!el) return
-    const cx = el.clientWidth/2, cy = el.clientHeight/2
-    const curK = kRef.current
-    const k2 = Math.min(K_MAX, Math.max(K_MIN, curK * f))
-    const worldX = (el.scrollLeft + cx) / curK
-    const worldY = (el.scrollTop + cy) / curK
-    kRef.current = k2
-    applyScale(k2)
-    el.scrollLeft = worldX * k2 - cx
-    el.scrollTop = worldY * k2 - cy
-    computeView()
-    setTf({ x: el.scrollLeft, y: el.scrollTop, k: k2 })
-  }
-
   return (
     <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
+      <TransformWrapper
+        initialScale={tf.k || 1} initialPositionX={tf.x || 0} initialPositionY={tf.y || 0}
+        minScale={K_MIN} maxScale={K_MAX} limitToBounds
+        wheel={{ step: 0.15 }} doubleClick={{ disabled: true }}
+      >
+        <MapView width={width} height={height} nodes={nodes} links={links} lang={lang}
+          expanded={expanded} toggle={toggle} onSelectSpecies={onSelectSpecies} onAddSpecies={onAddSpecies}
+          setExpanded={setExpanded} tf={tf} setTf={setTf} />
+      </TransformWrapper>
+    </div>
+  )
+}
+
+// composant interne : rendu sous <TransformWrapper>, seul endroit où les hooks
+// useControls/useTransformEffect de la librairie sont utilisables
+function MapView({ width, height, nodes, links, lang, expanded, toggle, onSelectSpecies, onAddSpecies, setExpanded, tf, setTf }) {
+  const { zoomIn, zoomOut, setTransform, instance } = useControls()
+
+  useTransformEffect(({ state }) => {
+    setTf({ x: state.positionX, y: state.positionY, k: state.scale })
+  })
+
+  const fit = useCallback((animationTime = 0) => {
+    const el = instance?.wrapperComponent
+    if (!el) return
+    const vw = el.clientWidth, vh = el.clientHeight
+    const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
+    setTransform((vw - width * k) / 2, 14, k, animationTime)
+  }, [width, height, setTransform, instance])
+
+  // recentre uniquement au tout premier affichage (tf encore à sa valeur par
+  // défaut) — un règne qu'on déplie ensuite ne fait plus sauter la vue
+  const didInitialFit = useRef(false)
+  useEffect(() => {
+    if (didInitialFit.current) return
+    if (tf.k === 1 && tf.x === 0 && tf.y === 0) { didInitialFit.current = true; fit() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <>
       <div style={{ position:'absolute', top:9, right:10, zIndex:5, display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
         <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
-        <button onClick={fit} style={btn}>Recentrer</button>
+        <button onClick={()=>fit(200)} style={btn}>Recentrer</button>
       </div>
       <div style={{ position:'absolute', bottom:52, right:10, zIndex:5, display:'flex', flexDirection:'column', gap:5 }}>
-        {[['+',1.28],['−',0.78]].map(([l,f])=>(
-          <button key={l} onClick={()=>zoomBy(f)} style={{ ...btn, width:34, height:34, padding:0,
-            fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>{l}</button>
-        ))}
+        <button onClick={()=>zoomIn(0.3)} style={{ ...btn, width:34, height:34, padding:0, fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+        <button onClick={()=>zoomOut(0.3)} style={{ ...btn, width:34, height:34, padding:0, fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
       </div>
 
-      <div ref={wrapRef}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
-        onPointerCancel={onUp} onPointerLeave={onUp} onLostPointerCapture={onUp}
-        onScroll={onScroll}
-        onDragStart={e=>e.preventDefault()}
-        style={{ flex:1, minHeight:300, overflow:'auto', position:'relative',
-          cursor:'grab', touchAction:'pan-x pan-y', overscrollBehavior:'contain',
-          // PAS de WebkitOverflowScrolling:'touch' : ce mode d'accélération hérité
-          // d'iOS <13 est connu pour verrouiller le scroll sur un seul axe et faire
-          // disparaître les fonds/motifs pendant le défilement — le scroll natif
-          // moderne (iOS 13+) est déjà fluide sans lui
-          userSelect:'none', WebkitUserSelect:'none', backgroundColor:'#E3DAC5' }}>
-        <div ref={sizerRef} style={{ position:'relative',
+      <TransformComponent wrapperStyle={{ flex:1, width:'100%', height:'100%' }} contentStyle={{}}>
+        <div style={{ width, height, position:'relative', cursor:'grab',
           backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
-          backgroundSize:`${GRID_STEP*tf.k}px ${GRID_STEP*tf.k}px` }}>
-          <div ref={stageRef} style={{ position:'absolute', top:0, left:0, transformOrigin:'0 0',
-            transform:`scale(${tf.k})`, willChange:'transform' }}>
-            <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
-              view={view}
-              expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
-              onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
-              onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
-          </div>
+          backgroundSize:`${GRID_STEP}px ${GRID_STEP}px`, backgroundColor:'#E3DAC5' }}>
+          <svg width={width} height={height} style={{ position:'absolute', top:0, left:0, pointerEvents:'none' }}>
+            {links.map((l,i)=>{
+              const my = (l.y1 + l.y2) / 2
+              return <path key={i} d={`M${l.x1},${l.y1} C${l.x1},${my} ${l.x2},${my} ${l.x2},${l.y2}`}
+                fill="none" stroke={l.depth===0?'#B0A182':'#C6B99E'} strokeWidth={l.depth===0?2:1.4} />
+            })}
+          </svg>
+          {nodes.map(n => (
+            <Virtualize key={n.id} x={n.x - CARD_W/2} y={n.y - CARD_H/2} width={CARD_W} height={CARD_H} margin={400}>
+              <Card n={n} lang={lang} expanded={expanded}
+                toggle={()=>toggle(n.id)}
+                onSp={()=> n.kind==='add' ? onAddSpecies?.(n.cat, n.sub) : onSelectSpecies(n.sp.id)} />
+            </Virtualize>
+          ))}
         </div>
-      </div>
+      </TransformComponent>
 
       <div style={{ display:'flex', gap:12, flexWrap:'wrap', padding:'8px 14px', borderTop:'1px solid #D3C7AE', fontSize:10.5, color:'#6B6357', background:'#E3DAC5', alignItems:'center' }}>
         {Object.entries(RARITY).map(([k,r])=>(
@@ -358,37 +185,9 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         </span>
         <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>
       </div>
-    </div>
-  )
-}
-
-const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onSp, onAdd, view }) {
-  // culling : on ne dessine que ce qui est visible, avec une marge généreuse
-  const vis = view
-    ? nodes.filter(n => n.x > view.x0 && n.x < view.x1 && n.y > view.y0 && n.y < view.y1)
-    : nodes
-  const visLinks = view
-    ? links.filter(l => Math.max(l.x1,l.x2) > view.x0 && Math.min(l.x1,l.x2) < view.x1
-                     && Math.max(l.y1,l.y2) > view.y0 && Math.min(l.y1,l.y2) < view.y1)
-    : links
-  return (
-    <>
-      <svg width={width} height={height} style={{ position:'absolute', top:0, left:0, pointerEvents:'none' }}>
-        {visLinks.map((l,i)=>{
-          const my = (l.y1 + l.y2) / 2
-          return <path key={i} d={`M${l.x1},${l.y1} C${l.x1},${my} ${l.x2},${my} ${l.x2},${l.y2}`}
-            fill="none" stroke={l.depth===0?'#B0A182':'#C6B99E'} strokeWidth={l.depth===0?2:1.4} />
-        })}
-      </svg>
-      {vis.map(n => (
-        <Card key={n.id} n={n} lang={lang} expanded={expanded}
-          toggle={()=>onToggle(n.id)}
-          onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)} />
-      ))}
-      <div style={{ width, height }} />
     </>
   )
-})
+}
 
 const btn = { fontSize:10.5, padding:'5px 9px', borderRadius:12, background:'#EDE7D8', color:'#6B6357', border:'1px solid #D3C7AE' }
 
