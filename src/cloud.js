@@ -47,3 +47,23 @@ export async function savePinType(t) {
   await sb.from('overrides').upsert({ kind:'pintype', key:`pintype_${t.id}`, value:t, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
 export async function deletePinType(id) { await sb.from('overrides').delete().eq('key', `pintype_${id}`) }
+
+// Thèmes du calendrier ajoutés par les observateurs
+export async function getThemes() {
+  const { data } = await sb.from('overrides').select('*').eq('kind','theme').order('updated_at')
+  return (data||[]).map(r=>r.value)
+}
+export async function saveTheme(t) {
+  await sb.from('overrides').upsert({ kind:'theme', key:`theme_${t.id}`, value:t, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+export async function deleteTheme(id) { await sb.from('overrides').delete().eq('key', `theme_${id}`) }
+
+// Lignes du calendrier — ajouts et modifications (id partagé avec un évènement de base = remplacement)
+export async function getCalEvents() {
+  const { data } = await sb.from('overrides').select('*').eq('kind','calevent').order('updated_at')
+  return (data||[]).map(r=>r.value)
+}
+export async function saveCalEvent(e) {
+  await sb.from('overrides').upsert({ kind:'calevent', key:`calevent_${e.id}`, value:e, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+export async function deleteCalEvent(id) { await sb.from('overrides').delete().eq('key', `calevent_${id}`) }

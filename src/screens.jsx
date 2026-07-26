@@ -7,7 +7,8 @@ import { UI, nameOf } from './i18n.js'
 import { LUT } from './photoui.jsx'
 import { allPhotos, allSpecies, allPlayers, subscribe } from './store.js'
 import { getTodos, saveTodo, deleteTodo, getPins, savePin, deletePin,
-         getZones, saveZone, deleteZone, getPinTypes, savePinType } from './cloud.js'
+         getZones, saveZone, deleteZone, getPinTypes, savePinType,
+         getThemes, saveTheme, getCalEvents, saveCalEvent } from './cloud.js'
 import { CoverBg } from './photoui.jsx'
 
 const T = {
@@ -25,14 +26,33 @@ function Back({ onBack, label }) {
   </button>
 }
 
+const SEASON_OF = (i) => i===11||i<=1 ? { c:'#5B6B7E' } : i<=4 ? { c:'#7A8B5C' } : i<=7 ? { c:'#C08A3E' } : { c:'#B5602F' }
+
 // ══════════ CALENDRIER + TO-DO ══════════
-export function Calendar({ wide, lang, onBack }) {
+export function Calendar({ wide, lang, onBack, edit }) {
   const t = UI[lang]
   const [theme, setTheme] = useState('all')
   const [month, setMonth] = useState(new Date().getMonth())
   const [tab, setTab] = useState('cal')
   const months = lang==='ru' ? MONTHS_RU : MONTHS
-  const list = EVENTS.filter(e => (theme==='all'||e.t===theme) && e.m.includes(month))
+  const todayMonth = new Date().getMonth()
+
+  // thèmes & évènements — base statique + ajouts/modifications partagés
+  const [customThemes, setCustomThemes] = useState([])
+  const [evOverrides, setEvOverrides] = useState([])
+  const [themeEditor, setThemeEditor] = useState(null)   // {} nouveau
+  const [eventEditor, setEventEditor] = useState(null)   // {initial} nouveau ou existant
+  const reloadCal = async () => {
+    try { const [th, ev] = await Promise.all([getThemes(), getCalEvents()]); setCustomThemes(th); setEvOverrides(ev) } catch(e){}
+  }
+  useEffect(()=>{ reloadCal() },[])
+  const allThemes = { ...THEMES, ...Object.fromEntries(customThemes.map(x=>[x.id,x])) }
+  const allEvents = (() => {
+    const map = new Map(EVENTS.map(e=>[e.id,e]))
+    evOverrides.forEach(o => map.set(o.id, o))
+    return [...map.values()]
+  })()
+  const list = allEvents.filter(e => (theme==='all'||e.t===theme) && e.m.includes(month))
 
   // to-do partagée (localStorage)
   const [todos, setTodos] = useState([])
@@ -62,7 +82,7 @@ export function Calendar({ wide, lang, onBack }) {
         {lang==='ru'?'Календарь работ':'Calendrier des travaux'}
       </h2>
       <p style={{ fontSize:12.5, color:T.mute, marginBottom:14 }}>
-        {lang==='ru'?'Что делать и что наблюдать в течение года':'Ce qu\u2019il y a à faire et à observer au fil de l\u2019année'}
+        {lang==='ru'?'Что делать и что наблюдать в течение года':'Ce qu’il y a à faire et à observer au fil de l’année'}
       </p>
 
       <div style={{ display:'flex', gap:6, marginBottom:14 }}>
@@ -79,48 +99,97 @@ export function Calendar({ wide, lang, onBack }) {
       </div>
 
       {tab==='cal' ? <>
-        <div style={{ display:'flex', gap:5, overflowX:'auto', paddingBottom:8, marginBottom:12 }}>
-          {months.map((m,i)=>(
-            <button key={m} onClick={()=>setMonth(i)} style={{ flexShrink:0, fontSize:12, padding:'7px 13px', borderRadius:16,
-              border:`1px solid ${month===i?T.clay:T.line}`, background:month===i?T.clay:'transparent',
-              color:month===i?'#fff':T.soft, fontWeight:month===i?600:400 }}>{m.slice(0,4)}</button>
-          ))}
+        <div style={{ display:'grid', gridTemplateColumns:`repeat(${wide?6:3},1fr)`, gap:7, marginBottom:16 }}>
+          {months.map((m,i)=>{
+            const s = SEASON_OF(i)
+            const cnt = allEvents.filter(e=>(theme==='all'||e.t===theme)&&e.m.includes(i)).length
+            const on = month===i
+            return (
+              <button key={m} onClick={()=>setMonth(i)} style={{ textAlign:'left', padding: wide?'12px 12px':'10px 10px',
+                borderRadius:13, border:`2px solid ${on?T.clay:'transparent'}`,
+                background: on ? T.clay : `${s.c}26`, transition:'background .12s, border-color .12s' }}>
+                <div className="serif" style={{ fontSize: wide?15:13, fontWeight:800, color:on?'#fff':T.ink, lineHeight:1.1 }}>{m}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:5 }}>
+                  {i===todayMonth && <span style={{ width:6, height:6, borderRadius:'50%', background:on?'#fff':T.clay, flexShrink:0 }} />}
+                  <span style={{ fontSize:10, fontWeight:600, color:on?'rgba(255,255,255,.85)':T.soft }}>
+                    {cnt} {lang==='ru'?'событ.':'évén.'}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
         </div>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:16 }}>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
           <button onClick={()=>setTheme('all')} style={chip(theme==='all')}>{t.all}</button>
-          {Object.entries(THEMES).map(([k,th])=>(
+          {Object.entries(allThemes).map(([k,th])=>(
             <button key={k} onClick={()=>setTheme(k)} style={{ ...chip(theme===k),
               background:theme===k?th.c:'transparent', borderColor:theme===k?th.c:T.line, color:theme===k?'#fff':T.soft }}>
               {th.e} {lang==='ru'?th.ru:th.l}
             </button>
           ))}
+          {edit && (
+            <button onClick={()=>setThemeEditor({})} style={{ ...chip(false), display:'flex', alignItems:'center', gap:4,
+              borderStyle:'dashed', color:T.clayDark }}>
+              <i className="ti ti-plus" style={{ fontSize:13 }} aria-hidden="true" />
+              {lang==='ru'?'Тема':'Thème'}
+            </button>
+          )}
         </div>
+        {theme==='chasse' && (
+          <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:11, padding:'9px 12px',
+            fontSize:11.5, color:'#6B5330', marginBottom:12, display:'flex', alignItems:'flex-start', gap:8, lineHeight:1.5 }}>
+            <i className="ti ti-alert-triangle" style={{ fontSize:15, flexShrink:0, marginTop:1 }} aria-hidden="true" />
+            <span>{lang==='ru'
+              ? 'Даты ориентировочные — перед выходом на охоту всегда проверяйте актуальные правила (VMD, Medību noteikumi).'
+              : 'Dates indicatives — vérifie toujours les règles en vigueur avant une sortie (Service forestier d’État VMD, Medību noteikumi).'}</span>
+          </div>
+        )}
+        {edit && (
+          <button onClick={()=>setEventEditor({ initial:{ t: theme==='all'?Object.keys(allThemes)[0]:theme, m:[month] } })}
+            className="serif" style={{ width:'100%', padding:'10px', borderRadius:12, border:`1px dashed ${T.clay}`,
+            background:'transparent', color:T.clayDark, fontSize:12.5, fontWeight:600, marginBottom:12,
+            display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
+            {lang==='ru'?'Добавить строку':'Ajouter une ligne'}
+          </button>
+        )}
         {list.length===0
           ? <div style={{ fontSize:13, color:T.mute, padding:'20px 0' }}>{t.nothingPlanned}</div>
           : <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:9 }}>
               {list.map((e,i)=>{
-                const th = THEMES[e.t]
+                const th = allThemes[e.t]
                 return (
-                  <div key={i} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, overflow:'hidden', display:'flex' }}>
+                  <div key={e.id||i} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, overflow:'hidden', display:'flex', position:'relative' }}>
                     <div style={{ width:5, background:th.c, flexShrink:0 }} />
                     <div style={{ padding:'11px 13px', flex:1 }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                         <span style={{ fontSize:14 }}>{th.e}</span>
                         <span style={{ fontSize:10, color:th.c, fontWeight:700, textTransform:'uppercase', letterSpacing:'.5px' }}>{lang==='ru'?th.ru:th.l}</span>
-                        <span style={{ marginLeft:'auto', fontSize:10, color:T.mute }}>{e.m.map(mi=>months[mi].slice(0,3)).join(' · ')}</span>
+                        <span style={{ marginLeft:'auto', fontSize:10, color:T.mute }}>{e.m.map(mi=>months[mi].slice(0,4)).join(' · ')}</span>
                       </div>
                       <div className="serif" style={{ fontSize:14, fontWeight:700, color:T.ink, marginBottom:3 }}>{e.l}</div>
                       <div style={{ fontSize:11.5, color:T.soft, lineHeight:1.5 }}>{e.d}</div>
                     </div>
+                    {edit && (
+                      <button onClick={()=>setEventEditor({ initial:e })} style={{ position:'absolute', top:7, right:7,
+                        width:24, height:24, borderRadius:'50%', background:'rgba(43,38,32,.12)', color:T.clayDark,
+                        display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <i className="ti ti-pencil" style={{ fontSize:12 }} aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
                 )
               })}
             </div>}
+        {themeEditor && <ThemeEditor lang={lang} onClose={()=>setThemeEditor(null)}
+          onSaved={()=>{ setThemeEditor(null); reloadCal() }} />}
+        {eventEditor && <EventEditor lang={lang} months={months} allThemes={allThemes} initial={eventEditor.initial}
+          onClose={()=>setEventEditor(null)} onSaved={()=>{ setEventEditor(null); reloadCal() }} />}
       </> : <>
         <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:14, padding:13, marginBottom:14 }}>
           <div style={{ display:'flex', gap:7, flexWrap:'wrap' }}>
             <input value={draft} onChange={e=>setDraft(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}
-              placeholder={lang==='ru'?'Что нужно сделать?':'Qu\u2019y a-t-il à faire ?'}
+              placeholder={lang==='ru'?'Что нужно сделать?':'Qu’y a-t-il à faire ?'}
               style={{ flex:1, minWidth:180, padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`, background:T.bg, fontSize:13, color:T.ink }} />
             <select value={who} onChange={e=>setWho(e.target.value)}
               style={{ padding:'10px 10px', borderRadius:10, border:`1px solid ${T.line}`, background:T.bg, fontSize:12.5, color:T.soft }}>
@@ -135,7 +204,7 @@ export function Calendar({ wide, lang, onBack }) {
           ? <div style={{ fontSize:13, color:T.mute, padding:'16px 0' }}>{t.noTask}</div>
           : <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:8 }}>
               {[...todos].sort((a,b)=>a.done-b.done).map(x=>{
-                const th = THEMES[x.theme] || THEMES.agri
+                const th = allThemes[x.theme] || THEMES.agri
                 return (
                   <div key={x.id} style={{ background:T.card, border:`1px solid ${x.done?T.line:th.c}`, borderRadius:12,
                     padding:'10px 12px', display:'flex', alignItems:'center', gap:10, opacity:x.done?.55:1 }}>
@@ -152,6 +221,135 @@ export function Calendar({ wide, lang, onBack }) {
               })}
             </div>}
       </>}
+    </div>
+  )
+}
+
+// ══════════ Thème du calendrier — édition ══════════
+const THEME_EMOJIS = ['🌾','🔨','🪓','🦌','🎯','🔭','🧺','🍄','🌸','🌱','🐟','🔥','🏠','⛺','🧊','🐝','🍂','☀️']
+function ThemeEditor({ lang, onClose, onSaved }) {
+  const [l, setL] = useState('')
+  const [ru, setRu] = useState('')
+  const [e, setE] = useState('🌾')
+  const [c, setC] = useState('#8B9B6E')
+  const [busy, setBusy] = useState(false)
+  const colors = ['#8B9B6E','#B5602F','#7A5A3A','#4A5D32','#6B2E2E','#5B6B7E','#C08A3E','#9A7B4F','#A9799A','#6E8A6A','#5B7E8E','#8A7B62']
+  const save = async () => {
+    if (!l.trim()) return
+    setBusy(true)
+    const id = 'th_' + Date.now().toString(36)
+    await saveTheme({ id, l:l.trim(), ru:ru.trim()||l.trim(), e, c })
+    setBusy(false); onSaved?.()
+  }
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.62)', zIndex:150,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={ev=>ev.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:22,
+        width:'100%', maxWidth:420, border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:18, fontWeight:900, color:T.ink, marginBottom:14 }}>
+          {lang==='ru'?'Новая тема':'Nouveau thème'}
+        </div>
+        <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Значок':'Emoji'}</label>
+        <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:12 }}>
+          {THEME_EMOJIS.map(x=>(
+            <button key={x} onClick={()=>setE(x)} style={{ fontSize:18, width:34, height:34, borderRadius:9,
+              border:`1px solid ${e===x?T.clay:T.line}`, background:e===x?'#F0DDD0':'transparent' }}>{x}</button>
+          ))}
+        </div>
+        <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Цвет':'Couleur'}</label>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+          {colors.map(x=>(
+            <button key={x} onClick={()=>setC(x)} style={{ width:28, height:28, borderRadius:'50%', background:x,
+              border:c===x?'3px solid #2B2620':'2px solid #fff', boxShadow:'0 1px 3px rgba(0,0,0,.2)' }} />
+          ))}
+        </div>
+        <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Название':'Nom du thème'}</label>
+        <input value={l} onChange={ev=>setL(ev.target.value)} autoFocus
+          placeholder={lang==='ru'?'Например: Рыбалка':'Ex. Pêche, Apiculture…'}
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+            background:T.card, fontSize:13.5, color:T.ink, marginBottom:11 }} />
+        <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>Название (RU)</label>
+        <input value={ru} onChange={ev=>setRu(ev.target.value)}
+          placeholder="Рыбалка"
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+            background:T.card, fontSize:13.5, color:T.ink, marginBottom:14 }} />
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10,
+            border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>{lang==='ru'?'Отмена':'Annuler'}</button>
+          <button onClick={save} disabled={busy||!l.trim()}
+            className="serif" style={{ flex:1.3, padding:'10px', borderRadius:10, background:T.clay,
+              color:'#fff', fontSize:13.5, fontWeight:700 }}>{lang==='ru'?'Создать':'Créer'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ══════════ Ligne du calendrier — ajout / édition ══════════
+function EventEditor({ lang, months, allThemes, initial, onClose, onSaved }) {
+  const [th, setTh] = useState(initial?.t || Object.keys(allThemes)[0])
+  const [ms, setMs] = useState(initial?.m || [])
+  const [l, setL] = useState(initial?.l || '')
+  const [d, setD] = useState(initial?.d || '')
+  const [busy, setBusy] = useState(false)
+  const toggleMonth = (i) => setMs(v => v.includes(i) ? v.filter(x=>x!==i) : [...v, i].sort((a,b)=>a-b))
+  const save = async () => {
+    if (!l.trim() || !ms.length) return
+    setBusy(true)
+    const id = initial?.id || ('ce_' + Date.now().toString(36))
+    await saveCalEvent({ id, t:th, m:ms, l:l.trim(), d:d.trim() })
+    setBusy(false); onSaved?.()
+  }
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.62)', zIndex:150,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={ev=>ev.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%',
+        maxWidth:460, maxHeight:'88vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div style={{ padding:'20px 22px 0' }}>
+          <div className="serif" style={{ fontSize:18, fontWeight:900, color:T.ink }}>
+            {initial?.id ? (lang==='ru'?'Изменить строку':'Modifier la ligne') : (lang==='ru'?'Новая строка':'Nouvelle ligne')}
+          </div>
+        </div>
+        <div style={{ padding:'14px 22px 0' }}>
+          <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Тема':'Thème'}</label>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:14 }}>
+            {Object.entries(allThemes).map(([k,tv])=>(
+              <button key={k} onClick={()=>setTh(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
+                border:`1px solid ${th===k?tv.c:T.line}`, background:th===k?tv.c:'transparent',
+                color:th===k?'#fff':T.soft }}>{tv.e} {lang==='ru'?tv.ru:tv.l}</button>
+            ))}
+          </div>
+          <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Месяцы':'Mois concernés'}</label>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:5, marginBottom:14 }}>
+            {months.map((m,i)=>{
+              const on = ms.includes(i)
+              return (
+                <button key={m} onClick={()=>toggleMonth(i)} style={{ fontSize:11, padding:'7px 4px', borderRadius:9,
+                  border:`1px solid ${on?T.clay:T.line}`, background:on?T.clay:'transparent',
+                  color:on?'#fff':T.soft, fontWeight:on?700:400 }}>{m.slice(0,4)}</button>
+              )
+            })}
+          </div>
+          <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Название':'Titre'}</label>
+          <input value={l} onChange={ev=>setL(ev.target.value)} autoFocus
+            placeholder={lang==='ru'?'Например: Сбор мёда':'Ex. Récolte du miel'}
+            style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+              background:T.card, fontSize:13.5, color:T.ink, marginBottom:11 }} />
+          <label style={{ fontSize:11, color:T.mute, display:'block', marginBottom:5 }}>{lang==='ru'?'Описание':'Description'}</label>
+          <textarea value={d} onChange={ev=>setD(ev.target.value)} rows={3}
+            style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+              background:T.card, fontSize:12.5, color:T.ink, marginBottom:14, resize:'vertical' }} />
+        </div>
+        <div style={{ position:'sticky', bottom:0, background:T.bg, borderTop:`1px solid ${T.line}`,
+          padding:'12px 22px', display:'flex', gap:9 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'11px', borderRadius:12,
+            border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>{lang==='ru'?'Отмена':'Annuler'}</button>
+          <button onClick={save} disabled={busy||!l.trim()||!ms.length}
+            className="serif" style={{ flex:1.6, padding:'11px', borderRadius:12,
+              background: (busy||!l.trim()||!ms.length)?'#DDD3BE':T.clay, color:(busy||!l.trim()||!ms.length)?T.mute:'#fff',
+              fontSize:14, fontWeight:700 }}>{lang==='ru'?'Сохранить':'Enregistrer'}</button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -547,6 +745,16 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
             </button>
           )
         })}
+      </div>
+
+      <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:12, padding:'11px 14px',
+        marginBottom:18, display:'flex', alignItems:'flex-start', gap:9 }}>
+        <i className="ti ti-camera" style={{ fontSize:16, color:'#8F6A2E', flexShrink:0, marginTop:1 }} aria-hidden="true" />
+        <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.55 }}>
+          {lang==='ru'
+            ? 'Каждое наблюдение должно сопровождаться фото — даже нечётким. Это единственное доказательство встречи. Цель проекта — собрать как можно более качественную фотоколлекцию, а не просто накопить очки.'
+            : 'Chaque observation doit être accompagnée d’une photo — même floue. C’est la seule preuve de la rencontre. Le but n’est pas d’accumuler des points, mais de construire la meilleure collection de photos possible.'}
+        </div>
       </div>
 
       {mySpecies.length===0

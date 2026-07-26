@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { sb } from './supabase.js'
-import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe, coverPhoto, individualCovers } from './store.js'
+import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe, coverPhoto, speciesPhotos } from './store.js'
 
 export const LUT = 'sepia(0.28) saturate(1.22) hue-rotate(342deg) brightness(0.97) contrast(1.06)'
 
@@ -53,6 +53,21 @@ export function PhotoBg({ target, fallback, rounded = 0, thumb = true }) {
       )}
     </div>
   )
+}
+
+// import + compression + upload d'une seule photo — réutilisé par PhotoManager et par le formulaire d'observation
+export async function uploadPhotoFile(target, file, caption = '', by = '') {
+  const isHero = String(target) === 'site:hero'
+  const [blob, thumb] = await Promise.all([
+    compress(file, isHero ? 2560 : 1600, isHero ? 0.9 : 0.82),
+    compress(file, 260, 0.72),
+  ])
+  const base = `${String(target).replace(/[^a-zA-Z0-9_-]/g,'_')}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`
+  const path = base + '.jpg'
+  const up = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' })
+  if (up.error) throw new Error(up.error.message)
+  await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  return addPhotoRec({ target, path, caption, by })
 }
 
 // re-rendu forcé quand le magasin change — utilisé par les vignettes dérivées (pas de snapshot figé possible)
@@ -115,16 +130,16 @@ export function PhotoHero({ target, fallback }) {
   )
 }
 
-// ── Bannière de fiche espèce : une image par individu répertorié, parcourue aux flèches ──
-export function PhotoHeroIndividuals({ sp, fallback }) {
+// ── Bannière de fiche espèce : toutes les photos de tous les individus, parcourues aux flèches ──
+export function PhotoHeroSpecies({ sp, fallback }) {
   useStoreTick()
-  const covers = individualCovers(sp)
+  const shots = speciesPhotos(sp)
   const [idx, setIdx] = useState(0)
   const [open, setOpen] = useState(false)
-  useEffect(() => { if (idx >= covers.length) setIdx(0) }, [covers.length, idx])
-  const current = covers[idx]
-  const many = covers.length > 1
-  const photos = covers.map(c => c.photo)
+  useEffect(() => { if (idx >= shots.length) setIdx(0) }, [shots.length, idx])
+  const current = shots[idx]
+  const many = shots.length > 1
+  const photos = shots.map(s => s.photo)
   return (
     <>
       <div onClick={()=>current && setOpen(true)} style={{ position:'absolute', inset:0, overflow:'hidden',
@@ -135,14 +150,15 @@ export function PhotoHeroIndividuals({ sp, fallback }) {
         )}
       </div>
       {current && (
-        <div style={{ position:'absolute', bottom:8, left:10, zIndex:2, background:'rgba(0,0,0,.4)', color:'#F2EEE2',
-          fontSize:10.5, fontWeight:600, padding:'3px 9px', borderRadius:10 }}>{current.displayName}</div>
+        <div style={{ position:'absolute', bottom:8, right:10, zIndex:2, background:'rgba(0,0,0,.4)', color:'#F2EEE2',
+          fontSize:10.5, fontWeight:600, padding:'3px 9px', borderRadius:10, maxWidth:'46%', textAlign:'right',
+          overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{current.displayName}</div>
       )}
       {many && <>
-        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+covers.length)%covers.length) }} style={navBtn('left')}>‹</button>
-        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%covers.length) }} style={navBtn('right')}>›</button>
+        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+shots.length)%shots.length) }} style={navBtn('left')}>‹</button>
+        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%shots.length) }} style={navBtn('right')}>›</button>
         <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:2 }}>
-          {covers.map((_,i)=>(
+          {shots.map((_,i)=>(
             <span key={i} style={{ width:i===idx?14:5, height:5, borderRadius:3,
               background: i===idx?'#F2EEE2':'rgba(242,238,226,.45)', transition:'width .15s' }} />
           ))}
@@ -197,15 +213,6 @@ export function Lightbox({ photos, index, onIndex, onClose }) {
   )
 }
 
-export function PhotoButton({ onClick, small }) {
-  return (
-    <button onClick={(e)=>{ e.stopPropagation(); onClick() }}
-      style={{ display:'inline-flex', alignItems:'center', gap:5, background:'rgba(0,0,0,.45)',
-        color:'#fff', borderRadius:12, padding: small?'3px 8px':'5px 10px', fontSize: small?10:11.5, fontWeight:600 }}>
-      <i className="ti ti-camera-plus" style={{ fontSize: small?12:14 }} aria-hidden="true" />
-    </button>
-  )
-}
 
 export function PhotoManager({ target, label, lang, onClose }) {
   const { photos } = usePhotos(target)
@@ -222,17 +229,7 @@ export function PhotoManager({ target, label, lang, onClose }) {
     try {
       for (const f of files) {
         if (!f.type.startsWith('image/')) continue
-        const isHero = String(target) === 'site:hero'
-        const [blob, thumb] = await Promise.all([
-          compress(f, isHero ? 2560 : 1600, isHero ? 0.9 : 0.82),
-          compress(f, 260, 0.72),
-        ])
-        const base = `${String(target).replace(/[^a-zA-Z0-9_-]/g,'_')}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`
-        const path = base + '.jpg'
-        const up = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' })
-        if (up.error) throw new Error(up.error.message)
-        await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
-        await addPhotoRec({ target, path, caption, by })
+        await uploadPhotoFile(target, f, caption, by)
       }
       setCaption('')
     } catch (e) { setErr(e.message || 'Import impossible') }

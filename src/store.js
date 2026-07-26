@@ -12,6 +12,7 @@ const S = {
   players: [],       // joueurs ajoutés
   edits: {},         // spId -> champs modifiés
   sightings: {},     // spId -> [{ind, ...}]
+  sightEdits: {},    // "sedit_spId::indName" -> {fields}
   ready: false,
 }
 const subs = new Set()
@@ -33,13 +34,14 @@ export async function loadAll() {
       caption: p.caption, by: p.author, pos: p.pos || '50% 50%' }
     ;(S.photos[p.target] ||= []).push(rec)
   })
-  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}
+  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
     if (r.kind === 'player')  S.players.push({ ...r.value, key: r.key })
     if (r.kind === 'spedit')  S.edits[r.value.id] = r.value
     if (r.kind === 'sighting') (S.sightings[r.value.spId] ||= []).push({ ...r.value, key: r.key })
+    if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
   })
   S.ready = true
   notify()
@@ -101,6 +103,13 @@ export function individualCovers(sp) {
     return photos.length ? { ind: ind.n, displayName: ov ? ov.name : ind.n, photo: photos[0] } : null
   }).filter(Boolean)
 }
+// toutes les photos de l'espèce (tous individus confondus) — sert au carrousel de la fiche espèce
+export function speciesPhotos(sp) {
+  return (sp.inds || []).flatMap(ind => {
+    const ov = S.named[`${sp.id}::${ind.n}`]
+    return photosFor(`ind:${sp.id}:${ind.n}`).map(photo => ({ ind: ind.n, displayName: ov ? ov.name : ind.n, photo }))
+  })
+}
 // la vignette choisie manuellement (réglages), sinon la première photo d'individu disponible
 export function coverPhoto(sp) {
   const covers = individualCovers(sp)
@@ -126,9 +135,16 @@ export function allSpecies() {
   return merged.map(sp => {
     const base = S.edits[sp.id] ? { ...sp, ...S.edits[sp.id].fields } : sp
     const extra = S.sightings[sp.id]
-    if (!extra || !extra.length) return base
-    return { ...base, inds: [...(base.inds || []), ...extra.map(x => x.ind)] }
-  })
+    const rawInds = extra && extra.length ? [...(base.inds || []), ...extra.map(x => x.ind)] : (base.inds || [])
+    if (!rawInds.length) return { ...base, inds: rawInds }
+    const inds = rawInds
+      .map(ind => {
+        const se = S.sightEdits[`sedit_${sp.id}::${ind.n}`]
+        return se ? { ...ind, ...se.fields } : ind
+      })
+      .filter(ind => !ind.removed)
+    return { ...base, inds }
+  }).filter(sp => !sp.removed)
 }
 export async function addSpecies(sp) {
   const id = sp.id || ('c_' + Date.now().toString(36))
@@ -143,8 +159,15 @@ export async function editSpecies(id, fields) {
   await sb.from('overrides').upsert({ kind: 'spedit', key: 'edit_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
 export async function removeSpecies(id) {
-  S.species = S.species.filter(s => s.id !== id); notify()
-  await sb.from('overrides').delete().eq('key', 'sp_' + id)
+  const isCustom = S.species.some(s => s.id === id)
+  if (isCustom) {
+    S.species = S.species.filter(s => s.id !== id); notify()
+    await sb.from('overrides').delete().eq('key', 'sp_' + id)
+  } else {
+    // espèce de base (ex. un individu de la catégorie Humains) : masquée via une surcharge, jamais retirée de data.js
+    const prev = S.edits[id]?.fields || {}
+    await editSpecies(id, { ...prev, removed: true })
+  }
 }
 
 // ── Observations : marquer qu'un joueur a vu une espèce ──
@@ -155,6 +178,14 @@ export async function setObservation(spId, player, methods) {
   const prev = S.edits[spId]?.fields || {}
   await editSpecies(spId, { ...prev, obs })
 }
+// ── Marque les observations d'un joueur pour une espèce comme provenant d'une photo floue (÷2 points) ──
+export async function setBlurry(spId, player, isBlurry) {
+  const sp = allSpecies().find(s => s.id === spId); if (!sp) return
+  const blurry = { ...(sp.blurry || {}) }
+  if (isBlurry) blurry[player] = true; else delete blurry[player]
+  const prev = S.edits[spId]?.fields || {}
+  await editSpecies(spId, { ...prev, blurry })
+}
 
 // ══════ OBSERVATIONS ══════
 export async function addSighting(spId, ind) {
@@ -164,21 +195,40 @@ export async function addSighting(spId, ind) {
   await sb.from('overrides').upsert({ kind:'sighting', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
   return key
 }
-export async function removeSighting(spId, key) {
-  S.sightings[spId] = (S.sightings[spId] || []).filter(x => x.key !== key); notify()
-  await sb.from('overrides').delete().eq('key', key)
+export async function editSighting(spId, indName, fields) {
+  const key = `sedit_${spId}::${indName}`
+  const value = { spId, indName, fields: { ...(S.sightEdits[key]?.fields || {}), ...fields } }
+  S.sightEdits[key] = value; notify()
+  await sb.from('overrides').upsert({ kind:'sightedit', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+export async function removeSighting(spId, indName) {
+  const orig = (S.sightings[spId] || []).find(x => x.ind?.n === indName)
+  const seKey = `sedit_${spId}::${indName}`
+  if (orig) {
+    S.sightings[spId] = S.sightings[spId].filter(x => x.key !== orig.key)
+    delete S.sightEdits[seKey]; notify()
+    await Promise.all([
+      sb.from('overrides').delete().eq('key', orig.key),
+      sb.from('overrides').delete().eq('key', seKey),
+    ])
+  } else {
+    await editSighting(spId, indName, { removed: true })
+  }
 }
 
 // ══════ SCORES (tiennent compte des ajouts) ══════
+// humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
+const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
 export function calcPtsLive(sp, player) {
   const methods = sp.obs?.[player] || []
   if (!methods.length) return 0
   const best = methods.reduce((b,m)=>(METHODS[m]?.mult||0)>(METHODS[b]?.mult||0)?m:b, methods[0])
   const bonuses = sp.bonus?.[player] || []
-  return Math.round(
-    (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1) * (METHODS[best]?.mult || 1) +
-    (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
-  )
+  const catMult = CAT_PT_MULT[sp.cat] ?? 1
+  const blurMult = sp.blurry?.[player] ? 0.5 : 1
+  const base = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1) * (METHODS[best]?.mult || 1)
+  const bonusPts = (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
+  return Math.round((base + bonusPts) * catMult * blurMult)
 }
 export function speciesPtsLive(player) {
   return allSpecies().reduce((s, sp) => s + calcPtsLive(sp, player), 0)

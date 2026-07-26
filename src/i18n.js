@@ -26,7 +26,8 @@ export const RU = {
 
 export const CAT_RU = {
   mammiferes:'Млекопитающие', oiseaux:'Птицы', arbres:'Деревья', arbustes:'Кустарники',
-  champignons:'Грибы', lichens:'Лишайники и мхи', insectes:'Насекомые',
+  champignons:'Грибы', lichens:'Лишайники и мхи', insectes:'Насекомые', humains:'Люди',
+  domestiques:'Домашние животные',
 }
 
 export const UI = {

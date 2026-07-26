@@ -61,6 +61,10 @@ export const CATS = [
       { id:'Résidents', lat:'Hominidae · permanents' },
       { id:'Visiteurs', lat:'Hominidae · saisonniers' },
   ]},
+  { id:'domestiques', e:'🐾', n:'Animaux domestiques', lat:'Animalia domestica', subs:[
+      { id:'Chiens', lat:'Canis lupus familiaris' },
+      { id:'Chats', lat:'Felis catus' },
+  ]},
   { id:'insectes', e:'🦋', n:'Insectes', lat:'Insecta', subs:[
       { id:'Lépidoptères', lat:'Lepidoptera' }, { id:'Coléoptères', lat:'Coleoptera' },
       { id:'Odonates', lat:'Odonata' }, { id:'Hyménoptères', lat:'Hymenoptera' },
@@ -377,6 +381,14 @@ export const SPECIES = [
   { id:'h_natacha2', n:'Natacha (2)', lat:'Homo sapiens', e:'👩‍🦰', cat:'humains', sub:'Résidents', r:'commun', sz:'m',
     obs:{}, bonus:{}, inds:[],
     alim:'Omnivore.', hab:'Homonyme — à distinguer de la première.', dng:'Aucun.' },
+
+  // ═══ ANIMAUX DOMESTIQUES ═══
+  { id:'d_sem', n:'Sem', lat:'Canis lupus familiaris', e:'🐕', cat:'domestiques', sub:'Chiens', r:'commun', sz:'m',
+    obs:{}, bonus:{}, inds:[],
+    alim:'Croquettes, restes de table.', hab:'Vit sur la propriété.', dng:'Aucun.' },
+  { id:'d_raya', n:'Raya', lat:'Canis lupus familiaris', e:'🐕', cat:'domestiques', sub:'Chiens', r:'commun', sz:'m',
+    obs:{}, bonus:{}, inds:[],
+    alim:'Croquettes, restes de table.', hab:'Vit sur la propriété.', dng:'Aucun.' },
 ]
 
 export const ACHIEVEMENTS = [

@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved } from './data'
 import MindMap from './mindmap.jsx'
+import SatMap from './satmap.jsx'
 import { gradientFor, gradientForCat } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
 import Experience from './experience.jsx'
-import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroIndividuals, PhotoButton, usePhotos, LUT } from './photoui.jsx'
+import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
-         namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive } from './store.js'
-import { IdentityPicker, SpeciesEditor, ObservationEditor, SightingEditor } from './editui.jsx'
+         namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
+         removeSighting } from './store.js'
+import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -168,8 +170,8 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
         </div>
         <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:'#6B6357' }}>
           {lang==='ru'
-            ? 'Документировать всё живое вокруг нас, сезон за сезоном, чтобы научиться узнавать и беречь это. Четыре наблюдателя, одно поместье в Видземе и простое желание — не упустить ничего незамеченным.'
-            : 'Documenter ce qui vit autour de nous, saison après saison, pour apprendre à le reconnaître et à le protéger. Quatre observateurs, une propriété en Vidzeme, et une envie simple : ne rien laisser filer sans le noter.'}
+            ? 'Документировать всё живое вокруг нас, сезон за сезоном, чтобы научиться узнавать и беречь это. Четыре наблюдателя, общая коллекция, которую можно пополнять откуда угодно, и простое желание — не упустить ничего незамеченным.'
+            : 'Documenter ce qui vit autour de nous, saison après saison, pour apprendre à le reconnaître et à le protéger. Quatre observateurs, une collection collaborative que chacun peut nourrir d’où il se trouve, et une envie simple : ne rien laisser filer sans le noter.'}
         </p>
       </div>
 
@@ -254,14 +256,15 @@ export default function App() {
   const [focus, setFocus] = useState(null)        // 'map' | 'matrix' | null
   const [curInd, setCurInd] = useState(null)      // individu ouvert
   const [curPlayer, setCurPlayer] = useState(null) // detail score
+  const [scoreCat, setScoreCat] = useState('all')  // filtre règne dans la fiche score
   const [photoTarget, setPhotoTarget] = useState(null) // {target,label}
   const [promoting, setPromoting] = useState(null)   // {sp, ind}
+  const [confirmDelSighting, setConfirmDelSighting] = useState(null) // {sp, ind}
   const [refresh, setRefresh] = useState(0)
   const [mapExpanded, setMapExpanded] = useState(() => new Set())
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
 
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
-  const [obsEditor, setObsEditor] = useState(null)
   const [sighting, setSighting] = useState(null)
   const [idPicker, setIdPicker] = useState(false)
 
@@ -310,7 +313,7 @@ export default function App() {
     </>
   )
   if (screen === 'experience') return <Experience wide={wide} onBack={()=>setScreen('landing')} />
-  if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>setScreen('landing')} /></Shell>
+  if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>setScreen('landing')} edit={edit} /></Shell>
   if (screen === 'territory') return <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}><Territory wide={wide} lang={lang} edit={edit} onBack={()=>setScreen('landing')} /></Shell>
   if (screen === 'gallery')   return (
     <Shell lang={lang} setLang={setLang} onHome={()=>setScreen('landing')}>
@@ -538,10 +541,10 @@ export default function App() {
     const seasons = sp.saisons
     const tabs = [['obs',t.obs],['infos',t.infos],...(seasons?[['saisons',t.seasons]]:[])]
     return (
-      <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems: wide?'center':'flex-end', justifyContent:'center', padding: wide?24:0 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius: wide?20:'20px 20px 0 0', width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
+      <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
           <div style={{ position:'relative', height: wide?420:260, display:'flex', alignItems:'flex-end', padding:20 }}>
-            <PhotoHeroIndividuals sp={sp} fallback={gradientFor(sp.id)} />
+            <PhotoHeroSpecies sp={sp} fallback={gradientFor(sp.id)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 65%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:14, right:52, display:'flex', gap:5 }}>
               <button onClick={(e)=>{ e.stopPropagation(); setSpEditor({ initial:sp }) }}
@@ -576,17 +579,11 @@ export default function App() {
               <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
                 {edit && <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
-                  <button onClick={()=>setSighting({ sp })} style={{ fontSize:11,
-                    padding:'4px 10px', borderRadius:12, background:T.clay, color:'#fff', fontWeight:600,
-                    display:'flex', alignItems:'center', gap:4 }}>
-                    <i className="ti ti-plus" style={{ fontSize:12 }} aria-hidden="true" />
+                  <button onClick={()=>setSighting({ sp })} style={{ fontSize:12.5,
+                    padding:'7px 14px', borderRadius:14, background:T.clay, color:'#fff', fontWeight:600,
+                    display:'flex', alignItems:'center', gap:5 }}>
+                    <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
                     {lang==='ru'?'Наблюдение':'Observation'}
-                  </button>
-                  <button onClick={()=>setObsEditor(sp)} style={{ fontSize:11,
-                    padding:'4px 10px', borderRadius:12, background:T.sageDark, color:'#fff', fontWeight:600,
-                    display:'flex', alignItems:'center', gap:4 }}>
-                    <i className="ti ti-eye-plus" style={{ fontSize:12 }} aria-hidden="true" />
-                    {lang==='ru'?'Отметить':'Méthodes'}
                   </button>
                 </div>}
               </div>
@@ -631,23 +628,11 @@ export default function App() {
                                 color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
                                 letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
-                              {edit && <div style={{ position:'absolute', top:5, right:5, display:'flex', gap:3 }}>
-                                <PhotoButton small onClick={()=>setPhotoTarget({ target:`ind:${sp.id}:${ind.n}`, label:`${sp.n} — ${ind.displayName}` })} />
-                              </div>}
                               <div style={{ position:'relative', height:'100%', minHeight:92, display:'flex',
                                 flexDirection:'column', justifyContent:'flex-end', padding:9 }}>
                                 <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#F2EEE2', lineHeight:1.1 }}>{ind.displayName}</div>
                                 <div style={{ fontSize:9.5, color:'rgba(242,238,226,.72)', marginTop:2 }}>{ind.d}</div>
                               </div>
-                              {edit && !isNamed && (
-                                <span onClick={(e)=>{ e.stopPropagation(); setPromoting({ sp, ind }) }}
-                                  style={{ position:'absolute', bottom:6, right:6, background:'rgba(143,74,34,.92)',
-                                    color:'#fff', borderRadius:9, padding:'2px 7px', fontSize:9, fontWeight:700,
-                                    display:'flex', alignItems:'center', gap:3 }}>
-                                  <i className="ti ti-lock-open" style={{ fontSize:10 }} aria-hidden="true" />
-                                  {lang==='ru'?'Назвать':'Nommer'}
-                                </span>
-                              )}
                             </button>
                           ))}
                         </div>}
@@ -723,12 +708,17 @@ export default function App() {
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:12, right:80, display:'flex', gap:5 }}>
-              <PhotoButton onClick={()=>setPhotoTarget({ target:`ind:${sp.id}:${ind.n}`, label:`${sp.n} — ${ind.n}` })} />
-              <button onClick={(e)=>{ e.stopPropagation(); setPromoting({ sp, ind }) }}
+              <button onClick={(e)=>{ e.stopPropagation(); setSighting({ editing:{ sp, ind } }) }}
                 style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
                   display:'flex', alignItems:'center', justifyContent:'center' }}
-                title={lang==='ru'?'Изменить особь':'Modifier cet individu'}>
+                title={lang==='ru'?'Изменить наблюдение':'Modifier cette observation'}>
                 <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+              </button>
+              <button onClick={(e)=>{ e.stopPropagation(); setConfirmDelSighting({ sp, ind }) }}
+                style={{ background:'rgba(139,58,46,.8)', color:'#fff', borderRadius:'50%', width:28, height:28,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}
+                title={lang==='ru'?'Удалить':'Supprimer cette observation'}>
+                <i className="ti ti-trash" style={{ fontSize:13 }} aria-hidden="true" />
               </button>
             </div>}
             <button onClick={()=>setCurInd(null)} style={{ position:'absolute', top:12, right:12, width:28, height:28, borderRadius:'50%', background:'rgba(0,0,0,.3)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -811,7 +801,7 @@ export default function App() {
           <div>
             <div className="serif" style={{ fontSize:13, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'1px', marginBottom:12 }}>Classement</div>
             {rows.map((p,i)=>(
-              <button key={p.id} onClick={()=>setCurPlayer(p.name)} style={{ width:'100%', textAlign:'left', background:T.card, border:`1px solid ${p.demo?'#C9BFA6':T.line}`, borderRadius:12, padding:'11px 13px', display:'flex', alignItems:'center', gap:11, marginBottom:7, opacity:p.demo?.68:1 }}>
+              <button key={p.id} onClick={()=>{ setCurPlayer(p.name); setScoreCat('all') }} style={{ width:'100%', textAlign:'left', background:T.card, border:`1px solid ${p.demo?'#C9BFA6':T.line}`, borderRadius:12, padding:'11px 13px', display:'flex', alignItems:'center', gap:11, marginBottom:7, opacity:p.demo?.68:1 }}>
                 <span style={{ fontSize:16, width:24 }}>{p.demo?'🎓':['🥇','🥈','🥉','4️⃣'][i]}</span>
                 <div className="serif" style={{ width:32, height:32, borderRadius:'50%', background:T.sage, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:600, flexShrink:0 }}>{p.id}</div>
                 <div style={{ flex:1, minWidth:0 }}>
@@ -874,9 +864,14 @@ export default function App() {
     }).sort((a,b)=>b.pts-a.pts)
     const myBadges = ACHIEVEMENTS.filter(a=>a.on && a.w.includes(curPlayer))
     const spTotal = speciesPtsLive(curPlayer), bTotal = badgePtsLive(curPlayer)
+    const catBreakdown = CATS.map(cat => ({
+      cat, pts: lines.filter(l=>l.s.cat===cat.id).reduce((s,l)=>s+l.pts,0), n: lines.filter(l=>l.s.cat===cat.id).length,
+    })).filter(c=>c.n>0).sort((a,b)=>b.pts-a.pts)
+    const shownLines = scoreCat==='all' ? lines : lines.filter(l=>l.s.cat===scoreCat)
+    const shownPts = scoreCat==='all' ? spTotal : (catBreakdown.find(c=>c.cat.id===scoreCat)?.pts || 0)
     return (
-      <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.55)', zIndex:70, display:'flex', alignItems: wide?'center':'flex-end', justifyContent:'center', padding: wide?24:0 }} onClick={()=>setCurPlayer(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius: wide?20:'20px 20px 0 0', width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+      <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.55)', zIndex:70, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurPlayer(null)}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'auto', border:`1px solid ${T.line}` }}>
           <div style={{ position:'sticky', top:0, background:T.surface, borderBottom:`1px solid ${T.line}`, padding:'14px 18px', display:'flex', alignItems:'center', gap:11, zIndex:2 }}>
             <div className="serif" style={{ width:38, height:38, borderRadius:'50%', background:T.sage, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:700 }}>{curPlayer[0]}</div>
             <div style={{ flex:1 }}>
@@ -889,8 +884,24 @@ export default function App() {
             </button>
           </div>
           <div style={{ padding:'14px 18px 22px' }}>
-            <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:8 }}>Observations · {spTotal} pts</div>
-            {lines.map(({s,best,bonuses,pts})=>{
+            {catBreakdown.length>1 && (
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+                <button onClick={()=>setScoreCat('all')} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
+                  border:`1px solid ${scoreCat==='all'?T.clay:T.line}`, background:scoreCat==='all'?T.clay:'transparent',
+                  color:scoreCat==='all'?'#fff':T.soft, fontWeight:scoreCat==='all'?700:400 }}>
+                  {lang==='ru'?'Все':'Tout'} · {spTotal}
+                </button>
+                {catBreakdown.map(({cat,pts,n})=>(
+                  <button key={cat.id} onClick={()=>setScoreCat(cat.id)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
+                    border:`1px solid ${scoreCat===cat.id?T.clay:T.line}`, background:scoreCat===cat.id?T.clay:'transparent',
+                    color:scoreCat===cat.id?'#fff':T.soft, fontWeight:scoreCat===cat.id?700:400 }}>
+                    {cat.e} {catNameOf(cat,lang).main} · {pts}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:8 }}>Observations · {shownPts} pts</div>
+            {shownLines.map(({s,best,bonuses,pts})=>{
               const r = (RARITY[s.r]||RARITY.commun), M = (METHODS[best]||METHODS.eye)
               return (
                 <div key={s.id} onClick={()=>{setCurPlayer(null);selSpFull(s.id)}} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px', marginBottom:6, cursor:'pointer' }}>
@@ -1121,13 +1132,19 @@ export default function App() {
       {curPlayer && <ScoreSheet />}
       {promoting && <PromoteSheet sp={promoting.sp} ind={promoting.ind} lang={lang} wide={wide}
         onClose={()=>setPromoting(null)} onDone={()=>{ setPromoting(null); setRefresh(r=>r+1) }} />}
+      {confirmDelSighting && <ConfirmDialog lang={lang}
+        title={lang==='ru'?'Удалить это наблюдение?':'Supprimer cette observation ?'}
+        message={lang==='ru'?'Это действие необратимо.':'Cette action est irréversible.'}
+        onCancel={()=>setConfirmDelSighting(null)}
+        onConfirm={async()=>{ await removeSighting(confirmDelSighting.sp.id, confirmDelSighting.ind.n);
+          setConfirmDelSighting(null); setCurInd(null); setRefresh(r=>r+1) }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
       {spEditor && <SpeciesEditor lang={lang} initial={spEditor.initial} presetCat={spEditor.cat}
-        presetSub={spEditor.sub} onClose={()=>setSpEditor(null)} onSaved={()=>setRefresh(r=>r+1)} />}
-      {sighting && <SightingEditor lang={lang} species={SPECIES} presetSp={sighting.sp}
-        onClose={()=>setSighting(null)} onSaved={(id)=>{ setRefresh(r=>r+1); if(id) selSpFull(id) }} />}
-      {obsEditor && <ObservationEditor sp={obsEditor} lang={lang} onClose={()=>setObsEditor(null)}
-        onSaved={()=>setRefresh(r=>r+1)} />}
+        presetSub={spEditor.sub} onClose={()=>setSpEditor(null)} onSaved={()=>setRefresh(r=>r+1)}
+        onDeleted={()=>{ setCurSp(null); setRefresh(r=>r+1) }} />}
+      {sighting && <SightingEditor lang={lang} species={SPECIES} presetSp={sighting.sp} editing={sighting.editing}
+        onClose={()=>setSighting(null)}
+        onSaved={(id)=>{ setRefresh(r=>r+1); if (sighting.editing) setCurInd(null); else if(id) selSpFull(id) }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
       {toast && <Toast msg={toast} />}
 
@@ -1265,17 +1282,15 @@ function Shell({ children, lang, setLang, onHome }) {
 
 function MiniMap({ gps }) {
   const [lat, lon] = gps
-  const bbox = [lon-0.006, lat-0.003, lon+0.006, lat+0.003].join('%2C')
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}`
   return (
     <div style={{ borderRadius:12, overflow:'hidden', border:'1px solid #D3C7AE', marginBottom:9 }}>
-      <iframe title="Localisation" src={src} style={{ width:'100%', height:170, border:'none', display:'block' }} loading="lazy" />
+      <SatMap center={{ lat, lon }} pins={[{ id:'p', lat, lon, color:'#B5602F', emoji:'📍' }]} height={170} />
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 11px', background:'#E6DDC8', fontSize:11, color:'#6B6357' }}>
         <span style={{ display:'flex', alignItems:'center', gap:5 }}>
           <i className="ti ti-map-pin" style={{ fontSize:13, color:'#B5602F' }} aria-hidden="true" />
           {lat.toFixed(4)}° N · {lon.toFixed(4)}° E
         </span>
-        <a href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`} target="_blank" rel="noreferrer" style={{ color:'#8F4A22', textDecoration:'none', fontWeight:600 }}>Ouvrir ↗</a>
+        <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noreferrer" style={{ color:'#8F4A22', textDecoration:'none', fontWeight:600 }}>Ouvrir ↗</a>
       </div>
     </div>
   )

@@ -1,8 +1,11 @@
-import { useState } from 'react'
-import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, setObservation, addSighting, getMe, setMe,
+import { useState, useRef, useEffect } from 'react'
+import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
+         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry,
          individualCovers, setCover, clearCover } from './store.js'
 import { RARITY, METHODS, SIZE_MULT } from './data'
-import { LUT } from './photoui.jsx'
+import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
+import SatMap from './satmap.jsx'
+import { CENTER } from './territory.js'
 
 const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
   mute:'#9A9081', line:'#D3C7AE', clay:'#B5602F', sageDark:'#4A5D32', gold:'#C9A046' }
@@ -15,6 +18,30 @@ const Modal = ({ children, onClose, wide, max=460 }) => (
   </div>
 )
 const label = { fontSize:11, color:T.mute, display:'block', marginBottom:4, marginTop:11 }
+
+// ══════ Confirmation (remplace window.confirm — bloque tout le navigateur et casse l'auto-clôture) ══════
+export function ConfirmDialog({ lang, title, message, onCancel, onConfirm, busy }) {
+  return (
+    <div onClick={onCancel} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.65)', zIndex:180,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:16, padding:20,
+        width:'100%', maxWidth:380, border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:16, fontWeight:800, color:T.ink, marginBottom:6 }}>{title}</div>
+        <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.55, marginBottom:18 }}>{message}</div>
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:'10px', borderRadius:10,
+            border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>
+            {lang==='ru'?'Отмена':'Annuler'}
+          </button>
+          <button onClick={onConfirm} disabled={busy} className="serif" style={{ flex:1.3, padding:'10px',
+            borderRadius:10, background:'#8F3A2E', color:'#fff', fontSize:13.5, fontWeight:700 }}>
+            {lang==='ru'?'Удалить':'Supprimer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 const input = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
   background:T.card, fontSize:13.5, color:T.ink }
 
@@ -71,7 +98,7 @@ export function IdentityPicker({ lang, onClose }) {
 // ══════ Nouvelle espèce ══════
 const EMOJIS = ['🦌','🦊','🐺','🐆','🦡','🦫','🐗','🐇','🐿️','🦔','🦉','🦅','🐦','🪽','🦆','🌳','🌲','🍁','🍄','🍃','🦋','🪲','🐝','🐌','🐸','🐍','🐟','🌸','🌾','🧍']
 
-export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, onSaved }) {
+export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, onSaved, onDeleted }) {
   const isEdit = !!initial
   const cats = allCats()
   const [n, setN] = useState(initial?.n || '')
@@ -86,6 +113,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [hab, setHab] = useState(initial?.hab || '')
   const [dng, setDng] = useState(initial?.dng || '')
   const [busy, setBusy] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const catObj = cats.find(c=>c.id===cat) || cats[0]
   const covers = isEdit ? individualCovers(initial) : []
   const [cover, setCoverLocal] = useState(initial?.cover || null)
@@ -100,6 +128,12 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
     if (isEdit) await editSpecies(initial.id, fields)
     else await addSpecies(fields)
     setBusy(false); onSaved?.(); onClose()
+  }
+
+  const remove = async () => {
+    setBusy(true)
+    await removeSpecies(initial.id)
+    setBusy(false); onDeleted?.(); onClose()
   }
 
   return (
@@ -197,9 +231,23 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
         <textarea value={hab} onChange={ev=>setHab(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
         <label style={label}>{lang==='ru'?'Опасность':'Danger'}</label>
         <textarea value={dng} onChange={ev=>setDng(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
+
+        {isEdit && (
+          <button onClick={()=>setConfirmDel(true)} disabled={busy} style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,
+            border:'1px dashed #C9877C', background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
+            display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
+            {lang==='ru'?'Удалить этот вид':'Supprimer cette espèce'}
+          </button>
+        )}
       </div>
 
       <ValidateBar lang={lang} onCancel={onClose} onSave={save} busy={busy} disabled={!n.trim()} />
+      {confirmDel && <ConfirmDialog lang={lang}
+        title={lang==='ru'?'Удалить этот вид?':'Supprimer cette espèce ?'}
+        message={lang==='ru'?'Все наблюдения этого вида будут потеряны. Это действие необратимо.'
+          :'Toutes ses observations seront perdues. Cette action est irréversible.'}
+        busy={busy} onCancel={()=>setConfirmDel(false)} onConfirm={remove} />}
     </Modal>
   )
 }
@@ -224,102 +272,85 @@ export function ValidateBar({ lang, onCancel, onSave, busy, disabled }) {
   )
 }
 
-// ══════ Marquer une observation ══════
-export function ObservationEditor({ sp, lang, onClose, onSaved }) {
-  const me = getMe() || allPlayers()[0]?.name
-  const [who, setWho] = useState(me)
-  const [methods, setMethods] = useState(sp.obs?.[me] || [])
-  const [busy, setBusy] = useState(false)
-  const toggle = (m) => setMethods(v => v.includes(m) ? v.filter(x=>x!==m) : [...v, m])
-  return (
-    <Modal onClose={onClose}>
-      <div style={{ padding:'20px 22px 12px' }}>
-        <div className="serif" style={{ fontSize:18, fontWeight:900, color:T.ink, marginBottom:3 }}>
-          {lang==='ru'?'Отметить наблюдение':'Marquer une observation'}
-        </div>
-        <div style={{ fontSize:12.5, color:T.soft, marginBottom:6 }}>{sp.e} {sp.n}</div>
-        <label style={label}>{lang==='ru'?'Наблюдатель':'Observateur'}</label>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {allPlayers().filter(p=>!p.demo).map(p=>(
-            <button key={p.name} onClick={()=>{ setWho(p.name); setMethods(sp.obs?.[p.name]||[]) }}
-              style={{ fontSize:12, padding:'6px 12px', borderRadius:14,
-                border:`1px solid ${who===p.name?T.clay:T.line}`,
-                background:who===p.name?T.clay:'transparent', color:who===p.name?'#fff':T.soft }}>{p.name}</button>
-          ))}
-        </div>
-        <label style={label}>{lang==='ru'?'Способ':'Comment ?'}</label>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          {Object.entries(METHODS).map(([k,m])=>{
-            const on = methods.includes(k)
-            return (
-              <button key={k} onClick={()=>toggle(k)} style={{ fontSize:12, padding:'8px 13px', borderRadius:14,
-                border:`1px solid ${on?m.c:T.line}`, background:on?m.c:'transparent',
-                color:on?m.on:T.soft, fontWeight:on?600:400, display:'flex', alignItems:'center', gap:5 }}>
-                {k==='eye'?'👁':k==='scope'?'🔭':k==='night'?'🌙':'📷'} {m.l} ×{m.mult}
-              </button>
-            )
-          })}
-        </div>
-        {methods.length===0 && (
-          <div style={{ fontSize:11.5, color:T.mute, marginTop:10 }}>
-            {lang==='ru'?'Без способа наблюдение будет удалено.':'Sans méthode, l\u2019observation sera retirée.'}
-          </div>
-        )}
-      </div>
-      <ValidateBar lang={lang} onCancel={onClose} busy={busy}
-        onSave={async()=>{ setBusy(true); await setObservation(sp.id, who, methods); setBusy(false); onSaved?.(); onClose() }} />
-    </Modal>
-  )
+// ══════ Nouvelle observation (passage ou familier) — ou édition d'une observation existante ══════
+
+// "12/6/2026" (toLocaleDateString('fr-FR')) → "2026-06-12" (valeur attendue par <input type="date">)
+function frDateToIso(s) {
+  const m = (s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (!m) return new Date().toISOString().slice(0,10)
+  const [,dd,mm,yyyy] = m
+  return `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`
 }
 
-// ══════ Nouvelle observation (passage ou familier) ══════
-
-export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
+export function SightingEditor({ lang, species, presetSp, editing, onClose, onSaved }) {
   const me = getMe() || allPlayers()[0]?.name || ''
-  const [spId, setSpId] = useState(presetSp?.id || '')
+  const editSp = editing?.sp, editInd = editing?.ind
+  const isEdit = !!editing
+  const [spId, setSpId] = useState(editSp?.id || presetSp?.id || '')
   const [q, setQ] = useState('')
-  const [named, setNamed] = useState(false)
-  const [name, setName] = useState('')
-  const [note, setNote] = useState('')
-  const [traits, setTraits] = useState('')
-  const [story, setStory] = useState('')
-  const [by, setBy] = useState(me)
-  const [method, setMethod] = useState('eye')
+  const [named, setNamed] = useState(editInd ? !!editInd.named : false)
+  const [name, setName] = useState(editInd?.displayName || editInd?.n || '')
+  const [note, setNote] = useState(editInd?.note || '')
+  const [traits, setTraits] = useState(editInd?.traits || '')
+  const [story, setStory] = useState(editInd?.story || '')
+  const [by, setBy] = useState(editInd?.by || me)
+  const [method, setMethod] = useState(editInd?.method || 'eye')
   const now = new Date()
-  const [d, setD] = useState(now.toISOString().slice(0,10))
-  const [time, setTime] = useState(now.toTimeString().slice(0,5))
-  const [weather, setWeather] = useState('')
-  const [lat, setLat] = useState('')
-  const [lon, setLon] = useState('')
+  const [d, setD] = useState(editInd ? frDateToIso(editInd.d) : now.toISOString().slice(0,10))
+  const [time, setTime] = useState(editInd?.time || now.toTimeString().slice(0,5))
+  const [weather, setWeather] = useState(editInd?.weather || '')
+  const [lat, setLat] = useState(editInd?.gps ? String(editInd.gps[0]) : '')
+  const [lon, setLon] = useState(editInd?.gps ? String(editInd.gps[1]) : '')
   const [busy, setBusy] = useState(false)
+  const [mapPick, setMapPick] = useState(false)
+  const [stagedFiles, setStagedFiles] = useState([])
+  const [blurry, setBlurryLocal] = useState(() => !!editSp?.blurry?.[editInd?.by])
+  const fileRef = useRef(null)
+  const { photos: existingPhotos } = usePhotos(isEdit ? `ind:${editSp?.id}:${editInd?.n}` : '')
 
-  const sp = species.find(s=>s.id===spId)
-  const results = q.trim()
+  const sp = isEdit ? editSp : species.find(s=>s.id===spId)
+  const isPlant = sp && ['arbres','arbustes','champignons','lichens'].includes(sp.cat)
+  const results = !isEdit && q.trim()
     ? species.filter(s=>s.n.toLowerCase().includes(q.toLowerCase().trim())).slice(0,8)
     : []
 
-  const locate = () => {
-    navigator.geolocation?.getCurrentPosition(
-      p => { setLat(p.coords.latitude.toFixed(5)); setLon(p.coords.longitude.toFixed(5)) },
-      () => {}, { enableHighAccuracy:true, timeout:8000 }
-    )
-  }
+  useEffect(() => { if (isPlant && method !== 'eye') setMethod('eye') }, [isPlant])
+
+  const addFiles = (files) => setStagedFiles(v => [...v, ...[...files].filter(f=>f.type.startsWith('image/'))])
+  const removeFile = (i) => setStagedFiles(v => v.filter((_,idx)=>idx!==i))
 
   const save = async () => {
     if (!spId) return
     setBusy(true)
+    const gps = (lat && lon) ? [parseFloat(lat), parseFloat(lon)] : null
+
+    if (isEdit) {
+      const fields = { note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'), time, by, method,
+        weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps }
+      await editSighting(spId, editInd.n, fields)
+      const wasNamed = !!namedOf(spId, editInd.n)
+      if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
+      else if (wasNamed) await demote(spId, editInd.n)
+      for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${editInd.n}`, f, '', by)
+      await setBlurry(spId, by, blurry)
+      setBusy(false); onSaved?.(spId); onClose()
+      return
+    }
+
     const label = named ? (name.trim() || 'Sans nom')
       : `Passage du ${new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
     const ind = {
       n: label, named, note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'),
       time, by, method, weather: weather.trim(), story: story.trim(),
       desc: '', b: [], traits: traits.trim(),
-      ...(lat && lon ? { gps:[parseFloat(lat), parseFloat(lon)] } : {}),
+      ...(gps ? { gps } : {}),
     }
     await addSighting(spId, ind)
+    for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${label}`, f, '', by)
     // marquer aussi l'espèce comme observée par cette personne
     const cur = sp?.obs?.[by] || []
     if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
+    if (blurry) await setBlurry(spId, by, true)
     setBusy(false); onSaved?.(spId); onClose()
   }
 
@@ -327,11 +358,15 @@ export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
     <Modal onClose={onClose} max={520}>
       <div style={{ padding:'20px 22px 0' }}>
         <div className="serif" style={{ fontSize:19, fontWeight:900, color:T.ink }}>
-          {lang==='ru'?'Новое наблюдение':'Nouvelle observation'}
+          {isEdit
+            ? (lang==='ru'?'Изменить наблюдение':'Modifier l’observation')
+            : (lang==='ru'?'Новое наблюдение':'Nouvelle observation')}
         </div>
         <div style={{ fontSize:12, color:T.soft, marginTop:3 }}>
-          {lang==='ru'?'Запишите встречу с животным или растением.'
-                     :'Note une rencontre : ce que tu as vu, où et quand.'}
+          {isEdit
+            ? (lang==='ru'?'Modifiez tous les détails de cette rencontre.':'Modifie tous les détails de cette rencontre.')
+            : (lang==='ru'?'Запишите встречу с животным или растением.'
+                         :'Note une rencontre : ce que tu as vu, où et quand.')}
         </div>
       </div>
       <div style={{ padding:'0 22px 12px' }}>
@@ -341,9 +376,11 @@ export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
             border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px' }}>
             <span style={{ fontSize:20 }}>{sp.e}</span>
             <span style={{ flex:1, fontSize:13.5, fontWeight:600, color:T.ink }}>{sp.n}</span>
-            <button onClick={()=>{ setSpId(''); setQ('') }} style={{ color:T.mute, fontSize:12 }}>
-              {lang==='ru'?'изменить':'changer'}
-            </button>
+            {!isEdit && (
+              <button onClick={()=>{ setSpId(''); setQ('') }} style={{ color:T.mute, fontSize:12 }}>
+                {lang==='ru'?'изменить':'changer'}
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -395,16 +432,72 @@ export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
             placeholder={lang==='ru'?'Шрам, окрас…':'Cicatrice, tache, bois…'} />
         </>}
 
-        <label style={label}>{lang==='ru'?'Способ':'Comment ?'}</label>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {Object.entries(METHODS).map(([k,m])=>(
-            <button key={k} onClick={()=>setMethod(k)} style={{ fontSize:11.5, padding:'7px 12px', borderRadius:14,
-              border:`1px solid ${method===k?m.c:T.line}`, background:method===k?m.c:'transparent',
-              color:method===k?m.on:T.soft, fontWeight:method===k?600:400 }}>
-              {k==='eye'?'👁':k==='scope'?'🔭':k==='night'?'🌙':'📷'} {m.l}
-            </button>
-          ))}
+        <label style={label}>{lang==='ru'?'Фото':'Photo(s)'}</label>
+        {isEdit && existingPhotos.length>0 && (
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+            {existingPhotos.map(p=>(
+              <div key={p.id} style={{ width:56, height:56, borderRadius:9, overflow:'hidden', border:`1px solid ${T.line}` }}>
+                <img src={p.thumbUrl||p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
+              </div>
+            ))}
+          </div>
+        )}
+        <div onDrop={e=>{ e.preventDefault(); addFiles(e.dataTransfer.files) }} onDragOver={e=>e.preventDefault()}
+          onClick={()=>fileRef.current?.click()}
+          style={{ border:`2px dashed ${T.line}`, borderRadius:12, padding:'14px', textAlign:'center',
+            cursor:'pointer', background:T.card }}>
+          <i className="ti ti-camera-plus" style={{ fontSize:20, color:T.clay }} aria-hidden="true" />
+          <div style={{ fontSize:11.5, color:T.soft, marginTop:4 }}>
+            {lang==='ru'?'Добавить фото':'Ajoute une ou plusieurs photos'}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+            onChange={e=>{ addFiles(e.target.files); e.target.value='' }} />
         </div>
+        {stagedFiles.length>0 && (
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
+            {stagedFiles.map((f,i)=>(
+              <div key={i} style={{ position:'relative', width:56, height:56, borderRadius:9, overflow:'hidden', border:`1px solid ${T.line}` }}>
+                <img src={URL.createObjectURL(f)} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                <button onClick={()=>removeFile(i)} style={{ position:'absolute', top:2, right:2, width:16, height:16,
+                  borderRadius:'50%', background:'rgba(0,0,0,.6)', color:'#fff', fontSize:10, lineHeight:1 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={()=>setBlurryLocal(v=>!v)} style={{ display:'flex', alignItems:'center', gap:8,
+          width:'100%', marginTop:9, padding:'9px 11px', borderRadius:10,
+          border:`1px solid ${blurry?T.clay:T.line}`, background:blurry?'#F0DDD0':'transparent', textAlign:'left' }}>
+          <span style={{ width:18, height:18, borderRadius:5, flexShrink:0,
+            border:`2px solid ${blurry?T.clay:T.line}`, background:blurry?T.clay:'transparent',
+            color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{blurry?'✓':''}</span>
+          <span style={{ fontSize:12, color:T.ink }}>
+            {lang==='ru'?'Фото нечёткое (очки ÷ 2)':'Photo floue (points divisés par deux)'}
+          </span>
+        </button>
+
+        {isPlant ? (
+          <>
+            <label style={label}>{lang==='ru'?'Способ':'Comment ?'}</label>
+            <div style={{ fontSize:11.5, color:T.mute, background:T.card, border:`1px solid ${T.line}`,
+              borderRadius:10, padding:'8px 11px', display:'flex', alignItems:'center', gap:6 }}>
+              👁 {lang==='ru'?'Только прямое наблюдение для растений и грибов.':'Vue directe uniquement pour le végétal et les champignons.'}
+            </div>
+          </>
+        ) : (
+          <>
+            <label style={label}>{lang==='ru'?'Способ':'Comment ?'}</label>
+            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+              {Object.entries(METHODS).map(([k,m])=>(
+                <button key={k} onClick={()=>setMethod(k)} style={{ fontSize:11.5, padding:'7px 12px', borderRadius:14,
+                  border:`1px solid ${method===k?m.c:T.line}`, background:method===k?m.c:'transparent',
+                  color:method===k?m.on:T.soft, fontWeight:method===k?600:400 }}>
+                  {k==='eye'?'👁':k==='scope'?'🔭':k==='night'?'🌙':'📷'} {m.l}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{ display:'flex', gap:8 }}>
           <div style={{ flex:1 }}>
@@ -432,9 +525,9 @@ export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
             style={{ ...input, flex:1, fontSize:12.5 }} />
           <input value={lon} onChange={e=>setLon(e.target.value)} placeholder="25.59392"
             style={{ ...input, flex:1, fontSize:12.5 }} />
-          <button onClick={locate} title="Ma position"
+          <button onClick={()=>setMapPick(true)} title={lang==='ru'?'Выбрать на карте':'Choisir sur la carte'}
             style={{ padding:'0 14px', borderRadius:10, border:`1px solid ${T.line}`,
-              background:T.card, color:T.clay, fontSize:16 }}>◎</button>
+              background:T.card, color:T.clay, fontSize:16 }}>📍</button>
         </div>
 
         <label style={label}>{lang==='ru'?'Условия':'Conditions'}</label>
@@ -451,6 +544,47 @@ export function SightingEditor({ lang, species, presetSp, onClose, onSaved }) {
           placeholder={lang==='ru'?'Что произошло…':'Raconte la rencontre…'} />
       </div>
       <ValidateBar lang={lang} onCancel={onClose} onSave={save} busy={busy} disabled={!spId} />
+      {mapPick && <GpsMapPicker lat={lat} lon={lon} lang={lang}
+        onCancel={()=>setMapPick(false)}
+        onPick={(p)=>{ setLat(p.lat.toFixed(5)); setLon(p.lon.toFixed(5)); setMapPick(false) }} />}
     </Modal>
+  )
+}
+
+// ══════ Sélection d'un point GPS sur la carte satellite du site ══════
+function GpsMapPicker({ lat, lon, lang, onCancel, onPick }) {
+  const [pos, setPos] = useState((lat && lon) ? { lat:parseFloat(lat), lon:parseFloat(lon) } : null)
+  const center = pos || CENTER
+  return (
+    <div onClick={onCancel} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.65)', zIndex:170,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:16, width:'100%', maxWidth:560,
+        border:`1px solid ${T.line}`, overflow:'hidden' }}>
+        <div style={{ padding:'13px 16px', borderBottom:`1px solid ${T.line}` }}>
+          <div className="serif" style={{ fontSize:15, fontWeight:800, color:T.ink }}>
+            {lang==='ru'?'Выбрать точку на карте':'Choisir le point sur la carte'}
+          </div>
+          <div style={{ fontSize:11, color:T.mute, marginTop:2 }}>
+            {lang==='ru'?'Нажмите на карту, чтобы установить координаты.':'Touche la carte pour placer le repère.'}
+          </div>
+        </div>
+        <div style={{ height:360, position:'relative' }}>
+          <SatMap center={center}
+            pins={pos ? [{ id:'pick', lat:pos.lat, lon:pos.lon, color:'#B5602F', emoji:'📍' }] : []}
+            addMode height={360} onMapClick={p=>setPos(p)} />
+        </div>
+        <div style={{ display:'flex', gap:8, padding:12 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:'10px', borderRadius:10,
+            border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>
+            {lang==='ru'?'Отмена':'Annuler'}
+          </button>
+          <button onClick={()=>pos && onPick(pos)} disabled={!pos} className="serif"
+            style={{ flex:1.4, padding:'10px', borderRadius:10, background:pos?T.clay:'#DDD3BE',
+              color:pos?'#fff':T.mute, fontSize:13.5, fontWeight:700 }}>
+            {lang==='ru'?'Подтвердить':'Valider ce point'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
