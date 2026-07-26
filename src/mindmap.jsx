@@ -330,8 +330,10 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     width:CARD_W, height:CARD_H, borderRadius:12, overflow:'hidden',
     display:'flex', flexDirection:'column', justifyContent:'flex-end',
     padding:8, textAlign:'left', border:'none', cursor:'pointer',
-    boxShadow: open ? '0 3px 12px rgba(43,38,32,.18)' : '0 1px 4px rgba(43,38,32,.08)',
-    transition:'box-shadow .15s, transform .15s', userSelect:'none',
+    // pas d'ombre floutée : coûteuse à recomposer sur mobile pendant un pan/zoom
+    // avec beaucoup de cartes visibles (grille dense d'un règne déployé)
+    boxShadow: open ? 'inset 0 0 0 1.5px rgba(43,38,32,.3)' : 'none',
+    userSelect:'none',
   }
 
   if (n.kind === 'root') return (
@@ -383,7 +385,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   return (
     <button onClick={onSp} data-tap-kind="sp" data-tap-id={sp.id} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
       {o
-        ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
+        ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} plain />
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
       {o && <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.66), transparent 55%)' }} />}
       <span style={{ position:'absolute', top:6, left:8, fontSize:17, filter:o?'none':'grayscale(.65)' }}>{sp.e}</span>

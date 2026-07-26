@@ -77,7 +77,9 @@ function useStoreTick() {
 }
 
 // ── Fond vignette d'espèce : reprend la photo choisie en réglages (ou la 1ère dispo) ──
-export function CoverBg({ sp, fallback, rounded = 0, thumb = true }) {
+// plain=true : saute le filtre colorimétrique (coûteux à composer sur mobile
+// quand beaucoup de vignettes sont visibles en même temps, ex. Mindmap dense)
+export function CoverBg({ sp, fallback, rounded = 0, thumb = true, plain = false }) {
   useStoreTick()
   const cover = coverPhoto(sp)
   const src = cover ? (thumb && cover.thumbUrl ? cover.thumbUrl : cover.url) : null
@@ -86,7 +88,7 @@ export function CoverBg({ sp, fallback, rounded = 0, thumb = true }) {
       background: cover ? '#1E2418' : fallback }}>
       {src && (
         <img src={src} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block', WebkitTouchCallout:'none' }} />
+          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:plain?'none':LUT, display:'block', WebkitTouchCallout:'none' }} />
       )}
     </div>
   )
