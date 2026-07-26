@@ -69,7 +69,7 @@ function NavCard({ c, wide, edit, onOpen, onEditPhoto }) {
   return (
     <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
       style={{ textAlign:'left', borderRadius:14, overflow:'hidden', border:'none', padding:0,
-        position:'relative', minHeight: wide?200:150 }}>
+        position:'relative', minHeight: wide?148:104 }}>
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(145deg,#39432E 0%,#5C6B48 100%)' }} />
       <div style={{ position:'absolute', inset:0, opacity: hover?1:0, transition:'opacity .3s' }}>
         <PhotoBg target={`site:card:${c.k}`} fallback="transparent" />
@@ -81,11 +81,11 @@ function NavCard({ c, wide, edit, onOpen, onEditPhoto }) {
           <i className="ti ti-camera-plus" style={{ fontSize:13 }} aria-hidden="true" />
         </button>
       )}
-      <div style={{ position:'relative', height:'100%', minHeight: wide?200:150, display:'flex', flexDirection:'column',
-        justifyContent:'flex-end', padding: wide?'22px':'18px' }}>
-        <span style={{ fontSize:10.5, letterSpacing:'1.4px', textTransform:'uppercase', color:'#C8DBA4', fontWeight:700, marginBottom:5 }}>{c.tag}</span>
-        <span className="serif" style={{ fontSize: wide?28:23, fontWeight:900, color:'#F2EEE2', lineHeight:1.05, letterSpacing:'-.6px' }}>{c.title}</span>
-        <span style={{ fontSize:12, color:'rgba(242,238,226,.76)', marginTop:6, lineHeight:1.45 }}>{c.sub}</span>
+      <div style={{ position:'relative', height:'100%', minHeight: wide?148:104, display:'flex', flexDirection:'column',
+        justifyContent:'flex-end', padding: wide?'17px':'14px' }}>
+        <span style={{ fontSize:10, letterSpacing:'1.4px', textTransform:'uppercase', color:'#C8DBA4', fontWeight:700, marginBottom:4 }}>{c.tag}</span>
+        <span className="serif" style={{ fontSize: wide?22:18, fontWeight:900, color:'#F2EEE2', lineHeight:1.05, letterSpacing:'-.6px' }}>{c.title}</span>
+        <span style={{ fontSize:11.5, color:'rgba(242,238,226,.76)', marginTop:4, lineHeight:1.4 }}>{c.sub}</span>
       </div>
     </button>
   )
@@ -104,8 +104,8 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
     { k:'gallery',   tag:t.browse,  title:t.gallery,   sub: lang==='ru'?'Все снимки особей':'Tous les clichés d\'individus' },
     { k:'quiz',      tag:t.play,    title:t.quiz,      sub: lang==='ru'?'Карточки-угадайки из ваших наблюдений':'Des cartes à deviner, tirées de vos observations' },
   ]
-  const heroH = wide ? 56 : 42
-  const bleed = wide ? 90 : 70
+  const heroH = wide ? 66 : 54
+  const bleed = wide ? 80 : 60
   return (
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
       <div style={{ position:'relative', height:`calc(${heroH}vh + ${bleed}px)`, minHeight:460, overflow:'hidden' }}>
@@ -143,16 +143,16 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
 
       <div style={{ position:'relative', marginTop:-bleed, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)',
-        padding: wide?'28px 40px 40px':'20px 20px 32px' }}>
-        <div style={{ display:'flex', gap:20, marginBottom:20, flexWrap:'wrap', justifyContent:'center' }}>
+        padding: wide?'22px 40px 32px':'16px 18px 24px' }}>
+        <div style={{ display:'flex', gap:20, marginBottom:16, flexWrap:'wrap', justifyContent:'center' }}>
           {[[SPECIES.length,t.species],[obs,t.observed],[CATS.length,t.reigns],[PLAYERS.length,t.observers]].map(([v,l])=>(
             <div key={l} style={{ textAlign:'center' }}>
-              <div className="serif" style={{ fontSize: wide?30:24, fontWeight:900, color:'#2B2620', lineHeight:1 }}>{v}</div>
-              <div style={{ fontSize:11.5, color:'#9A9081', marginTop:3 }}>{l}</div>
+              <div className="serif" style={{ fontSize: wide?26:20, fontWeight:900, color:'#2B2620', lineHeight:1 }}>{v}</div>
+              <div style={{ fontSize:11, color:'#9A9081', marginTop:3 }}>{l}</div>
             </div>
           ))}
         </div>
-        <div style={{ display:'grid', gridTemplateColumns: wide?'repeat(auto-fit,minmax(230px,1fr))':'1fr', gap:13 }}>
+        <div style={{ display:'grid', gridTemplateColumns: wide?'repeat(auto-fit,minmax(210px,1fr))':'1fr', gap:9 }}>
           {cards.map(c=>(
             <NavCard key={c.k} c={c} wide={wide} edit={edit}
               onOpen={()=> c.k==='quiz' ? onQuiz() : go(c.k)} onEditPhoto={onEditCard} />
@@ -160,7 +160,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
         </div>
       </div>
 
-      <div style={{ padding: wide?'56px 40px 20px':'40px 22px 14px', textAlign:'center', maxWidth:640, margin:'0 auto' }}>
+      <div style={{ padding: wide?'40px 40px 20px':'28px 22px 14px', textAlign:'center', maxWidth:640, margin:'0 auto' }}>
         <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
           <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
           <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:'#2B2620', whiteSpace:'nowrap' }}>

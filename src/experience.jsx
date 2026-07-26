@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { gradientFor } from './gradients.js'
 import { PhotoBg, PhotoHero, PhotoManager, usePhotos, LUT } from './photoui.jsx'
 
@@ -397,6 +397,11 @@ export default function Experience({ wide, onBack }) {
   const [photoTarget, setPhotoTarget] = useState(null)
   const l = TXT[lang]
 
+  // mémorise la position de défilement de chaque vue (accueil/activité/réservation)
+  const scrollPos = useRef({})
+  const goView = (v) => { scrollPos.current[view] = window.scrollY; setView(v) }
+  useEffect(() => { window.scrollTo(0, scrollPos.current[view] || 0) }, [view])
+
   const submitPw = () => {
     if (pw === 'arc') { setEdit(true); setPwOpen(false); setPw(''); try { localStorage.setItem('pludini_editExp', '1') } catch {} }
     else setPw('')
@@ -407,7 +412,7 @@ export default function Experience({ wide, onBack }) {
   }
   const openPhoto = (a) => setPhotoTarget({ target:`exp:activity:${a.id}`, label:a[lang].title })
 
-  if (view === 'booking') return <Booking lang={lang} onBack={()=>setView('home')} />
+  if (view === 'booking') return <Booking lang={lang} onBack={()=>goView('home')} />
 
   const activity = ALL_ACTIVITIES.find(a => a.id === activeId)
 
@@ -415,7 +420,7 @@ export default function Experience({ wide, onBack }) {
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {view === 'activity' && activity ? (
         <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} edit={edit}
-          onBack={()=>setView('home')} onEditPhoto={openPhoto} />
+          onBack={()=>goView('home')} onEditPhoto={openPhoto} />
       ) : (
         <>
           <div style={{ position:'relative', height:`calc(${wide?92:70}vh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
@@ -429,7 +434,7 @@ export default function Experience({ wide, onBack }) {
               <h1 className="serif" style={{ fontSize: wide?68:36, fontWeight:600, color:'#F2EEE2',
                 letterSpacing:'-1.4px', lineHeight:1.06, marginBottom:16 }}>{l.heroTitle}</h1>
               <p style={{ fontSize: wide?15.5:13, color:'rgba(237,231,216,.88)', maxWidth:480, lineHeight:1.65, marginBottom:26 }}>{l.heroSub}</p>
-              <button onClick={()=>setView('booking')} className="serif" style={{ background:T.clay, color:'#fff',
+              <button onClick={()=>goView('booking')} className="serif" style={{ background:T.clay, color:'#fff',
                 padding: wide?'14px 28px':'12px 22px', borderRadius:18, fontSize: wide?15:13.5, fontWeight:700,
                 display:'inline-flex', alignItems:'center', gap:8, boxShadow:'0 10px 28px rgba(0,0,0,.4)' }}>
                 {l.book}<i className="ti ti-arrow-up-right" style={{ fontSize:15 }} aria-hidden="true" />
@@ -447,7 +452,7 @@ export default function Experience({ wide, onBack }) {
               padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
               {ALL_ACTIVITIES.map(a => (
                 <ActivityTile key={a.id} a={a} lang={lang} edit={edit} wide={wide}
-                  onOpen={()=>{ setActiveId(a.id); setView('activity') }} onEditPhoto={openPhoto} />
+                  onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
               ))}
               {/* comble la dernière ligne sans étirer une vraie vignette ni laisser un trou visible */}
               {Array.from({ length:6 }).map((_,i) => (
