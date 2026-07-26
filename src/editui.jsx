@@ -309,7 +309,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const { photos: existingPhotos } = usePhotos(isEdit ? `ind:${editSp?.id}:${editInd?.n}` : '')
 
   const sp = isEdit ? editSp : species.find(s=>s.id===spId)
-  const isPlant = sp && ['arbres','arbustes','champignons','lichens'].includes(sp.cat)
+  // seuls mammifères et oiseaux se prêtent à l'affût/caméra — le reste (végétal, champignons, insectes…) s'observe à l'œil nu
+  const isPlant = sp && !['mammiferes','oiseaux'].includes(sp.cat)
   const results = !isEdit && q.trim()
     ? species.filter(s=>s.n.toLowerCase().includes(q.toLowerCase().trim())).slice(0,8)
     : []
@@ -481,7 +482,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
             <label style={label}>{lang==='ru'?'Способ':'Comment ?'}</label>
             <div style={{ fontSize:11.5, color:T.mute, background:T.card, border:`1px solid ${T.line}`,
               borderRadius:10, padding:'8px 11px', display:'flex', alignItems:'center', gap:6 }}>
-              👁 {lang==='ru'?'Только прямое наблюдение для растений и грибов.':'Vue directe uniquement pour le végétal et les champignons.'}
+              👁 {lang==='ru'?'Только прямое наблюдение для этой категории.':'Vue directe uniquement pour cette catégorie.'}
             </div>
           </>
         ) : (
