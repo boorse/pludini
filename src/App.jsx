@@ -715,16 +715,18 @@ export default function App() {
                   const m = sp.obs[pl.name]||[]
                   const best = m.length ? m.reduce((b,x)=>(METHODS[x]?.mult||0)>(METHODS[b]?.mult||0)?x:b, m[0]) : null
                   const p2 = calcPtsLive(sp, pl.name)
-                  // observation cochée sans individu associé (souvent un reliquat d'une
-                  // suppression d'individu antérieure à la correction de la cascade) :
-                  // seul cas où on propose de l'effacer directement depuis cette vignette
-                  const hasInd = sp.inds.some(i=>i.by===pl.name)
-                  const orphan = edit && m.length>0 && !hasInd
+                  // méthodes cochées sans individu qui les justifie encore (reliquat d'une
+                  // suppression d'individu antérieure à la correction de la cascade — y compris
+                  // partiel : un individu subsiste mais avec moins de méthodes qu'avant) :
+                  // seul cas où on propose de resynchroniser directement depuis cette vignette
+                  const indMethods = new Set(sp.inds.filter(i=>i.by===pl.name).map(i=>i.method).filter(Boolean))
+                  const orphanMethods = m.filter(x=>!indMethods.has(x))
+                  const orphan = edit && orphanMethods.length>0
                   return (
                     <div key={pl.id} style={{ position:'relative', background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'9px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
                       {orphan && (
-                        <button onClick={()=>setConfirmClearObs({ sp, player:pl.name })}
-                          title={lang==='ru'?'Удалить наблюдение (без особи)':'Effacer cette observation (sans individu)'}
+                        <button onClick={()=>setConfirmClearObs({ sp, player:pl.name, keep:[...indMethods] })}
+                          title={lang==='ru'?'Убрать способы без особи':'Retirer les méthodes sans individu'}
                           style={{ position:'absolute', top:-6, right:-6, width:18, height:18, borderRadius:'50%',
                             background:'#8F3A2E', color:'#fff', fontSize:10, lineHeight:1, display:'flex',
                             alignItems:'center', justifyContent:'center' }}>✕</button>
@@ -1283,14 +1285,14 @@ export default function App() {
           }
           setConfirmDelSighting(null); setCurInd(null); setRefresh(r=>r+1) }} />}
       {confirmClearObs && <ConfirmDialog lang={lang}
-        title={lang==='ru'?'Удалить это наблюдение?':'Effacer cette observation ?'}
-        message={lang==='ru'?'Способы наблюдения и очки этого наблюдателя для этого вида будут удалены.'
-          :'Les méthodes d’observation et les points de cet observateur pour cette espèce seront effacés.'}
+        title={lang==='ru'?'Убрать способы без особи?':'Retirer les méthodes sans individu ?'}
+        message={lang==='ru'?'Способы наблюдения, для которых больше нет особи, будут убраны (очки соответственно уменьшатся).'
+          :'Les méthodes d’observation qui ne correspondent plus à aucun individu seront retirées (les points seront recalculés en conséquence).'}
         onCancel={()=>setConfirmClearObs(null)}
         onConfirm={async()=>{
-          const { sp, player } = confirmClearObs
-          await setObservation(sp.id, player, [])
-          await setBlurry(sp.id, player, false)
+          const { sp, player, keep } = confirmClearObs
+          await setObservation(sp.id, player, keep)
+          if (!keep.length) await setBlurry(sp.id, player, false)
           setConfirmClearObs(null); setRefresh(r=>r+1) }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
       {spEditor && <SpeciesEditor lang={lang} initial={spEditor.initial} presetCat={spEditor.cat}
