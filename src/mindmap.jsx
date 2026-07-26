@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { TransformWrapper, TransformComponent, Virtualize, useControls, useTransformEffect } from 'react-zoom-pan-pinch'
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { RARITY, isObserved } from './data'
 import { allSpecies, allCats } from './store.js'
 import { gradientFor, gradientForCat } from './gradients.js'
@@ -7,12 +6,15 @@ import { nameOf, catNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
 const CARD_W = 92, CARD_H = 68, GAP_X = 14, LEVEL_Y = 118
-const GRID_STEP = 34
-const K_MIN = 0.22, K_MAX = 2.6
 // décalage vertical par colonne — évite une map trop horizontale
 const STAGGER = [0, 46, 16, 62, 30, 74]
 
+// état du geste au niveau module : ne disparaît pas si le composant se reconstruit
+const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
+
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, edit, onAddSpecies }) {
+  const wrapRef = useRef(null)
+
   const toggle = useCallback((id) => {
     setExpanded(prev => {
       const n = new Set(prev)
@@ -80,7 +82,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           c.y = n.y + CARD_H / 2 + 44 + row * rowH
           c.units = 1
           nodes.push(c)
-          links.push({ x1: n.x, y1: n.y + CARD_H / 2, x2: c.x, y2: c.y - CARD_H / 2 })
+          links.push({ x1: n.x, y1: n.y + CARD_H / 2, x2: c.x, y2: c.y - CARD_H / 2, depth, leaf: true })
         })
         return
       }
@@ -101,83 +103,160 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     return { nodes, links, width, height }
   }, [expanded, edit, SPECIES.length, CATS.length])
 
-  return (
-    <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
-      <TransformWrapper
-        initialScale={tf.k || 1} initialPositionX={tf.x || 0} initialPositionY={tf.y || 0}
-        minScale={K_MIN} maxScale={K_MAX}
-        // limitToBounds désactivé : la contrainte dépend d'une mesure correcte
-        // du wrapper au moment du calcul, ce qui a bloqué le pan (mais pas le
-        // zoom, recalculé indépendamment) sur mobile — comportement d'origine
-        // (pan libre, sans limite) plus sûr
-        limitToBounds={false}
-        wheel={{ step: 0.15 }} doubleClick={{ disabled: true }}
-      >
-        <MapView width={width} height={height} nodes={nodes} links={links} lang={lang}
-          expanded={expanded} toggle={toggle} onSelectSpecies={onSelectSpecies} onAddSpecies={onAddSpecies}
-          setExpanded={setExpanded} tf={tf} setTf={setTf} />
-      </TransformWrapper>
-    </div>
-  )
-}
+  const stageRef = useRef(null)
+  const liveRef = useRef({ ...tf })
+  const [view, setView] = useState(null)
 
-// composant interne : rendu sous <TransformWrapper>, seul endroit où les hooks
-// useControls/useTransformEffect de la librairie sont utilisables
-function MapView({ width, height, nodes, links, lang, expanded, toggle, onSelectSpecies, onAddSpecies, setExpanded, tf, setTf }) {
-  const { zoomIn, zoomOut, setTransform, instance } = useControls()
-
-  useTransformEffect(({ state }) => {
-    setTf({ x: state.positionX, y: state.positionY, k: state.scale })
-  })
-
-  const fit = useCallback((animationTime = 0) => {
-    const el = instance?.wrapperComponent
-    if (!el) return
-    const vw = el.clientWidth, vh = el.clientHeight
-    const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
-    setTransform((vw - width * k) / 2, 14, k, animationTime)
-  }, [width, height, setTransform, instance])
-
-  // recentre uniquement au tout premier affichage (tf encore à sa valeur par
-  // défaut) — un règne qu'on déplie ensuite ne fait plus sauter la vue
-  const didInitialFit = useRef(false)
-  useEffect(() => {
-    if (didInitialFit.current) return
-    if (tf.k === 1 && tf.x === 0 && tf.y === 0) { didInitialFit.current = true; fit() }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const computeView = useCallback(() => {
+    const el = wrapRef.current; if (!el) return
+    const { x, y, k } = liveRef.current
+    const M = 400 / k   // marge : on garde de quoi voir venir
+    setView({
+      x0: (-x) / k - M, x1: (-x + el.clientWidth) / k + M,
+      y0: (-y) / k - M, y1: (-y + el.clientHeight) / k + M,
+    })
   }, [])
 
+  const applyLive = () => {
+    const el = stageRef.current
+    if (el) el.style.transform = `translate3d(${liveRef.current.x}px,${liveRef.current.y}px,0) scale(${liveRef.current.k})`
+  }
+  useEffect(() => { liveRef.current = { ...tf }; applyLive(); computeView() }, [tf.x, tf.y, tf.k, computeView])
+
+  const fit = useCallback(() => {
+    const el = wrapRef.current; if (!el) return
+    const vw = el.clientWidth, vh = el.clientHeight
+    const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
+    const next = { x: (vw - width * k) / 2, y: 14, k }
+    liveRef.current = next; applyLive(); setTf(next)
+  }, [width, height, setTf])
+
+  useEffect(() => {
+    if (tf.k === 1 && tf.x === 0 && tf.y === 0) fit()
+    else computeView()
+  }, [fit, width, height])
+
+  // ── Pointer Events : un seul chemin pour souris, stylet et doigts ──
+  const ptrs = useRef(new Map())
+  const gest = useRef(null)
+
+  const onDown = (e) => {
+    const el = wrapRef.current; if (!el) return
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    G.moved = false
+    if (ptrs.current.size === 1) {
+      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, ox:liveRef.current.x, oy:liveRef.current.y }
+    } else if (ptrs.current.size === 2) {
+      try { el.setPointerCapture?.(e.pointerId) } catch {}
+      const [a,b] = [...ptrs.current.values()]
+      const r = el.getBoundingClientRect()
+      gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), k:liveRef.current.k,
+        x:liveRef.current.x, y:liveRef.current.y,
+        mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top }
+    }
+  }
+
+  const onMove = (e) => {
+    if (!ptrs.current.has(e.pointerId)) return
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const g = gest.current; if (!g) return
+
+    if (g.mode === 'pan' && ptrs.current.size === 1) {
+      const dx = e.clientX - g.sx, dy = e.clientY - g.sy
+      if (!G.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        G.moved = true
+        wrapRef.current?.setPointerCapture?.(e.pointerId)   // capture seulement en glissant
+      }
+      if (!G.moved) return
+      liveRef.current = { ...liveRef.current, x: g.ox + dx, y: g.oy + dy }
+      applyLive()
+    } else if (g.mode === 'zoom' && ptrs.current.size >= 2) {
+      const [a,b] = [...ptrs.current.values()]
+      const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
+      const k2 = Math.min(2.6, Math.max(0.22, g.k * ratio))
+      const r = k2 / g.k
+      liveRef.current = { k:k2, x: g.mx - (g.mx - g.x) * r, y: g.my - (g.my - g.y) * r }
+      applyLive(); G.moved = true
+    }
+  }
+
+  const onUp = (e) => {
+    try { wrapRef.current?.releasePointerCapture?.(e.pointerId) } catch {}
+    ptrs.current.delete(e.pointerId)
+    if (ptrs.current.size === 0) {
+      gest.current = null
+      // ne toucher à React que si l'on a vraiment bougé :
+      // sinon le re-rendu détruit le bouton avant que le clic n'arrive
+      if (G.moved) { setTf({ ...liveRef.current }); computeView() }
+      setTimeout(()=>{ G.moved = false }, 0)
+    } else if (ptrs.current.size === 1) {
+      const [p] = [...ptrs.current.values()]
+      gest.current = { mode:'pan', sx:p.x, sy:p.y, ox:liveRef.current.x, oy:liveRef.current.y }
+    }
+  }
+
+  const onWheel = useCallback((e) => {
+    e.preventDefault()
+    const el = wrapRef.current; if (!el) return
+    const r = el.getBoundingClientRect()
+    const mx = e.clientX - r.left, my = e.clientY - r.top
+    const cur = liveRef.current
+    const k2 = Math.min(2.6, Math.max(0.22, cur.k * (1 - e.deltaY * 0.0014)))
+    const ratio = k2 / cur.k
+    liveRef.current = { k:k2, x: mx - (mx - cur.x) * ratio, y: my - (my - cur.y) * ratio }
+    applyLive()
+    clearTimeout(onWheel._t)
+    onWheel._t = setTimeout(()=>setTf({ ...liveRef.current }), 140)
+  }, [setTf])
+
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [onWheel])
+
+  const zoomBy = (f) => {
+    const el = wrapRef.current; if (!el) return
+    const cx2 = el.clientWidth/2, cy2 = el.clientHeight/2
+    const cur = liveRef.current
+    const k2 = Math.min(2.6, Math.max(0.22, cur.k * f)), r = k2/cur.k
+    liveRef.current = { k:k2, x: cx2-(cx2-cur.x)*r, y: cy2-(cy2-cur.y)*r }
+    applyLive(); setTf({ ...liveRef.current })
+  }
+
+  const gridStep = 34
   return (
-    <>
+    <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
       <div style={{ position:'absolute', top:9, right:10, zIndex:5, display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
         <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
-        <button onClick={()=>fit(200)} style={btn}>Recentrer</button>
+        <button onClick={fit} style={btn}>Recentrer</button>
       </div>
       <div style={{ position:'absolute', bottom:52, right:10, zIndex:5, display:'flex', flexDirection:'column', gap:5 }}>
-        <button onClick={()=>zoomIn(0.3)} style={{ ...btn, width:34, height:34, padding:0, fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
-        <button onClick={()=>zoomOut(0.3)} style={{ ...btn, width:34, height:34, padding:0, fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
+        {[['+',1.28],['−',0.78]].map(([l,f])=>(
+          <button key={l} onClick={()=>zoomBy(f)} style={{ ...btn, width:34, height:34, padding:0,
+            fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>{l}</button>
+        ))}
       </div>
 
-      <TransformComponent wrapperStyle={{ flex:1, width:'100%', height:'100%' }} contentStyle={{}}>
-        <div style={{ width, height, position:'relative', cursor:'grab',
+      <div ref={wrapRef}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+        onPointerCancel={onUp} onPointerLeave={onUp} onLostPointerCapture={onUp}
+        onDragStart={e=>e.preventDefault()}
+        style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative',
+          cursor:'grab', touchAction:'none', userSelect:'none', WebkitUserSelect:'none',
           backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
-          backgroundSize:`${GRID_STEP}px ${GRID_STEP}px`, backgroundColor:'#E3DAC5' }}>
-          <svg width={width} height={height} style={{ position:'absolute', top:0, left:0, pointerEvents:'none' }}>
-            {links.map((l,i)=>{
-              const my = (l.y1 + l.y2) / 2
-              return <path key={i} d={`M${l.x1},${l.y1} C${l.x1},${my} ${l.x2},${my} ${l.x2},${l.y2}`}
-                fill="none" stroke={l.depth===0?'#B0A182':'#C6B99E'} strokeWidth={l.depth===0?2:1.4} />
-            })}
-          </svg>
-          {nodes.map(n => (
-            <Virtualize key={n.id} x={n.x - CARD_W/2} y={n.y - CARD_H/2} width={CARD_W} height={CARD_H} margin={400}>
-              <Card n={n} lang={lang} expanded={expanded}
-                toggle={()=>toggle(n.id)}
-                onSp={()=> n.kind==='add' ? onAddSpecies?.(n.cat, n.sub) : onSelectSpecies(n.sp.id)} />
-            </Virtualize>
-          ))}
+          backgroundSize:`${gridStep*tf.k}px ${gridStep*tf.k}px`,
+          backgroundPosition:`${tf.x}px ${tf.y}px`,
+          backgroundColor:'#E3DAC5' }}>
+        <div ref={stageRef} style={{ position:'absolute', transformOrigin:'0 0',
+          transform:`translate3d(${tf.x}px,${tf.y}px,0) scale(${tf.k})`, willChange:'transform' }}>
+          <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
+            view={view}
+            expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+            onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
+            onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
         </div>
-      </TransformComponent>
+      </div>
 
       <div style={{ display:'flex', gap:12, flexWrap:'wrap', padding:'8px 14px', borderTop:'1px solid #D3C7AE', fontSize:10.5, color:'#6B6357', background:'#E3DAC5', alignItems:'center' }}>
         {Object.entries(RARITY).map(([k,r])=>(
@@ -190,9 +269,37 @@ function MapView({ width, height, nodes, links, lang, expanded, toggle, onSelect
         </span>
         <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>
       </div>
-    </>
+    </div>
   )
 }
+
+const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onSp, onAdd, view }) {
+  // culling : on ne dessine que ce qui est visible, avec une marge généreuse
+  const vis = view
+    ? nodes.filter(n => n.x > view.x0 && n.x < view.x1 && n.y > view.y0 && n.y < view.y1)
+    : nodes
+  const visLinks = view
+    ? links.filter(l => Math.max(l.x1,l.x2) > view.x0 && Math.min(l.x1,l.x2) < view.x1
+                     && Math.max(l.y1,l.y2) > view.y0 && Math.min(l.y1,l.y2) < view.y1)
+    : links
+  return (
+    <>
+      <svg width={width} height={height} style={{ position:'absolute', top:0, left:0, pointerEvents:'none' }}>
+        {visLinks.map((l,i)=>{
+          const my = (l.y1 + l.y2) / 2
+          return <path key={i} d={`M${l.x1},${l.y1} C${l.x1},${my} ${l.x2},${my} ${l.x2},${l.y2}`}
+            fill="none" stroke={l.depth===0?'#B0A182':'#C6B99E'} strokeWidth={l.depth===0?2:1.4} />
+        })}
+      </svg>
+      {vis.map(n => (
+        <Card key={n.id} n={n} lang={lang} expanded={expanded}
+          toggle={()=>onToggle(n.id)}
+          onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)} />
+      ))}
+      <div style={{ width, height }} />
+    </>
+  )
+})
 
 const btn = { fontSize:10.5, padding:'5px 9px', borderRadius:12, background:'#EDE7D8', color:'#6B6357', border:'1px solid #D3C7AE' }
 
@@ -204,10 +311,8 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     width:CARD_W, height:CARD_H, borderRadius:12, overflow:'hidden',
     display:'flex', flexDirection:'column', justifyContent:'flex-end',
     padding:8, textAlign:'left', border:'none', cursor:'pointer',
-    // pas d'ombre floutée : coûteuse à recomposer sur mobile pendant un pan/zoom
-    // avec beaucoup de cartes visibles (grille dense d'un règne déployé)
-    boxShadow: open ? 'inset 0 0 0 1.5px rgba(43,38,32,.3)' : 'none',
-    userSelect:'none',
+    boxShadow: open ? '0 3px 12px rgba(43,38,32,.18)' : '0 1px 4px rgba(43,38,32,.08)',
+    transition:'box-shadow .15s, transform .15s', userSelect:'none',
   }
 
   if (n.kind === 'root') return (
@@ -259,7 +364,7 @@ function Card({ n, lang, expanded, toggle, onSp }) {
   return (
     <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
       {o
-        ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} plain />
+        ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
       {o && <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.66), transparent 55%)' }} />}
       <span style={{ position:'absolute', top:6, left:8, fontSize:17, filter:o?'none':'grayscale(.65)' }}>{sp.e}</span>
