@@ -576,7 +576,7 @@ export default function Experience({ wide, onBack }) {
           </div>
           <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 60px':'20px 16px 44px',
             borderRadius:18, overflow:'hidden' }}>
-            <PhotoBg target="exp:story" fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
+            <PhotoBg target="exp:story" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
           </div>
         </>
