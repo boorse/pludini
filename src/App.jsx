@@ -851,12 +851,6 @@ export default function App() {
                 title={lang==='ru'?'Изменить наблюдение':'Modifier cette observation'}>
                 <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
               </button>
-              <button onClick={(e)=>{ e.stopPropagation(); setConfirmDelSighting({ sp, ind }) }}
-                style={{ background:'rgba(139,58,46,.8)', color:'#fff', borderRadius:'50%', width:28, height:28,
-                  display:'flex', alignItems:'center', justifyContent:'center' }}
-                title={lang==='ru'?'Удалить':'Supprimer cette observation'}>
-                <i className="ti ti-trash" style={{ fontSize:13 }} aria-hidden="true" />
-              </button>
             </div>}
             <button onClick={()=>setCurInd(null)} style={{ position:'absolute', top:12, right:12, width:28, height:28, borderRadius:'50%', background:'rgba(0,0,0,.3)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
@@ -915,12 +909,20 @@ export default function App() {
                 {lang==='ru'?'Опознать эту особь и дать имя':'Reconnaître cet individu et lui donner un nom'}
               </button>
             )}
-            <IndPhotos spId={sp.id} indName={ind.n} />
             {ind.desc && (
               <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>Description</div>
                 <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.6 }}>{ind.desc}</div>
               </div>
+            )}
+            {edit && (
+              <button onClick={()=>setConfirmDelSighting({ sp, ind })}
+                style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,
+                  border:'1px dashed #C9877C', background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
+                  display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Удалить это наблюдение':'Supprimer cette observation'}
+              </button>
             )}
           </div>
         </div>
@@ -1397,20 +1399,6 @@ function SpeciesCell({ spId, method, label }) {
       <span style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(14,16,10,.72)',
         color:'#F2EEE2', fontSize:7, lineHeight:'10px', textAlign:'center' }}>{ico}</span>
     </span>
-  )
-}
-
-function IndPhotos({ spId, indName }) {
-  const { photos } = usePhotos(`ind:${spId}:${indName}`)
-  if (photos.length < 2) return null
-  return (
-    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(96px,1fr))', gap:7, marginBottom:9 }}>
-      {photos.slice(1).map(p=>(
-        <div key={p.id} style={{ borderRadius:10, overflow:'hidden', border:'1px solid #D3C7AE', aspectRatio:'1/1' }}>
-          <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
-        </div>
-      ))}
-    </div>
   )
 }
 
