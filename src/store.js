@@ -278,14 +278,29 @@ export async function removeSighting(spId, indName) {
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
 const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
 export function calcPtsLive(sp, player) {
-  const methods = sp.obs?.[player] || []
-  if (!methods.length) return 0
-  const best = methods.reduce((b,m)=>(METHODS[m]?.mult||0)>(METHODS[b]?.mult||0)?m:b, methods[0])
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
   const blurMult = sp.blurry?.[player] ? 0.5 : 1
-  const base = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1) * (METHODS[best]?.mult || 1)
   const bonusPts = (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
+  const rarityPts = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1)
+  const myInds = (sp.inds || []).filter(i => i.by === player)
+  let base
+  if (myInds.length) {
+    // chaque passage compte pour les points de sa propre méthode d'observation :
+    // seul le tout premier passage ajouté rapporte 100% des points de base,
+    // les suivants n'en rapportent que 10% (sinon cumuler les photos d'un
+    // même animal déjà reconnu gonflerait le score sans limite)
+    base = myInds.reduce((sum, ind, i) => {
+      const mult = METHODS[ind.method]?.mult || 1
+      return sum + rarityPts * mult * (i === 0 ? 1 : 0.1)
+    }, 0)
+  } else {
+    // pas encore de passage enregistré : méthode(s) cochée(s) sans individu
+    const methods = sp.obs?.[player] || []
+    if (!methods.length) return 0
+    const best = methods.reduce((b,m)=>(METHODS[m]?.mult||0)>(METHODS[b]?.mult||0)?m:b, methods[0])
+    base = rarityPts * (METHODS[best]?.mult || 1)
+  }
   return Math.round((base + bonusPts) * catMult * blurMult)
 }
 export function speciesPtsLive(player) {
