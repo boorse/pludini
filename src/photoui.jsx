@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { sb } from './supabase.js'
 import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe, coverPhoto, speciesPhotos } from './store.js'
 
-export const LUT = 'sepia(0.28) saturate(1.22) hue-rotate(342deg) brightness(0.97) contrast(1.06)'
+// pas de sepia/hue-rotate : ça écrasait le bleu du ciel et virait tout au
+// brun (l'effet "vieux filtre Instagram" signalé) — juste un peu de
+// saturation/contraste/lumière pour faire ressortir le ciel, le vert et
+// les fleurs sans dénaturer les couleurs
+export const LUT = 'saturate(1.15) contrast(1.06) brightness(1.02)'
 
 const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
   mute:'#9A9081', line:'#D3C7AE', clay:'#B5602F', sageDark:'#4A5D32' }
