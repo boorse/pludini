@@ -168,17 +168,20 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
             {lang==='ru'?'Фон':'Changer l\u2019image'}
           </button>
         )}
-        <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
-            <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
-          </button>
-          <div style={{ display:'flex', gap:5 }}>
-            {['fr','ru'].map(c=>(
-              <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
-                background: lang===c?'rgba(242,238,226,.9)':'rgba(242,238,226,.13)',
-                color: lang===c?'#2B2620':'rgba(242,238,226,.8)', fontWeight:600,
-                border:'1px solid rgba(242,238,226,.28)' }}>{c==='fr'?'FR':'RU'}</button>
-            ))}
+        <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
+          <div className="serif" style={{ fontSize: wide?16:14, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
+            </button>
+            <div style={{ display:'flex', gap:5 }}>
+              {['fr','ru'].map(c=>(
+                <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
+                  background: lang===c?'rgba(242,238,226,.9)':'rgba(242,238,226,.13)',
+                  color: lang===c?'#2B2620':'rgba(242,238,226,.8)', fontWeight:600,
+                  border:'1px solid rgba(242,238,226,.28)' }}>{c==='fr'?'FR':'RU'}</button>
+              ))}
+            </div>
           </div>
         </div>
         <div style={{ position:'relative', height:`${heroH}dvh`, display:'flex', flexDirection:'column', alignItems:'center',

@@ -179,20 +179,24 @@ function EditBtn({ onClick, style }) {
   )
 }
 
-function TopBar({ lang, setLang, onBack, backLabel }) {
+function TopBar({ lang, setLang, onBack, backLabel, siteTitle }) {
   return (
-    <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding:'18px 24px',
-      display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-      <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize:13 }}>
-        <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
-      </button>
-      <div style={{ display:'flex', gap:5 }}>
-        {['fr','ru','en'].map(c => (
-          <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
-            background: lang===c ? 'rgba(242,238,226,.9)' : 'rgba(242,238,226,.13)',
-            color: lang===c ? '#2B2620' : 'rgba(242,238,226,.8)', fontWeight:600,
-            border:'1px solid rgba(242,238,226,.28)' }}>{c.toUpperCase()}</button>
-        ))}
+    <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding:'18px 24px' }}>
+      {siteTitle && (
+        <div className="serif" style={{ fontSize:15, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>{siteTitle}</div>
+      )}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize:13 }}>
+          <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
+        </button>
+        <div style={{ display:'flex', gap:5 }}>
+          {['fr','ru','en'].map(c => (
+            <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
+              background: lang===c ? 'rgba(242,238,226,.9)' : 'rgba(242,238,226,.13)',
+              color: lang===c ? '#2B2620' : 'rgba(242,238,226,.8)', fontWeight:600,
+              border:'1px solid rgba(242,238,226,.28)' }}>{c.toUpperCase()}</button>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -495,7 +499,7 @@ export default function Experience({ wide, onBack }) {
           <div style={{ position:'relative', height:`calc(${wide?92:70}dvh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
             <AutoSlideshow target="exp:hero" fallback="linear-gradient(160deg,#2A2118 0%,#5C4A2E 45%,#A88B5C 100%)" arrows />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,14,10,.5) 0%, rgba(16,14,10,.1) 38%, rgba(16,14,10,.6) 100%)' }} />
-            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" />
+            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
             <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
               justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
