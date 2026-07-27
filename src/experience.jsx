@@ -220,15 +220,15 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle }) {
 }
 
 // ── Fond photo qui défile tout seul toutes les 7s, glissement latéral (pas de coupe sèche) ──
-function AutoSlideshow({ target, fallback, arrows }) {
+function AutoSlideshow({ target, fallback, arrows, intervalMs = 7000 }) {
   const { photos } = usePhotos(target)
   const [idx, setIdx] = useState(0)
   useEffect(() => { if (idx >= photos.length) setIdx(0) }, [photos.length, idx])
   useEffect(() => {
     if (photos.length < 2) return
-    const t = setInterval(() => setIdx(i => (i+1) % photos.length), 7000)
+    const t = setInterval(() => setIdx(i => (i+1) % photos.length), intervalMs)
     return () => clearInterval(t)
-  }, [photos.length])
+  }, [photos.length, intervalMs])
   const many = photos.length > 1
   return (
     <div style={{ position:'absolute', inset:0, overflow:'hidden', background: photos.length ? '#1E2418' : fallback }}>
@@ -332,20 +332,21 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
 function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
   const [hover, setHover] = useState(false)
   const at = a[lang]
+  // décalage propre à chaque case : avec une moyenne de (nb de cases × 4s) par
+  // case, on obtient un changement toutes les ~4s en regardant toute la
+  // grille, sans que les cases changent en même temps (intervalle tiré au sort)
+  const [slideInterval] = useState(() => ALL_ACTIVITIES.length * 4000 * (0.5 + Math.random()))
   return (
     <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
       style={{ position:'relative', width:'100%', aspectRatio:'1', overflow:'hidden', border:'none', padding:0, borderRadius:14 }}>
-      <div style={{ position:'absolute', inset:0, filter: hover ? 'none' : 'grayscale(0.55) brightness(0.87)', transition:'filter .25s' }}>
-        <AutoSlideshow target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} />
+      <div style={{ position:'absolute', inset:0, filter:'grayscale(0.3) brightness(0.92)',
+        transform: hover ? 'scale(1.07)' : 'scale(1)', transition:'transform .35s ease' }}>
+        <AutoSlideshow target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} intervalMs={slideInterval} />
       </div>
-      <div style={{ position:'absolute', inset:0, background:'rgba(16,14,10,.5)', opacity: hover?1:0,
-        transition:'opacity .2s', display:'flex', alignItems:'center', justifyContent:'center', padding:14 }}>
-        <span className="serif" style={{ color:'#F2EEE2', fontSize:19, fontWeight:700, textAlign:'center', lineHeight:1.2 }}>{at.title}</span>
+      <div style={{ position:'absolute', left:0, right:0, bottom:0, pointerEvents:'none',
+        background:'linear-gradient(to top, rgba(16,14,10,.82), transparent 65%)', padding:'22px 12px 10px' }}>
+        <span className="serif" style={{ color:'#F2EEE2', fontSize:14.5, fontWeight:700, lineHeight:1.2 }}>{at.title}</span>
       </div>
-      {!hover && (
-        <span style={{ position:'absolute', bottom:10, left:10, fontSize:11, background:'rgba(0,0,0,.45)',
-          color:'#F2EEE2', padding:'3px 8px', borderRadius:10 }}>{seasonLabel(lang, a.seasons)}</span>
-      )}
       {edit && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:10, right:10, padding:'6px 9px' }} />}
     </button>
   )

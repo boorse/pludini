@@ -1248,8 +1248,8 @@ export default function App() {
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {/* HEADER */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: wide?'12px 24px':'11px 16px', borderBottom:`1px solid ${T.line}`, background:T.surface, position:'sticky', top:0, zIndex:30 }}>
-        <button onClick={()=>goScreen('landing')} className="serif" style={{ fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:7 }}>
-          <BobberIcon size={19} style={{ marginRight: -2 }} />Pludini
+        <button onClick={()=>goScreen('landing')} className="serif" style={{ fontSize:42, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:10 }}>
+          <BobberIcon size={40} style={{ marginRight: -2 }} />Pludini
         </button>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <div style={{ display:'flex', gap:3 }}>
@@ -1449,9 +1449,9 @@ function Shell({ children, lang, setLang, onHome, edit, onToggleEdit }) {
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
         padding:'12px 24px', borderBottom:'1px solid #D3C7AE', background:'#E3DAC5', position:'sticky', top:0, zIndex:30 }}>
-        <button onClick={onHome} className="serif" style={{ fontSize:20, fontWeight:900, color:'#2B2620',
-          display:'flex', alignItems:'center', gap:7 }}>
-          <BobberIcon size={19} style={{ marginRight: -2 }} />Pludini
+        <button onClick={onHome} className="serif" style={{ fontSize:42, fontWeight:900, color:'#2B2620',
+          display:'flex', alignItems:'center', gap:10 }}>
+          <BobberIcon size={40} style={{ marginRight: -2 }} />Pludini
         </button>
         <div style={{ display:'flex', gap:5 }}>
           {['fr','ru'].map(c=>(
