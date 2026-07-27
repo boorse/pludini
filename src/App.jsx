@@ -878,6 +878,12 @@ export default function App() {
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
             {edit && <div style={{ position:'absolute', top:12, right:80, display:'flex', gap:5 }}>
+              <button onClick={(e)=>{ e.stopPropagation(); setPhotoTarget({ target:`ind:${sp.id}:${ind.n}`, label: ind.displayName || ind.n }) }}
+                style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
+                  display:'flex', alignItems:'center', justifyContent:'center' }}
+                title={lang==='ru'?'Управление фото':'Gérer les photos'}>
+                <i className="ti ti-photo" style={{ fontSize:13 }} aria-hidden="true" />
+              </button>
               <button onClick={(e)=>{ e.stopPropagation(); setSighting({ editing:{ sp, ind } }) }}
                 style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
                   display:'flex', alignItems:'center', justifyContent:'center' }}

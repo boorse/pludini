@@ -237,6 +237,29 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
   const { photos } = usePhotos('exp:comfort')
   const trackRef = useRef(null)
   const l = TXT[lang]
+  const loop = photos.length > 1
+  const items = loop ? [...photos, ...photos, ...photos] : (photos.length ? photos : [null])
+
+  // Boucle infinie : on affiche 3 copies de la liste et on recentre discrètement
+  // (sans animation) sur la copie du milieu dès qu'on dérive vers une copie voisine.
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el || !loop) return
+    el.scrollLeft = el.scrollWidth / 3
+  }, [loop, photos.length])
+
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el || !loop) return
+    const onScroll = () => {
+      const single = el.scrollWidth / 3
+      if (el.scrollLeft < single * 0.5) el.scrollLeft += single
+      else if (el.scrollLeft > single * 1.5) el.scrollLeft -= single
+    }
+    el.addEventListener('scroll', onScroll, { passive:true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [loop])
+
   const scrollNext = () => {
     const el = trackRef.current; if (!el) return
     const tile = el.firstElementChild
@@ -253,8 +276,8 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
         <div ref={trackRef} style={{ display:'flex', gap:10, overflowX:'auto', scrollSnapType:'x mandatory',
           WebkitOverflowScrolling:'touch', height: wide?'46dvh':'35dvh',
           padding: wide?'0 40px':'0 20px' }}>
-          {(photos.length ? photos : [null]).map((p,i)=>(
-            <div key={p?.id ?? i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
+          {items.map((p,i)=>(
+            <div key={p ? `${p.id}-${i}` : i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
               borderRadius:16, overflow:'hidden', scrollSnapAlign:'center',
               background: p ? '#1E2418' : 'linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)' }}>
               {p && <img src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
@@ -262,7 +285,7 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
             </div>
           ))}
         </div>
-        {photos.length > 1 && (
+        {loop && (
           <button onClick={scrollNext} aria-label="next" style={{ position:'absolute', top:'50%', right: wide?26:10,
             transform:'translateY(-50%)', width:38, height:38, borderRadius:'50%', background:'#C9D98A', color:'#22301C',
             fontSize:19, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center',

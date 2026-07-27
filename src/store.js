@@ -13,6 +13,7 @@ const S = {
   edits: {},         // spId -> champs modifiés
   sightings: {},     // spId -> [{ind, ...}]
   sightEdits: {},    // "sedit_spId::indName" -> {fields}
+  covers: {},        // target -> id de la photo choisie comme vignette
   ready: false,
 }
 const subs = new Set()
@@ -34,7 +35,7 @@ export async function loadAll() {
       caption: p.caption, by: p.author, pos: p.pos || '50% 50%' }
     ;(S.photos[p.target] ||= []).push(rec)
   })
-  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}
+  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -42,6 +43,7 @@ export async function loadAll() {
     if (r.kind === 'spedit')  S.edits[r.value.id] = r.value
     if (r.kind === 'sighting') (S.sightings[r.value.spId] ||= []).push({ ...r.value, key: r.key })
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
+    if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
   })
   S.ready = true
   notify()
@@ -49,7 +51,30 @@ export async function loadAll() {
 
 // ══════ PHOTOS ══════
 const EMPTY = Object.freeze([])
-export function photosFor(target) { return S.photos[target] || EMPTY }
+// la vignette choisie (réglages) passe en tête de liste — c'est elle que
+// PhotoBg/PhotoHero/etc. affichent par défaut (photos[0]), sans rien changer
+// ailleurs dans l'appli
+// Résultat mis en cache par target : useSyncExternalStore exige un snapshot
+// stable (même référence tant que rien n'a changé), sinon boucle infinie.
+const photosForCache = {}
+export function photosFor(target) {
+  const list = S.photos[target] || EMPTY
+  const coverId = S.covers[target] || null
+  const cached = photosForCache[target]
+  if (cached && cached.list === list && cached.coverId === coverId) return cached.result
+  let result = list
+  if (coverId) {
+    const idx = list.findIndex(p => p.id === coverId)
+    if (idx > 0) {
+      const copy = list.slice()
+      const [chosen] = copy.splice(idx, 1)
+      copy.unshift(chosen)
+      result = copy
+    }
+  }
+  photosForCache[target] = { list, coverId, result }
+  return result
+}
 export function allPhotos() {
   return Object.entries(S.photos).flatMap(([target, list]) => list.map(p => ({ ...p, target })))
 }
@@ -65,12 +90,45 @@ export async function removePhoto(target, id, path) {
   if (path) await sb.storage.from('photos').remove([path, path.replace(/\.jpg$/, '_t.jpg')])
   await sb.from('photos').delete().eq('id', id)
   S.photos[target] = (S.photos[target] || []).filter(p => p.id !== id)
+  if (S.covers[target] === id) delete S.covers[target]
   notify()
 }
+// écrit l'aperçu tout de suite (réactif), mais différe l'envoi réseau : sans
+// ça, cliquer plusieurs fois de suite pour affiner le point envoie une
+// requête par clic, et rien ne garantit que la dernière arrivée au serveur
+// soit la dernière envoyée — le point choisi ne "tenait" pas au rechargement
+const posTimers = {}
+const posPending = {}
 export async function setPhotoPos(target, id, pos) {
   S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, pos } : p)
   notify()
+  posPending[id] = pos
+  clearTimeout(posTimers[id])
+  posTimers[id] = setTimeout(() => flushPhotoPos(id), 500)
+}
+// à appeler à la fermeture du sélecteur de point focal : sans ça, un envoi
+// encore en attente (moins de 500ms) est perdu si l'utilisateur ferme tout
+// de suite après avoir choisi son point
+export async function flushPhotoPos(id) {
+  if (!(id in posPending)) return
+  clearTimeout(posTimers[id])
+  delete posTimers[id]
+  const pos = posPending[id]
+  delete posPending[id]
   await sb.from('photos').update({ pos }).eq('id', id)
+}
+
+// ══════ VIGNETTE CHOISIE (par cible, pour tout type de photo) ══════
+export function coverIdFor(target) { return S.covers[target] || null }
+export async function setPhotoCover(target, photoId) {
+  S.covers[target] = photoId; notify()
+  const key = 'cover_' + String(target).replace(/[^a-zA-Z0-9_:.-]/g, '_')
+  await sb.from('overrides').upsert({ kind:'cover', key, value:{ target, photoId }, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+export async function clearPhotoCover(target) {
+  delete S.covers[target]; notify()
+  const key = 'cover_' + String(target).replace(/[^a-zA-Z0-9_:.-]/g, '_')
+  await sb.from('overrides').delete().eq('key', key)
 }
 
 // ══════ FAMILIERS ══════

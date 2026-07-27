@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { sb } from './supabase.js'
-import { photosFor, addPhotoRec, removePhoto, setPhotoPos, subscribe, allPlayers, getMe, coverPhoto, speciesPhotos } from './store.js'
+import { photosFor, addPhotoRec, removePhoto, setPhotoPos, flushPhotoPos, subscribe, allPlayers, getMe, coverPhoto, speciesPhotos,
+         coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
 
 // pas de sepia/hue-rotate : ça écrasait le bleu du ciel et virait tout au
 // brun (l'effet "vieux filtre Instagram" signalé) — juste un peu de
@@ -221,7 +222,9 @@ export function Lightbox({ photos, index, onIndex, onClose }) {
 
 
 export function PhotoManager({ target, label, lang, onClose }) {
+  useStoreTick() // pour que l'étoile de vignette choisie se mette à jour tout de suite
   const { photos } = usePhotos(target)
+  const coverId = coverIdFor(target)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
   const [caption, setCaption] = useState('')
@@ -289,9 +292,11 @@ export function PhotoManager({ target, label, lang, onClose }) {
                 {lang==='ru'?'Пока нет фотографий.':'Aucune photo pour l\u2019instant.'}
               </div>
             : <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))', gap:9 }}>
-                {photos.map(p=>(
+                {photos.map((p,i)=>{
+                  const isCover = coverId ? coverId===p.id : i===0
+                  return (
                   <div key={p.id} style={{ position:'relative', borderRadius:11, overflow:'hidden',
-                    border:`1px solid ${T.line}`, aspectRatio:'4/5' }}>
+                    border:`1px solid ${isCover?T.clay:T.line}`, aspectRatio:'4/5' }}>
                     <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
                       objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />
                     <button onClick={()=>setFocalPhoto(p)}
@@ -303,6 +308,14 @@ export function PhotoManager({ target, label, lang, onClose }) {
                     <button onClick={()=>removePhoto(target, p.id, p.path)}
                       style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%',
                         background:'rgba(0,0,0,.55)', color:'#fff', fontSize:12 }}>✕</button>
+                    <button onClick={()=>isCover ? clearPhotoCover(target) : setPhotoCover(target, p.id)}
+                      style={{ position:'absolute', bottom:6, right:6, width:24, height:24, borderRadius:'50%',
+                        background: isCover ? T.clay : 'rgba(0,0,0,.55)', color:'#fff', fontSize:12, display:'flex',
+                        alignItems:'center', justifyContent:'center', zIndex:2 }}
+                      title={isCover ? (lang==='ru'?'Обложка (нажмите, чтобы сбросить)':'Vignette actuelle (clique pour réinitialiser)')
+                                     : (lang==='ru'?'Сделать обложкой':'Choisir comme vignette')}>
+                      <i className="ti ti-star" style={{ fontSize:13 }} aria-hidden="true" />
+                    </button>
                     {(p.caption || p.by) && (
                       <div style={{ position:'absolute', left:0, right:0, bottom:0,
                         background:'linear-gradient(to top, rgba(14,16,10,.88), transparent)', padding:'14px 8px 7px' }}>
@@ -311,7 +324,8 @@ export function PhotoManager({ target, label, lang, onClose }) {
                       </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>}
         </div>
       </div>
@@ -325,6 +339,8 @@ function FocalPicker({ target, photo, lang, onClose }) {
   const [pos, setPos] = useState(photo.pos || '50% 50%')
   const boxRef = useRef(null)
   const [px, py] = pos.replace(/%/g,'').split(' ').map(Number)
+
+  useEffect(() => () => { flushPhotoPos(photo.id) }, [photo.id])
 
   const pick = (e) => {
     const box = boxRef.current, img = box?.querySelector('img')
