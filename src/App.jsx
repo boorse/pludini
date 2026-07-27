@@ -172,11 +172,8 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           </button>
         )}
         <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
-          <div className="serif" style={{ fontSize: wide?18:16, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
-              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
-            </button>
+            <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>Pludini Doc</div>
             <div style={{ display:'flex', gap:5 }}>
               {['fr','ru'].map(c=>(
                 <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
@@ -186,6 +183,9 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
               ))}
             </div>
           </div>
+          <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13, marginTop:6 }}>
+            <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
+          </button>
         </div>
         <div style={{ position:'relative', height:`${heroH}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
           justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>

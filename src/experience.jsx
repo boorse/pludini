@@ -196,16 +196,13 @@ function EditBtn({ onClick, style }) {
   )
 }
 
-function TopBar({ lang, setLang, onBack, backLabel, siteTitle }) {
+function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide }) {
   return (
-    <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding:'18px 24px' }}>
-      {siteTitle && (
-        <div className="serif" style={{ fontSize:30, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>{siteTitle}</div>
-      )}
+    <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize:13 }}>
-          <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
-        </button>
+        {siteTitle
+          ? <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>{siteTitle}</div>
+          : <div />}
         <div style={{ display:'flex', gap:5 }}>
           {['fr','ru','en'].map(c => (
             <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
@@ -215,6 +212,9 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle }) {
           ))}
         </div>
       </div>
+      <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13, marginTop:6 }}>
+        <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
+      </button>
     </div>
   )
 }
@@ -366,7 +366,7 @@ function ActivityDetail({ a, lang, setLang, wide, edit, onBack, onEditPhoto }) {
       <div style={{ position:'relative', height: wide?'68vh':'44vh', minHeight:300, overflow:'hidden' }}>
         <PhotoHero target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,14,10,.75), transparent 50%)', pointerEvents:'none' }} />
-        <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel={l.activitiesTitle} />
+        <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel={l.activitiesTitle} wide={wide} />
         {edit && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:64 }} />}
         <div style={{ position:'absolute', left:0, right:0, bottom:0, padding: wide?'0 40px 30px':'0 20px 22px' }}>
           <span style={{ fontSize: wide?38:30 }}>{a.icon}</span>
@@ -535,7 +535,7 @@ export default function Experience({ wide, onBack }) {
             {/* assombrit légèrement juste derrière le texte central, pas toute la photo */}
             <div style={{ position:'absolute', inset:0, pointerEvents:'none',
               background:'radial-gradient(ellipse 55% 42% at 50% 50%, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 72%)' }} />
-            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" />
+            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" wide={wide} />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
             <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
               justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
