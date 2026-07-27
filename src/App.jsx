@@ -160,6 +160,9 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
       <div style={{ position:'relative', height:`calc(${heroH}dvh + ${bleed}px)`, minHeight:460, overflow:'hidden' }}>
         <PhotoBg target="site:hero" thumb={false} fallback="linear-gradient(155deg,#22301C 0%,#3E5233 42%,#6E8557 78%,#94A874 100%)" />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,20,12,.55) 0%, rgba(16,20,12,.12) 40%, rgba(16,20,12,.4) 75%, rgba(16,20,12,.58) 100%)' }} />
+        {/* assombrit légèrement juste derrière le texte central, pas toute la photo */}
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+          background:'radial-gradient(ellipse 55% 42% at 50% 50%, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 72%)' }} />
         {edit && (
           <button onClick={onEditHero} style={{ position:'absolute', top:64, right:20, zIndex:4,
             background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'7px 13px',

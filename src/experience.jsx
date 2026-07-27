@@ -527,6 +527,9 @@ export default function Experience({ wide, onBack }) {
           <div style={{ position:'relative', height:`calc(${wide?92:70}dvh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
             <AutoSlideshow target="exp:hero" fallback="linear-gradient(160deg,#2A2118 0%,#5C4A2E 45%,#A88B5C 100%)" arrows />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(16,14,10,.5) 0%, rgba(16,14,10,.1) 38%, rgba(16,14,10,.6) 100%)' }} />
+            {/* assombrit légèrement juste derrière le texte central, pas toute la photo */}
+            <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+              background:'radial-gradient(ellipse 55% 42% at 50% 50%, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 72%)' }} />
             <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
             <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
