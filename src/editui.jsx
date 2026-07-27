@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
-         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry,
+         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated,
          individualCovers, setCover, clearCover } from './store.js'
 import { RARITY, METHODS, SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
@@ -307,6 +307,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const [mapPick, setMapPick] = useState(false)
   const [stagedFiles, setStagedFiles] = useState([])
   const [blurry, setBlurryLocal] = useState(() => !!editSp?.blurry?.[editInd?.by])
+  const [pixelated, setPixelatedLocal] = useState(() => !!editSp?.pixelated?.[editInd?.by])
   const fileRef = useRef(null)
   const { photos: existingPhotos } = usePhotos(isEdit ? `ind:${editSp?.id}:${editInd?.n}` : '')
 
@@ -337,6 +338,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         else if (wasNamed) await demote(spId, editInd.n)
         for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${editInd.n}`, f, '', by)
         await setBlurry(spId, by, blurry)
+        await setPixelated(spId, by, pixelated)
         onSaved?.(spId); onClose()
         return
       }
@@ -355,6 +357,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       const cur = sp?.obs?.[by] || []
       if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
       if (blurry) await setBlurry(spId, by, true)
+      if (pixelated) await setPixelated(spId, by, true)
       onSaved?.(spId); onClose()
     } catch (e) {
       // sans ce filet, un échec réseau/upload laissait le bouton bloqué sur
@@ -485,6 +488,17 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
             color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{blurry?'✓':''}</span>
           <span style={{ fontSize:12, color:T.ink }}>
             {lang==='ru'?'Фото нечёткое (очки ÷ 2)':'Photo floue (points divisés par deux)'}
+          </span>
+        </button>
+
+        <button onClick={()=>setPixelatedLocal(v=>!v)} style={{ display:'flex', alignItems:'center', gap:8,
+          width:'100%', marginTop:6, padding:'9px 11px', borderRadius:10,
+          border:`1px solid ${pixelated?T.clay:T.line}`, background:pixelated?'#F0DDD0':'transparent', textAlign:'left' }}>
+          <span style={{ width:18, height:18, borderRadius:5, flexShrink:0,
+            border:`2px solid ${pixelated?T.clay:T.line}`, background:pixelated?T.clay:'transparent',
+            color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{pixelated?'✓':''}</span>
+          <span style={{ fontSize:12, color:T.ink }}>
+            {lang==='ru'?'Фото пикселизировано (очки ÷ 2)':'Photo pixelisée (points divisés par deux)'}
           </span>
         </button>
 

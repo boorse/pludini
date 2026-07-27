@@ -244,6 +244,14 @@ export async function setBlurry(spId, player, isBlurry) {
   const prev = S.edits[spId]?.fields || {}
   await editSpecies(spId, { ...prev, blurry })
 }
+// ── Même principe, pour une photo pixelisée / basse résolution (÷2 points, cumulable avec le flou) ──
+export async function setPixelated(spId, player, isPixelated) {
+  const sp = allSpecies().find(s => s.id === spId); if (!sp) return
+  const pixelated = { ...(sp.pixelated || {}) }
+  if (isPixelated) pixelated[player] = true; else delete pixelated[player]
+  const prev = S.edits[spId]?.fields || {}
+  await editSpecies(spId, { ...prev, pixelated })
+}
 
 // ══════ OBSERVATIONS ══════
 export async function addSighting(spId, ind) {
@@ -281,6 +289,7 @@ export function calcPtsLive(sp, player) {
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
   const blurMult = sp.blurry?.[player] ? 0.5 : 1
+  const pixelMult = sp.pixelated?.[player] ? 0.5 : 1
   const bonusPts = (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
   const rarityPts = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1)
   const myInds = (sp.inds || []).filter(i => i.by === player)
@@ -301,7 +310,7 @@ export function calcPtsLive(sp, player) {
     const best = methods.reduce((b,m)=>(METHODS[m]?.mult||0)>(METHODS[b]?.mult||0)?m:b, methods[0])
     base = rarityPts * (METHODS[best]?.mult || 1)
   }
-  return Math.round((base + bonusPts) * catMult * blurMult)
+  return Math.round((base + bonusPts) * catMult * blurMult * pixelMult)
 }
 export function speciesPtsLive(player) {
   return allSpecies().reduce((s, sp) => s + calcPtsLive(sp, player), 0)
