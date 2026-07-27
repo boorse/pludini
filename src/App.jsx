@@ -169,7 +169,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           </button>
         )}
         <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
-          <div className="serif" style={{ fontSize: wide?16:14, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
+          <div className="serif" style={{ fontSize: wide?32:28, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
               <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host

@@ -200,7 +200,7 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle }) {
   return (
     <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding:'18px 24px' }}>
       {siteTitle && (
-        <div className="serif" style={{ fontSize:15, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>{siteTitle}</div>
+        <div className="serif" style={{ fontSize:30, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>{siteTitle}</div>
       )}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize:13 }}>
