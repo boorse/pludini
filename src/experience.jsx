@@ -245,28 +245,53 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide }) {
 // ── Fond photo qui défile tout seul toutes les 7s, glissement latéral (pas de coupe sèche) ──
 function AutoSlideshow({ target, fallback, arrows, intervalMs = 7000 }) {
   const { photos } = usePhotos(target)
+  const n = photos.length
+  const many = n > 1
   const [idx, setIdx] = useState(0)
-  useEffect(() => { if (idx >= photos.length) setIdx(0) }, [photos.length, idx])
+  const [anim, setAnim] = useState(true)
+
+  // remise à zéro si la liste change (ajout/suppression de photo) — ne touche
+  // pas aux états transitoires -1/n utilisés pour la boucle sans à-coup
+  useEffect(() => { if (idx < -1 || idx > n) { setAnim(false); setIdx(0) } }, [n])
+
   useEffect(() => {
-    if (photos.length < 2) return
-    const t = setInterval(() => setIdx(i => (i+1) % photos.length), intervalMs)
+    if (!many) return
+    const t = setInterval(() => { setAnim(true); setIdx(i => i + 1) }, intervalMs)
     return () => clearInterval(t)
-  }, [photos.length, intervalMs])
-  const many = photos.length > 1
+  }, [many, intervalMs])
+
+  // boucle infinie toujours dans le même sens : un clone de la photo
+  // suivante (ou précédente) est affiché juste après le bord, puis on
+  // revient silencieusement (sans transition) sur la vraie photo une fois
+  // la transition terminée — invisible car strictement identique
+  useEffect(() => {
+    if (!many) return
+    if (idx === n) { const t = setTimeout(() => { setAnim(false); setIdx(0) }, 620); return () => clearTimeout(t) }
+    if (idx === -1) { const t = setTimeout(() => { setAnim(false); setIdx(n - 1) }, 620); return () => clearTimeout(t) }
+  }, [idx, n, many])
+
+  const display = many ? [photos[n - 1], ...photos, photos[0]] : photos
+  const next = () => { setAnim(true); setIdx(i => i + 1) }
+  const prev = () => { setAnim(true); setIdx(i => i - 1) }
+
   return (
     <div style={{ position:'absolute', inset:0, overflow:'hidden', background: photos.length ? '#1E2418' : fallback }}>
-      {photos.map((p,i)=>(
-        <img key={p.id} src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover',
-            objectPosition:p.pos||'50% 50%', filter:LUT, display:'block',
-            transform:`translateX(${(i-idx)*100}%)`, transition:'transform .6s cubic-bezier(.4,0,.2,1)' }} />
-      ))}
+      {display.map((p,j)=>{
+        const L = many ? j - 1 : j
+        return (
+          <img key={many ? `${p.id}-${j}` : p.id} src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
+            style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover',
+              objectPosition:p.pos||'50% 50%', filter:LUT, display:'block',
+              transform:`translateX(${(L-idx)*100}%)`,
+              transition: anim ? 'transform .6s cubic-bezier(.4,0,.2,1)' : 'none' }} />
+        )
+      })}
       {arrows && many && <>
-        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+photos.length)%photos.length) }}
+        <button onClick={(e)=>{ e.stopPropagation(); prev() }}
           style={{ position:'absolute', top:'50%', left:14, transform:'translateY(-50%)', zIndex:4,
             width:38, height:38, borderRadius:'50%', background:'rgba(0,0,0,.35)', color:'#fff',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>‹</button>
-        <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%photos.length) }}
+        <button onClick={(e)=>{ e.stopPropagation(); next() }}
           style={{ position:'absolute', top:'50%', right:14, transform:'translateY(-50%)', zIndex:4,
             width:38, height:38, borderRadius:'50%', background:'rgba(0,0,0,.35)', color:'#fff',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>›</button>
