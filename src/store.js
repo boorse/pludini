@@ -14,6 +14,7 @@ const S = {
   sightings: {},     // spId -> [{ind, ...}]
   sightEdits: {},    // "sedit_spId::indName" -> {fields}
   covers: {},        // target -> id de la photo choisie comme vignette
+  activityEdits: {}, // activityId -> { fr:{title,text}, ru:{...}, en:{...} } (Pludini Host)
   ready: false,
 }
 const subs = new Set()
@@ -36,6 +37,7 @@ export async function loadAll() {
     ;(S.photos[p.target] ||= []).push(rec)
   })
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
+  S.activityEdits = {}
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -44,6 +46,7 @@ export async function loadAll() {
     if (r.kind === 'sighting') (S.sightings[r.value.spId] ||= []).push({ ...r.value, key: r.key })
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
     if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
+    if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
   })
   S.ready = true
   notify()
@@ -251,6 +254,16 @@ export async function setPixelated(spId, player, isPixelated) {
   if (isPixelated) pixelated[player] = true; else delete pixelated[player]
   const prev = S.edits[spId]?.fields || {}
   await editSpecies(spId, { ...prev, pixelated })
+}
+
+// ══════ CHAPITRES DE PLUDINI HOST (titres/textes éditables) ══════
+export function activityEditsFor(id) { return S.activityEdits[id] || null }
+export async function editActivity(id, lang, fields) {
+  const key = `actedit_${id}`
+  const prev = S.activityEdits[id] || { id }
+  const value = { ...prev, [lang]: { ...(prev[lang] || {}), ...fields } }
+  S.activityEdits[id] = value; notify()
+  await sb.from('overrides').upsert({ kind:'activityedit', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
 
 // ══════ OBSERVATIONS ══════

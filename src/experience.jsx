@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { gradientFor } from './gradients.js'
 import { PhotoBg, PhotoHero, PhotoManager, usePhotos, LUT } from './photoui.jsx'
-import { getMe } from './store.js'
+import { getMe, subscribe, activityEditsFor, editActivity } from './store.js'
+
+// re-rendu forcé quand le magasin change — utilisé par la liste d'activités
+// (titres/textes éditables) qui n'a pas de snapshot figé possible
+function useStoreTick() {
+  const [, tick] = useState(0)
+  useEffect(() => subscribe(() => tick(x => x + 1)), [])
+}
 
 const T = {
   bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357', mute:'#9A9081',
@@ -120,6 +127,22 @@ const CATEGORIES = [
 ]
 
 const ALL_ACTIVITIES = CATEGORIES.flatMap(c => c.items)
+
+// titres/textes éditables : fusionne les surcharges par-dessus les données de
+// base, sans rien changer ailleurs (mêmes objets tant qu'aucune surcharge)
+function useActivities() {
+  useStoreTick()
+  return ALL_ACTIVITIES.map(a => {
+    const ov = activityEditsFor(a.id)
+    if (!ov) return a
+    return {
+      ...a,
+      fr: { ...a.fr, ...ov.fr },
+      ru: { ...a.ru, ...ov.ru },
+      en: { ...a.en, ...ov.en },
+    }
+  })
+}
 
 // nombre de colonnes toujours diviseur du total d'activités (12 → 2/3/4/6) :
 // la grille forme une masse compacte, sans ligne incomplète, à toute résolution
@@ -346,7 +369,7 @@ function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
       <div style={{ position:'absolute', inset:0, background:'rgba(16,14,10,.45)', pointerEvents:'none',
         display:'flex', alignItems:'center', justifyContent:'center', padding:14 }}>
         <span className="serif" style={{ color:'#F2EEE2', fontWeight:700, textAlign:'center', lineHeight:1.2,
-          fontSize: hover?22:19, transition:'font-size .35s ease' }}>{at.title}</span>
+          fontSize:19 }}>{at.title}</span>
       </div>
       {edit && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:10, right:10, padding:'6px 9px' }} />}
     </button>
@@ -354,7 +377,7 @@ function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
 }
 
 // ── Page détail d'une activité : grande photo (carrousel si plusieurs images) + texte ──
-function ActivityDetail({ a, lang, setLang, wide, edit, onBack, onEditPhoto }) {
+function ActivityDetail({ a, lang, setLang, wide, editImages, editText, onBack, onEditPhoto, onEditText }) {
   const at = a[lang]
   const l = TXT[lang]
   return (
@@ -363,7 +386,13 @@ function ActivityDetail({ a, lang, setLang, wide, edit, onBack, onEditPhoto }) {
         <PhotoHero target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,14,10,.75), transparent 50%)', pointerEvents:'none' }} />
         <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel={l.activitiesTitle} wide={wide} />
-        {edit && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:64 }} />}
+        {editImages && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:64 }} />}
+        {editText && (
+          <button onClick={()=>onEditText(a)} style={{ position:'absolute', top:64, right: editImages?60:12, zIndex:6,
+            background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'6px 9px' }}>
+            <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+          </button>
+        )}
         <div style={{ position:'absolute', left:0, right:0, bottom:0, padding: wide?'0 40px 30px':'0 20px 22px' }}>
           <span style={{ fontSize: wide?38:30 }}>{a.icon}</span>
           <h1 className="serif" style={{ fontSize: wide?40:27, fontWeight:800, color:'#F2EEE2', letterSpacing:'-.8px', margin:'6px 0 4px' }}>{at.title}</h1>
@@ -372,6 +401,54 @@ function ActivityDetail({ a, lang, setLang, wide, edit, onBack, onEditPhoto }) {
       </div>
       <div style={{ padding: wide?'36px 60px 60px':'26px 20px 44px', maxWidth:720, margin:'0 auto' }}>
         <p style={{ fontSize: wide?16:14, lineHeight:1.85, color:T.ink }}>{at.text}</p>
+      </div>
+    </div>
+  )
+}
+
+function ActivityEditor({ a, lang, onClose }) {
+  const at = a[lang]
+  const [title, setTitle] = useState(at.title)
+  const [text, setText] = useState(at.text)
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    await editActivity(a.id, lang, { title: title.trim(), text: text.trim() })
+    setBusy(false)
+    onClose()
+  }
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.45)', display:'flex',
+      alignItems:'center', justifyContent:'center', zIndex:170, padding:20 }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:22,
+        width:'100%', maxWidth:480, maxHeight:'86vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink, marginBottom:3 }}>
+          {lang==='ru'?'Изменить главу':lang==='en'?'Edit this chapter':'Modifier ce chapitre'} ({lang.toUpperCase()})
+        </div>
+        <div style={{ fontSize:11.5, color:T.mute, marginBottom:14, lineHeight:1.5 }}>
+          {lang==='ru'?'Смените язык вверху страницы, чтобы изменить каждую версию.'
+            :lang==='en'?'Switch language at the top of the page to edit each version.'
+            :'Change de langue en haut de la page pour éditer chaque version.'}
+        </div>
+        <label style={{ fontSize:11, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', display:'block', marginBottom:5 }}>
+          {lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre'}
+        </label>
+        <input value={title} onChange={e=>setTitle(e.target.value)} style={{ width:'100%', padding:'9px 12px',
+          borderRadius:10, border:`1px solid ${T.line}`, background:T.card, fontSize:14, marginBottom:14, color:T.ink }} />
+        <label style={{ fontSize:11, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', display:'block', marginBottom:5 }}>
+          {lang==='ru'?'Текст':lang==='en'?'Text':'Texte'}
+        </label>
+        <textarea value={text} onChange={e=>setText(e.target.value)} rows={7} style={{ width:'100%', padding:'9px 12px',
+          borderRadius:10, border:`1px solid ${T.line}`, background:T.card, fontSize:13, lineHeight:1.6, color:T.ink, resize:'vertical' }} />
+        <div style={{ display:'flex', gap:8, marginTop:16 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>
+            {lang==='ru'?'Отмена':lang==='en'?'Cancel':'Annuler'}
+          </button>
+          <button onClick={save} disabled={busy} className="serif" style={{ flex:1, padding:'10px', borderRadius:10,
+            background:T.clay, color:'#fff', fontSize:13, fontWeight:600, opacity:busy?.6:1 }}>
+            {busy ? '…' : (lang==='ru'?'Сохранить':lang==='en'?'Save':'Enregistrer')}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -492,7 +569,9 @@ export default function Experience({ wide, onBack }) {
   const [pwOpen, setPwOpen] = useState(false)
   const [pw, setPw] = useState('')
   const [photoTarget, setPhotoTarget] = useState(null)
+  const [textEditor, setTextEditor] = useState(null)
   const activityCols = useActivityCols()
+  const activities = useActivities()
   const l = TXT[lang]
   // seul Ferdinand peut changer les images de Pludini Host (le mode édition
   // lui-même reste accessible à qui connaît le mot de passe, mais ne révèle
@@ -516,13 +595,13 @@ export default function Experience({ wide, onBack }) {
 
   if (view === 'booking') return <Booking lang={lang} onBack={()=>goView('home')} />
 
-  const activity = ALL_ACTIVITIES.find(a => a.id === activeId)
+  const activity = activities.find(a => a.id === activeId)
 
   return (
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {view === 'activity' && activity ? (
-        <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} edit={canEditImages}
-          onBack={()=>goView('home')} onEditPhoto={openPhoto} />
+        <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} editImages={canEditImages} editText={edit}
+          onBack={()=>goView('home')} onEditPhoto={openPhoto} onEditText={setTextEditor} />
       ) : (
         <>
           <div style={{ position:'relative', height:`calc(${wide?92:70}dvh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
@@ -560,7 +639,7 @@ export default function Experience({ wide, onBack }) {
 
             <div style={{ display:'grid', gridTemplateColumns:`repeat(${activityCols}, 1fr)`, gap:4,
               padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
-              {ALL_ACTIVITIES.map(a => (
+              {activities.map(a => (
                 <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
               ))}
@@ -598,6 +677,7 @@ export default function Experience({ wide, onBack }) {
       )}
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang==='en'?'fr':lang} onClose={()=>setPhotoTarget(null)} />}
+      {textEditor && <ActivityEditor a={textEditor} lang={lang} onClose={()=>setTextEditor(null)} />}
     </div>
   )
 }
