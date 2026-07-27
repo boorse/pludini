@@ -22,6 +22,7 @@ const TXT = {
     storyTitle:'Notre histoire',
     storyText:'Le cidre se presse encore comme au temps de notre grand-père, un lynx passe parfois devant nos pièges photo, et la nuit ici n’a pas la moindre lumière parasite. Plus qu’une liste d’activités, c’est un lieu vivant — où la forêt, la ferme et le silence se partagent.',
     seasonAll:'Toute l’année', seasons:{ spring:'Printemps', summer:'Été', autumn:'Automne', winter:'Hiver' },
+    comfortLine:'Un intérieur chaleureux, entre bois brut et lumière du matin.',
   },
   ru: {
     tag:'Гостевой дом', heroTitle:'Ночь в лесу',
@@ -36,6 +37,7 @@ const TXT = {
     storyTitle:'Наша история',
     storyText:'Сидр здесь до сих пор давят так же, как во времена нашего деда, рысь порой проходит перед нашими фотоловушками, а ночью здесь нет ни единого постороннего огня. Это не список развлечений — это живое место, где лес, ферма и тишина делятся с гостями.',
     seasonAll:'Круглый год', seasons:{ spring:'Весна', summer:'Лето', autumn:'Осень', winter:'Зима' },
+    comfortLine:'Тёплый интерьер — необработанное дерево и утренний свет.',
   },
   en: {
     tag:'Guest house', heroTitle:'A night in the forest',
@@ -50,6 +52,7 @@ const TXT = {
     storyTitle:'Our story',
     storyText:'Cider is still pressed here the way our grandfather did it, a lynx sometimes walks past our camera traps, and at night there isn’t a single stray light. More than a list of activities, this is a living place — where the forest, the farm and the silence are shared.',
     seasonAll:'Year-round', seasons:{ spring:'Spring', summer:'Summer', autumn:'Autumn', winter:'Winter' },
+    comfortLine:'A warm interior, raw wood and morning light.',
   },
 }
 
@@ -195,24 +198,25 @@ function TopBar({ lang, setLang, onBack, backLabel }) {
   )
 }
 
-// ── Fond photo qui défile tout seul toutes les 3s (plusieurs photos sur une même cible) ──
+// ── Fond photo qui défile tout seul toutes les 7s, glissement latéral (pas de coupe sèche) ──
 function AutoSlideshow({ target, fallback, arrows }) {
   const { photos } = usePhotos(target)
   const [idx, setIdx] = useState(0)
   useEffect(() => { if (idx >= photos.length) setIdx(0) }, [photos.length, idx])
   useEffect(() => {
     if (photos.length < 2) return
-    const t = setInterval(() => setIdx(i => (i+1) % photos.length), 3000)
+    const t = setInterval(() => setIdx(i => (i+1) % photos.length), 7000)
     return () => clearInterval(t)
   }, [photos.length])
-  const cover = photos[idx]
   const many = photos.length > 1
   return (
-    <div style={{ position:'absolute', inset:0, overflow:'hidden', background: cover ? '#1E2418' : fallback }}>
-      {cover && (
-        <img src={cover.url} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block' }} />
-      )}
+    <div style={{ position:'absolute', inset:0, overflow:'hidden', background: photos.length ? '#1E2418' : fallback }}>
+      {photos.map((p,i)=>(
+        <img key={p.id} src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover',
+            objectPosition:p.pos||'50% 50%', filter:LUT, display:'block',
+            transform:`translateX(${(i-idx)*100}%)`, transition:'transform .6s cubic-bezier(.4,0,.2,1)' }} />
+      ))}
       {arrows && many && <>
         <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+photos.length)%photos.length) }}
           style={{ position:'absolute', top:'50%', left:14, transform:'translateY(-50%)', zIndex:4,
@@ -223,6 +227,49 @@ function AutoSlideshow({ target, fallback, arrows }) {
             width:38, height:38, borderRadius:'50%', background:'rgba(0,0,0,.35)', color:'#fff',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>›</button>
       </>}
+    </div>
+  )
+}
+
+// ── Bandeau "confort" : légende fine + photos d'intérieur qu'on fait défiler
+// soi-même (la suivante reste visible en bordure, comme une invite à glisser) ──
+function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
+  const { photos } = usePhotos('exp:comfort')
+  const trackRef = useRef(null)
+  const l = TXT[lang]
+  const scrollNext = () => {
+    const el = trackRef.current; if (!el) return
+    const tile = el.firstElementChild
+    const step = tile ? tile.getBoundingClientRect().width + 10 : el.clientWidth * 0.8
+    el.scrollBy({ left: step, behavior:'smooth' })
+  }
+  if (!photos.length && !canEditImages) return null
+  return (
+    <div style={{ padding: wide?'44px 0 6px':'30px 0 4px' }}>
+      <div style={{ textAlign:'center', padding: wide?'0 40px 18px':'0 20px 12px' }}>
+        <span style={{ fontSize: wide?14:12.5, color:T.soft, lineHeight:1.5 }}>{l.comfortLine}</span>
+      </div>
+      <div style={{ position:'relative' }}>
+        <div ref={trackRef} style={{ display:'flex', gap:10, overflowX:'auto', scrollSnapType:'x mandatory',
+          WebkitOverflowScrolling:'touch', height: wide?'46dvh':'35dvh',
+          padding: wide?'0 40px':'0 20px' }}>
+          {(photos.length ? photos : [null]).map((p,i)=>(
+            <div key={p?.id ?? i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
+              borderRadius:16, overflow:'hidden', scrollSnapAlign:'center',
+              background: p ? '#1E2418' : 'linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)' }}>
+              {p && <img src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
+                style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />}
+            </div>
+          ))}
+        </div>
+        {photos.length > 1 && (
+          <button onClick={scrollNext} aria-label="next" style={{ position:'absolute', top:'50%', right: wide?26:10,
+            transform:'translateY(-50%)', width:38, height:38, borderRadius:'50%', background:'#C9D98A', color:'#22301C',
+            fontSize:19, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center',
+            boxShadow:'0 4px 14px rgba(0,0,0,.25)' }}>›</button>
+        )}
+        {canEditImages && <EditBtn onClick={onEditPhoto} style={{ top:10, right: wide?50:20 }} />}
+      </div>
     </div>
   )
 }
@@ -443,6 +490,8 @@ export default function Experience({ wide, onBack }) {
 
           <div style={{ position:'relative', marginTop: -(wide?90:70), borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
             backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)' }}>
+            <ComfortStrip lang={lang} wide={wide} canEditImages={canEditImages}
+              onEditPhoto={()=>setPhotoTarget({ target:'exp:comfort', label:l.comfortLine })} />
             <div style={{ padding: wide?'28px 32px 0':'20px 16px 0', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.activitiesTitle}</h2>
             </div>
