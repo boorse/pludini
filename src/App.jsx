@@ -119,8 +119,22 @@ function NavCard({ c, wide, edit, onOpen, onEditPhoto }) {
   )
 }
 
+// ── Bouton flottant, présent sur toutes les pages : entrer/quitter le mode
+// édition. Auparavant introuvable sur Accueil (une fois actif) et sur
+// Calendrier/Territoire/Galerie, qui n'avaient aucun bouton du tout ──
+function EditToggleBtn({ editMode, onToggle, lang }) {
+  return (
+    <button onClick={onToggle} style={{ position:'fixed', bottom:16, right:16, zIndex:20,
+      background: editMode ? 'rgba(181,96,47,.88)' : 'rgba(43,38,32,.72)', color:'#EDE7D8',
+      borderRadius:20, padding:'8px 14px', fontSize:11.5, display:'flex', alignItems:'center', gap:5 }}>
+      <i className={`ti ${editMode?'ti-check':'ti-pencil'}`} style={{ fontSize:13 }} aria-hidden="true" />
+      {editMode ? (lang==='ru'?'Готово':'Quitter') : (lang==='ru'?'Правка':'Édition')}
+    </button>
+  )
+}
+
 // ══════════════════ LANDING ══════════════════
-function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
+function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEditHero, onEditCard }) {
   const wide = useWide()
   const SPECIES = allSpecies(), CATS = allCats(), PLAYERS = allPlayers().filter(p=>!p.demo)
   const t = UI[lang]
@@ -251,6 +265,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, onEditHero, onEditCard }) {
         </div>
       )}
       {installHint && <InstallHint lang={lang} isIOS={isIOS} onClose={()=>setInstallHint(false)} />}
+      <EditToggleBtn editMode={editMode} onToggle={onToggleEdit} lang={lang} />
     </div>
   )
 }
@@ -392,6 +407,7 @@ export default function App() {
   const selSpFull = (id) => { const s = SPECIES.find(x=>x.id===id); setCurCat(s?.cat); setCurSp(id); setDetTab('obs') }
 
   const submitPw = () => { if (pw==='arbalete'){ setEdit(true); setPwOpen(false); setPw(''); if(!getMe()) setIdPicker(true) } else setPw('') }
+  const toggleEdit = () => edit ? setEdit(false) : setPwOpen(true)
   // seul Ferdinand peut changer les images du fond d'accueil et des menus
   // (le reste du mode édition — espèces, observations — reste ouvert à tous)
   const canEditImages = edit && getMe() === 'Ferdinand'
@@ -402,17 +418,10 @@ export default function App() {
   if (screen === 'landing') return (
     <>
       <Landing lang={lang} setLang={setLang} go={goScreen} onQuiz={()=>showToast(t.quizSoon)}
-        edit={canEditImages} onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
+        edit={canEditImages} editMode={edit} onToggleEdit={toggleEdit}
+        onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
         onEditCard={(c)=>setPhotoTarget({ target:`site:card:${c.k}`, label:c.title })} />
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
-      {!edit && (
-        <button onClick={()=>setPwOpen(true)} style={{ position:'fixed', bottom:16, right:16, zIndex:20,
-          background:'rgba(43,38,32,.72)', color:'#EDE7D8', borderRadius:20, padding:'8px 14px',
-          fontSize:11.5, display:'flex', alignItems:'center', gap:5 }}>
-          <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
-          {lang==='ru'?'Правка':'Édition'}
-        </button>
-      )}
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw}
         onClose={()=>{ setPwOpen(false); setPw('') }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
@@ -420,12 +429,35 @@ export default function App() {
     </>
   )
   if (screen === 'experience') return <Experience wide={wide} onBack={()=>goScreen('landing')} />
-  if (screen === 'calendar')  return <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}><Calendar wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} /></Shell>
-  if (screen === 'territory') return <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}><Territory wide={wide} lang={lang} edit={edit} onBack={()=>goScreen('landing')} /></Shell>
+  // Calendrier/Territoire/Galerie : même bouton flottant que sur Accueil pour
+  // entrer/quitter le mode édition, plus le mot de passe qui va avec — ces
+  // pages n'avaient jusqu'ici aucun moyen d'y accéder ni d'en sortir
+  if (screen === 'calendar') return (
+    <>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+        <Calendar wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} />
+      </Shell>
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
+      {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+    </>
+  )
+  if (screen === 'territory') return (
+    <>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+        <Territory wide={wide} lang={lang} edit={edit} onBack={()=>goScreen('landing')} />
+      </Shell>
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
+      {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+    </>
+  )
   if (screen === 'gallery')   return (
-    <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')}>
-      <Gallery wide={wide} lang={lang} onBack={()=>goScreen('landing')} />
-    </Shell>
+    <>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+        <Gallery wide={wide} lang={lang} onBack={()=>goScreen('landing')} />
+      </Shell>
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
+      {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+    </>
   )
 
   // ═════ MATRIX PANE ═════
@@ -1403,7 +1435,7 @@ function SpeciesCell({ spId, method, label }) {
   )
 }
 
-function Shell({ children, lang, setLang, onHome }) {
+function Shell({ children, lang, setLang, onHome, edit, onToggleEdit }) {
   return (
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -1421,6 +1453,7 @@ function Shell({ children, lang, setLang, onHome }) {
         </div>
       </div>
       {children}
+      {onToggleEdit && <EditToggleBtn editMode={edit} onToggle={onToggleEdit} lang={lang} />}
     </div>
   )
 }
