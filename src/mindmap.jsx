@@ -268,6 +268,9 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           <span style={{ width:9, height:9, borderRadius:2, background:'#CFC3A8' }} />Non observée
         </span>
         <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>
+        <span style={{ width:'100%', color:'#9A9081' }}>
+          {lang==='ru'?'Двумя пальцами — перемещение и масштабирование':'Utilisez deux doigts pour vous déplacer et zoomer'}
+        </span>
       </div>
     </div>
   )

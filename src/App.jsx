@@ -172,7 +172,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           </button>
         )}
         <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
-          <div className="serif" style={{ fontSize: wide?32:28, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
+          <div className="serif" style={{ fontSize: wide?18:16, fontWeight:600, color:'#F2EEE2', marginBottom:4 }}>Pludini Doc</div>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
               <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
@@ -440,7 +440,8 @@ export default function App() {
   // pages n'avaient jusqu'ici aucun moyen d'y accéder ni d'en sortir
   if (screen === 'calendar') return (
     <>
-      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
+        pageTitle={lang==='ru'?'Календарь':'Calendrier'}>
         <Calendar wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} />
       </Shell>
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
@@ -449,7 +450,8 @@ export default function App() {
   )
   if (screen === 'territory') return (
     <>
-      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
+        pageTitle={lang==='ru'?'Территория':'Territoire'}>
         <Territory wide={wide} lang={lang} edit={edit} onBack={()=>goScreen('landing')} />
       </Shell>
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
@@ -458,7 +460,8 @@ export default function App() {
   )
   if (screen === 'gallery')   return (
     <>
-      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
+        pageTitle={lang==='ru'?'Галерея':'Galerie'}>
         <Gallery wide={wide} lang={lang} onBack={()=>goScreen('landing')} />
       </Shell>
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
@@ -1201,9 +1204,24 @@ export default function App() {
 
   // ═════ EXPLORE (split) ═════
   const Explore = () => {
+    // hauteur calculée (pas un simple "100dvh - constante") : elle s'ajuste à
+    // la vraie place restante sous l'en-tête, quelle que soit la taille de
+    // l'écran ou celle de l'en-tête — sinon la légende du bas était rognée
+    const mapWrapRef = useRef(null)
+    const [mapH, setMapH] = useState(420)
+    useEffect(() => {
+      if (wide) return
+      const el = mapWrapRef.current
+      if (!el) return
+      const compute = () => setMapH(Math.max(320, window.innerHeight - el.getBoundingClientRect().top - 10))
+      compute()
+      window.addEventListener('resize', compute)
+      window.addEventListener('orientationchange', compute)
+      return () => { window.removeEventListener('resize', compute); window.removeEventListener('orientationchange', compute) }
+    }, [wide, mobileTab])
     if (!wide) {
       return (
-        <div style={{ padding:'10px 14px 26px' }}>
+        <div style={{ padding: mobileTab==='map' ? '10px 14px 0' : '10px 14px 26px' }}>
           <div style={{ display:'flex', gap:6, marginBottom:12 }}>
             {[['map','Mindmap','ti-hierarchy-2'],['matrix','Matrice','ti-layout-grid']].map(([v,l,ic])=>(
               <button key={v} onClick={()=>setMobileTab(v)} style={{ flex:1, fontSize:13, padding:'9px', borderRadius:14, border:`1px solid ${mobileTab===v?T.clay:T.line}`, background:mobileTab===v?T.clay:'transparent', color:mobileTab===v?'#fff':T.soft, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
@@ -1211,9 +1229,9 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div style={{ background:T.surface, borderRadius:16, border:`1px solid ${T.line}`,
+          <div ref={mapWrapRef} style={{ background:T.surface, borderRadius:16, border:`1px solid ${T.line}`,
             ...(mobileTab==='map'
-              ? { overflow:'hidden', height:'calc(100dvh - 230px)', minHeight:420 }
+              ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
             {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
           </div>
@@ -1251,8 +1269,14 @@ export default function App() {
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {/* HEADER */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding: wide?'12px 24px':'11px 16px', borderBottom:`1px solid ${T.line}`, background:T.surface, position:'sticky', top:0, zIndex:30 }}>
-        <button onClick={()=>goScreen('landing')} className="serif" style={{ fontSize:42, fontWeight:900, color:T.ink, letterSpacing:'-0.5px', display:'flex', alignItems:'center', gap:10 }}>
-          <BobberIcon size={40} style={{ marginRight: -2 }} />Pludini
+        <button onClick={()=>goScreen('landing')} style={{ display:'flex', alignItems:'center', gap:9 }}>
+          <BobberIcon size={26} />
+          <span style={{ textAlign:'left' }}>
+            <span className="serif" style={{ display:'block', fontSize:10.5, fontWeight:600, color:T.soft, letterSpacing:'.3px' }}>Pludini Doc</span>
+            <span className="serif" style={{ display:'block', fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.4px', lineHeight:1.05 }}>
+              {lang==='ru'?'Покедекс':'Pokédex'}
+            </span>
+          </span>
         </button>
         <div style={{ display:'flex', alignItems:'center', gap:7 }}>
           <div style={{ display:'flex', gap:3 }}>
@@ -1447,14 +1471,17 @@ function SpeciesCell({ spId, method, label }) {
   )
 }
 
-function Shell({ children, lang, setLang, onHome, edit, onToggleEdit }) {
+function Shell({ children, lang, setLang, onHome, edit, onToggleEdit, pageTitle }) {
   return (
     <div style={{ minHeight:'100vh', background:'#EDE7D8' }}>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
         padding:'12px 24px', borderBottom:'1px solid #D3C7AE', background:'#E3DAC5', position:'sticky', top:0, zIndex:30 }}>
-        <button onClick={onHome} className="serif" style={{ fontSize:42, fontWeight:900, color:'#2B2620',
-          display:'flex', alignItems:'center', gap:10 }}>
-          <BobberIcon size={40} style={{ marginRight: -2 }} />Pludini
+        <button onClick={onHome} style={{ display:'flex', alignItems:'center', gap:9 }}>
+          <BobberIcon size={26} />
+          <span style={{ textAlign:'left' }}>
+            <span className="serif" style={{ display:'block', fontSize:10.5, fontWeight:600, color:'#9A9081', letterSpacing:'.3px' }}>Pludini Doc</span>
+            <span className="serif" style={{ display:'block', fontSize:20, fontWeight:900, color:'#2B2620', letterSpacing:'-0.4px', lineHeight:1.05 }}>{pageTitle}</span>
+          </span>
         </button>
         <div style={{ display:'flex', gap:5 }}>
           {['fr','ru'].map(c=>(
