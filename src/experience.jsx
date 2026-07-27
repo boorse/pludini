@@ -12,7 +12,7 @@ const TXT = {
   fr: {
     tag:'Chambre d’hôtes', heroTitle:'Une nuit dans la forêt',
     heroSub:'Faune sauvage, autosuffisance et nuits sans une seule lumière — une propriété familiale nichée dans la forêt du Vidzeme, à vivre le temps d’une nuit.',
-    book:'Réserver une nuit', activitiesTitle:'À vivre sur place', back:'Accueil', edit:'Édition',
+    book:'Réserver une nuit', activitiesTitle:'Des expériences à vivre ici', cocoonTitle:'Restez dans votre cocon', back:'Accueil', edit:'Édition',
     bookingTitle:'Réserver votre séjour', chooseDates:'Choisissez vos dates', night:'nuit', nights:'nuits',
     payment:'Moyen de paiement', confirm:'Confirmer la demande',
     disclaimer:'Module de paiement bientôt disponible — pour l’instant, contactez-nous directement.',
@@ -27,7 +27,7 @@ const TXT = {
   ru: {
     tag:'Гостевой дом', heroTitle:'Ночь в лесу',
     heroSub:'Дикая природа, натуральное хозяйство и ночи без единого огня — семейное поместье в лесах Видземе, где можно провести хотя бы одну ночь.',
-    book:'Забронировать ночь', activitiesTitle:'Чем заняться на месте', back:'Домой', edit:'Правка',
+    book:'Забронировать ночь', activitiesTitle:'Чем заняться на месте', cocoonTitle:'Останьтесь в своём коконе', back:'Домой', edit:'Правка',
     bookingTitle:'Забронировать проживание', chooseDates:'Выберите даты', night:'ночь', nights:'ночей',
     payment:'Способ оплаты', confirm:'Подтвердить запрос',
     disclaimer:'Модуль онлайн-оплаты скоро появится — пока свяжитесь с нами напрямую.',
@@ -42,7 +42,7 @@ const TXT = {
   en: {
     tag:'Guest house', heroTitle:'A night in the forest',
     heroSub:'Wild animals, self-sufficiency, and nights without a single light — a family property tucked into the forests of Vidzeme, to experience for a night.',
-    book:'Book a night', activitiesTitle:'Things to do here', back:'Home', edit:'Edit',
+    book:'Book a night', activitiesTitle:'Things to do here', cocoonTitle:'Stay in your cocoon', back:'Home', edit:'Edit',
     bookingTitle:'Book your stay', chooseDates:'Choose your dates', night:'night', nights:'nights',
     payment:'Payment method', confirm:'Confirm request',
     disclaimer:'Online payment is coming soon — for now, contact us directly.',
@@ -120,6 +120,23 @@ const CATEGORIES = [
 ]
 
 const ALL_ACTIVITIES = CATEGORIES.flatMap(c => c.items)
+
+// nombre de colonnes toujours diviseur du total d'activités (12 → 2/3/4/6) :
+// la grille forme une masse compacte, sans ligne incomplète, à toute résolution
+function activityColsFor(w) {
+  if (w >= 1100) return 6
+  if (w >= 760) return 4
+  if (w >= 480) return 3
+  return 2
+}
+function useActivityCols() {
+  const [cols, setCols] = useState(() => activityColsFor(typeof window !== 'undefined' ? window.innerWidth : 1200))
+  useEffect(() => {
+    const on = () => setCols(activityColsFor(window.innerWidth))
+    window.addEventListener('resize', on); return () => window.removeEventListener('resize', on)
+  }, [])
+  return cols
+}
 
 function seasonLabel(lang, seasons) {
   const l = TXT[lang]
@@ -240,6 +257,7 @@ function AutoSlideshow({ target, fallback, arrows }) {
 function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
   const { photos } = usePhotos('exp:comfort')
   const trackRef = useRef(null)
+  const pausedRef = useRef(false)
   const l = TXT[lang]
   const loop = photos.length > 1
   const items = loop ? [...photos, ...photos, ...photos] : (photos.length ? photos : [null])
@@ -264,12 +282,27 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
     return () => el.removeEventListener('scroll', onScroll)
   }, [loop])
 
-  const scrollNext = () => {
-    const el = trackRef.current; if (!el) return
-    const tile = el.firstElementChild
-    const step = tile ? tile.getBoundingClientRect().width + 10 : el.clientWidth * 0.8
-    el.scrollBy({ left: step, behavior:'smooth' })
-  }
+  // dérive continue vers la droite, en boucle infinie ; on met en pause pendant
+  // qu'on glisse la bande à la main, et on reprend juste après
+  useEffect(() => {
+    const el = trackRef.current
+    if (!el || !loop) return
+    let raf
+    const tick = () => { if (!pausedRef.current) el.scrollLeft += 0.6; raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    const pause = () => { pausedRef.current = true }
+    const resume = () => setTimeout(() => { pausedRef.current = false }, 2500)
+    el.addEventListener('pointerdown', pause)
+    el.addEventListener('pointerup', resume)
+    el.addEventListener('pointercancel', resume)
+    return () => {
+      cancelAnimationFrame(raf)
+      el.removeEventListener('pointerdown', pause)
+      el.removeEventListener('pointerup', resume)
+      el.removeEventListener('pointercancel', resume)
+    }
+  }, [loop])
+
   if (!photos.length && !canEditImages) return null
   return (
     <div style={{ padding: wide?'44px 0 6px':'30px 0 4px' }}>
@@ -277,24 +310,18 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
         <span style={{ fontSize: wide?14:12.5, color:T.soft, lineHeight:1.5 }}>{l.comfortLine}</span>
       </div>
       <div style={{ position:'relative' }}>
-        <div ref={trackRef} style={{ display:'flex', gap:10, overflowX:'auto', scrollSnapType:'x mandatory',
-          WebkitOverflowScrolling:'touch', height: wide?'46dvh':'35dvh',
+        <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', gap:10, overflowX:'auto',
+          WebkitOverflowScrolling:'touch', height: wide?'52dvh':'40dvh',
           padding: wide?'0 40px':'0 20px' }}>
           {items.map((p,i)=>(
             <div key={p ? `${p.id}-${i}` : i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
-              borderRadius:16, overflow:'hidden', scrollSnapAlign:'center',
+              borderRadius:16, overflow:'hidden',
               background: p ? '#1E2418' : 'linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)' }}>
               {p && <img src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
                 style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />}
             </div>
           ))}
         </div>
-        {loop && (
-          <button onClick={scrollNext} aria-label="next" style={{ position:'absolute', top:'50%', right: wide?26:10,
-            transform:'translateY(-50%)', width:38, height:38, borderRadius:'50%', background:'#C9D98A', color:'#22301C',
-            fontSize:19, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center',
-            boxShadow:'0 4px 14px rgba(0,0,0,.25)' }}>›</button>
-        )}
         {canEditImages && <EditBtn onClick={onEditPhoto} style={{ top:10, right: wide?50:20 }} />}
       </div>
     </div>
@@ -302,13 +329,12 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
 }
 
 // ── Vignette de la grille "à la Instagram Explore" : titre révélé au survol / au toucher ──
-function ActivityTile({ a, lang, edit, wide, onOpen, onEditPhoto }) {
+function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
   const [hover, setHover] = useState(false)
   const at = a[lang]
   return (
     <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
-      style={{ position:'relative', aspectRatio:'1', overflow:'hidden', border:'none', padding:0, borderRadius:14,
-        flex: wide ? '1 1 300px' : '1 1 170px', maxWidth: wide ? 480 : 260 }}>
+      style={{ position:'relative', width:'100%', aspectRatio:'1', overflow:'hidden', border:'none', padding:0, borderRadius:14 }}>
       <div style={{ position:'absolute', inset:0, filter: hover ? 'none' : 'grayscale(0.55) brightness(0.87)', transition:'filter .25s' }}>
         <AutoSlideshow target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} />
       </div>
@@ -464,6 +490,7 @@ export default function Experience({ wide, onBack }) {
   const [pwOpen, setPwOpen] = useState(false)
   const [pw, setPw] = useState('')
   const [photoTarget, setPhotoTarget] = useState(null)
+  const activityCols = useActivityCols()
   const l = TXT[lang]
   // seul Ferdinand peut changer les images de Pludini Host (le mode édition
   // lui-même reste accessible à qui connaît le mot de passe, mais ne révèle
@@ -517,22 +544,20 @@ export default function Experience({ wide, onBack }) {
 
           <div style={{ position:'relative', marginTop: -(wide?90:70), borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
             backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)' }}>
+            <div style={{ padding: wide?'28px 32px 0':'20px 16px 0', textAlign:'center' }}>
+              <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.cocoonTitle}</h2>
+            </div>
             <ComfortStrip lang={lang} wide={wide} canEditImages={canEditImages}
               onEditPhoto={()=>setPhotoTarget({ target:'exp:comfort', label:l.comfortLine })} />
             <div style={{ padding: wide?'28px 32px 0':'20px 16px 0', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.activitiesTitle}</h2>
             </div>
 
-            <div style={{ display:'flex', flexWrap:'wrap', gap:4,
+            <div style={{ display:'grid', gridTemplateColumns:`repeat(${activityCols}, 1fr)`, gap:4,
               padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
               {ALL_ACTIVITIES.map(a => (
-                <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages} wide={wide}
+                <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
-              ))}
-              {/* comble la dernière ligne sans étirer une vraie vignette ni laisser un trou visible */}
-              {Array.from({ length:6 }).map((_,i) => (
-                <div key={'filler'+i} aria-hidden="true"
-                  style={{ flex: wide ? '1 1 300px' : '1 1 170px', maxWidth: wide ? 480 : 260, height:0 }} />
               ))}
             </div>
           </div>
