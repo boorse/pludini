@@ -333,12 +333,12 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
         <span style={{ fontSize: wide?14:12.5, color:T.soft, lineHeight:1.5 }}>{l.comfortLine}</span>
       </div>
       <div style={{ position:'relative' }}>
-        <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', gap:10, overflowX:'auto',
+        <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', overflowX:'auto',
           WebkitOverflowScrolling:'touch', height: wide?'52dvh':'40dvh',
           padding: wide?'0 40px':'0 20px' }}>
           {items.map((p,i)=>(
             <div key={p ? `${p.id}-${i}` : i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
-              borderRadius:16, overflow:'hidden',
+              overflow:'hidden',
               background: p ? '#1E2418' : 'linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)' }}>
               {p && <img src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
                 style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />}
@@ -352,13 +352,15 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
 }
 
 // ── Vignette de la grille "à la Instagram Explore" : titre révélé au survol / au toucher ──
-function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
+function ActivityTile({ a, lang, edit, wide, onOpen, onEditPhoto }) {
   const [hover, setHover] = useState(false)
   const at = a[lang]
   // décalage propre à chaque case : avec une moyenne de (nb de cases × 4s) par
   // case, on obtient un changement toutes les ~4s en regardant toute la
   // grille, sans que les cases changent en même temps (intervalle tiré au sort)
   const [slideInterval] = useState(() => ALL_ACTIVITIES.length * 4000 * (0.5 + Math.random()))
+  // PC/Mac : titre révélé au survol seulement — téléphone (pas de souris) : toujours visible
+  const showTitle = !wide || hover
   return (
     <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
       style={{ position:'relative', width:'100%', aspectRatio:'1', overflow:'hidden', border:'none', padding:0, borderRadius:14 }}>
@@ -367,6 +369,7 @@ function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
         <AutoSlideshow target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} intervalMs={slideInterval} />
       </div>
       <div style={{ position:'absolute', inset:0, background:'rgba(16,14,10,.45)', pointerEvents:'none',
+        opacity: showTitle?1:0, transition:'opacity .25s ease',
         display:'flex', alignItems:'center', justifyContent:'center', padding:14 }}>
         <span className="serif" style={{ color:'#F2EEE2', fontWeight:700, textAlign:'center', lineHeight:1.2,
           fontSize:19 }}>{at.title}</span>
@@ -640,7 +643,7 @@ export default function Experience({ wide, onBack }) {
             <div style={{ display:'grid', gridTemplateColumns:`repeat(${activityCols}, 1fr)`, gap:4,
               padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
               {activities.map(a => (
-                <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages}
+                <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages} wide={wide}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
               ))}
             </div>
