@@ -339,13 +339,18 @@ function ActivityTile({ a, lang, edit, onOpen, onEditPhoto }) {
   return (
     <button onClick={onOpen} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
       style={{ position:'relative', width:'100%', aspectRatio:'1', overflow:'hidden', border:'none', padding:0, borderRadius:14 }}>
-      <div style={{ position:'absolute', inset:0, filter:'grayscale(0.3) brightness(0.92)',
-        transform: hover ? 'scale(1.07)' : 'scale(1)', transition:'transform .35s ease' }}>
+      <div style={{ position:'absolute', inset:0, filter: hover ? 'none' : 'grayscale(0.8)',
+        transform: hover ? 'scale(1.07)' : 'scale(1)', transition:'transform .35s ease, filter .35s ease' }}>
         <AutoSlideshow target={`exp:activity:${a.id}`} fallback={gradientFor('exp-'+a.id)} intervalMs={slideInterval} />
       </div>
-      <div style={{ position:'absolute', left:0, right:0, bottom:0, pointerEvents:'none',
-        background:'linear-gradient(to top, rgba(16,14,10,.82), transparent 65%)', padding:'22px 12px 10px' }}>
-        <span className="serif" style={{ color:'#F2EEE2', fontSize:14.5, fontWeight:700, lineHeight:1.2 }}>{at.title}</span>
+      {/* même vert que les cartes de menu de Pludini Doc (NavCard), en fondu
+          "color" pour teinter la photo désaturée sans l'assombrir */}
+      <div style={{ position:'absolute', inset:0, pointerEvents:'none',
+        background:'linear-gradient(145deg,#39432E 0%,#5C6B48 100%)',
+        mixBlendMode:'color', opacity: hover?0:0.55, transition:'opacity .35s ease' }} />
+      <div style={{ position:'absolute', inset:0, background:'rgba(16,14,10,.5)', opacity: hover?1:0,
+        transition:'opacity .2s', pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'center', padding:14 }}>
+        <span className="serif" style={{ color:'#F2EEE2', fontSize:19, fontWeight:700, textAlign:'center', lineHeight:1.2 }}>{at.title}</span>
       </div>
       {edit && <EditBtn onClick={()=>onEditPhoto(a)} style={{ top:10, right:10, padding:'6px 9px' }} />}
     </button>
