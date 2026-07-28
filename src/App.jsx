@@ -717,30 +717,20 @@ export default function App() {
             </div>
           </div>
           <div style={{ padding:'14px 18px 22px' }}>
-            {isPerson && <>
-              {[['Alimentation',sp.alim],['Habitat & territoire',sp.hab],['Danger',sp.dng]].map(([tt,v])=>(
-                <div key={tt} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
-                  <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{tt}</div>
-                  <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
-                </div>
-              ))}
-              {sp.anecdote && (
-                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4 }}>
-                  <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
-                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />Le saviez-vous
-                  </div>
-                  <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>
-                </div>
-              )}
-            </>}
             {!isPerson && <div className="serif" style={{ fontSize:15, fontWeight:600, color:T.clay, marginBottom:12 }}>{baseP} pts base · max {baseP*3+50} pts</div>}
-            {!isPerson && <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:14 }}>
+            {isPerson && (
+              <div style={{ fontSize:11.5, color:T.mute, marginBottom:12, fontStyle:'italic' }}>
+                {lang==='ru'?'Не приносит очков, но наблюдения всё равно можно записывать.'
+                            :'Ne rapporte pas de points, mais on peut quand même noter des observations.'}
+              </div>
+            )}
+            <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:14 }}>
               {tabs.map(([id,l])=>(
                 <button key={id} onClick={()=>setDetTab(id)} style={{ fontSize:12.5, padding:'8px 14px', color:detTab===id?T.clayDark:T.soft, borderBottom:`2px solid ${detTab===id?T.clay:'transparent'}`, marginBottom:-1, fontWeight:detTab===id?600:400 }}>{l}</button>
               ))}
-            </div>}
+            </div>
 
-            {!isPerson && detTab==='obs' && <>
+            {detTab==='obs' && <>
               <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
                 {edit && <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
@@ -835,7 +825,7 @@ export default function App() {
               )}
             </>}
 
-            {!isPerson && detTab==='infos' && <>
+            {detTab==='infos' && <>
               {[['Alimentation',sp.alim],['Habitat & territoire',sp.hab],['Danger',sp.dng]].map(([t,v])=>(
                 <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
