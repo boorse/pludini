@@ -9,8 +9,9 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, photosFor } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
+import { AddObservation } from './addobs.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -386,6 +387,7 @@ export default function App() {
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
   const [sighting, setSighting] = useState(null)
   const [idPicker, setIdPicker] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(null) // espèce dont on affiche le calendrier des passages
 
   useEffect(() => {
     loadAll().then(()=>setRefresh(r=>r+1))
@@ -733,14 +735,24 @@ export default function App() {
             {detTab==='obs' && <>
               <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
-                {edit && <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
-                  <button onClick={()=>setSighting({ sp })} style={{ fontSize:12.5,
-                    padding:'7px 14px', borderRadius:14, background:T.clay, color:'#fff', fontWeight:600,
-                    display:'flex', alignItems:'center', gap:5 }}>
-                    <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
-                    {lang==='ru'?'Наблюдение':'Observation'}
-                  </button>
-                </div>}
+                <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
+                  {speciesType(sp)===1 && (
+                    <button onClick={()=>setShowCalendar(sp)}
+                      title={lang==='ru'?'Календарь появлений':'Calendrier des passages'}
+                      style={{ width:32, height:32, borderRadius:'50%', border:`1px solid ${T.line}`,
+                        background:T.card, color:T.clay, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <i className="ti ti-calendar-event" style={{ fontSize:15 }} aria-hidden="true" />
+                    </button>
+                  )}
+                  {edit && (
+                    <button onClick={()=>setSighting({ sp })} style={{ fontSize:12.5,
+                      padding:'7px 14px', borderRadius:14, background:T.clay, color:'#fff', fontWeight:600,
+                      display:'flex', alignItems:'center', gap:5 }}>
+                      <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
+                      {lang==='ru'?'Наблюдение':'Observation'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:`repeat(${wide?5:3},1fr)`, gap:8, marginBottom:16 }}>
                 {ALL_PLAYERS.map(pl=>{
@@ -770,7 +782,51 @@ export default function App() {
                   )
                 })}
               </div>
-              {sp.inds.length>0 && (() => {
+              {speciesType(sp)===2 ? (() => {
+                // on liste les individus directement (pas juste leurs photos) : une
+                // observation sans photo doit rester visible et supprimable, sinon
+                // impossible de revenir dessus une fois enregistrée
+                const entries = (sp.inds||[]).map(ind => ({ ind, photos: photosFor(`ind:${sp.id}:${ind.n}`) }))
+                return entries.length>0 ? (
+                  <div>
+                    <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
+                      letterSpacing:'.6px', marginBottom:8 }}>
+                      {lang==='ru'?'Наблюдения':'Observations'} ({entries.length})
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?110:90}px,1fr))`, gap:8 }}>
+                      {entries.map(({ ind, photos }, i)=>(
+                        <div key={i} style={{ position:'relative', borderRadius:10, overflow:'hidden', aspectRatio:'1',
+                          border:`1px solid ${T.line}`, background:T.card }}>
+                          {photos[0] ? (
+                            <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
+                          ) : (
+                            <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column',
+                              alignItems:'center', justifyContent:'center', padding:6, textAlign:'center' }}>
+                              <i className="ti ti-eye" style={{ fontSize:18, color:T.mute }} aria-hidden="true" />
+                              {ind.note && <div style={{ fontSize:9, color:T.soft, marginTop:4, lineHeight:1.3 }}>{ind.note}</div>}
+                            </div>
+                          )}
+                          {photos.length>1 && (
+                            <span style={{ position:'absolute', bottom:4, left:4, background:'rgba(20,18,14,.6)',
+                              color:'#fff', fontSize:9, padding:'2px 6px', borderRadius:8 }}>+{photos.length-1}</span>
+                          )}
+                          {edit && (
+                            <button onClick={()=>setConfirmDelSighting({ sp, ind })}
+                              title={lang==='ru'?'Удалить это наблюдение':'Supprimer cette observation'}
+                              style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%',
+                                background:'rgba(20,18,14,.6)', color:'#fff', fontSize:11, lineHeight:1,
+                                display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize:11.5, color:T.mute, fontStyle:'italic' }}>
+                    {lang==='ru'?'Пока нет наблюдений':'Aucune observation pour l\'instant'}
+                  </div>
+                )
+              })() : sp.inds.length>0 && (() => {
                 const { named, sightings } = splitInds(sp)
                 const Col = ({ title, icon, list, isNamed }) => (
                   <div>
@@ -807,10 +863,11 @@ export default function App() {
                         </div>}
                   </div>
                 )
+                const showFamiliers = speciesType(sp)!==3
                 return (
-                  <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:16 }}>
+                  <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16 }}>
                     <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
-                    <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />
+                    {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
                   </div>
                 )
               })()}
@@ -876,13 +933,7 @@ export default function App() {
           <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
-            {edit && <div style={{ position:'absolute', top:12, right:80, display:'flex', gap:5 }}>
-              <button onClick={(e)=>{ e.stopPropagation(); setPhotoTarget({ target:`ind:${sp.id}:${ind.n}`, label: ind.displayName || ind.n }) }}
-                style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
-                  display:'flex', alignItems:'center', justifyContent:'center' }}
-                title={lang==='ru'?'Управление фото':'Gérer les photos'}>
-                <i className="ti ti-photo" style={{ fontSize:13 }} aria-hidden="true" />
-              </button>
+            {edit && <div style={{ position:'absolute', top:12, right:48, display:'flex', gap:5 }}>
               <button onClick={(e)=>{ e.stopPropagation(); setSighting({ editing:{ sp, ind } }) }}
                 style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
                   display:'flex', alignItems:'center', justifyContent:'center' }}
@@ -938,7 +989,7 @@ export default function App() {
                 <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.6 }}>{ind.traits}</div>
               </div>
             )}
-            {edit && !ind.named && (
+            {edit && !ind.named && speciesType(sp)!==3 && (
               <button onClick={()=>{ setCurInd(null); setPromoting({ sp, ind }) }}
                 style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
                   background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
@@ -1359,10 +1410,14 @@ export default function App() {
       {spEditor && <SpeciesEditor lang={lang} initial={spEditor.initial} presetCat={spEditor.cat}
         presetSub={spEditor.sub} onClose={()=>setSpEditor(null)} onSaved={()=>setRefresh(r=>r+1)}
         onDeleted={()=>{ setCurSp(null); setRefresh(r=>r+1) }} />}
-      {sighting && <SightingEditor lang={lang} species={SPECIES} presetSp={sighting.sp} editing={sighting.editing}
+      {sighting && sighting.editing && <SightingEditor lang={lang} species={SPECIES} editing={sighting.editing}
         onClose={()=>setSighting(null)}
-        onSaved={(id)=>{ setRefresh(r=>r+1); if (sighting.editing) setCurInd(null); else if(id) selSpFull(id) }} />}
+        onSaved={()=>{ setRefresh(r=>r+1); setCurInd(null) }} />}
+      {sighting && !sighting.editing && <AddObservation lang={lang} species={SPECIES} presetSp={sighting.sp}
+        onClose={()=>setSighting(null)}
+        onSaved={(id)=>{ setRefresh(r=>r+1); if(id) selSpFull(id) }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
+      {showCalendar && <PassageCalendar sp={showCalendar} lang={lang} onClose={()=>setShowCalendar(null)} />}
       {toast && <Toast msg={toast} />}
 
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw}
@@ -1372,6 +1427,79 @@ export default function App() {
 }
 
 
+
+// "12/6/2026" (toLocaleDateString('fr-FR')) → { day:12, month:6 } — sert au calendrier des passages
+function parseFrDate(s) {
+  const m = (s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (!m) return null
+  return { day: parseInt(m[1],10), month: parseInt(m[2],10) }
+}
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+
+// ═════ Calendrier annuel des passages (toutes années confondues) — Type 1 uniquement ═════
+function PassageCalendar({ sp, lang, onClose }) {
+  const marks = new Set()
+  ;(sp.inds||[]).forEach(ind => {
+    const p = parseFrDate(ind.d)
+    if (p) marks.add(`${p.month}-${p.day}`)
+  })
+  const REF_YEAR = 2024 // année bissextile arbitraire, seulement pour aligner les jours de la semaine
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:170,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:680,
+        maxHeight:'88vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+          <div>
+            <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink }}>
+              {lang==='ru'?'Календарь появлений':'Calendrier des passages'}
+            </div>
+            <div style={{ fontSize:11.5, color:T.soft, marginTop:2 }}>{sp.n}</div>
+          </div>
+          <button onClick={onClose} style={{ width:28, height:28, borderRadius:'50%', background:T.card, color:T.soft,
+            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
+          </button>
+        </div>
+        <div style={{ padding:'12px 18px 6px', display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:12 }}>
+          {Array.from({ length:12 }).map((_, mi) => {
+            const month = mi+1
+            const first = new Date(REF_YEAR, mi, 1)
+            const startDow = (first.getDay()+6)%7 // lundi=0
+            const daysInMonth = new Date(REF_YEAR, mi+1, 0).getDate()
+            const cells = []
+            for (let i=0;i<startDow;i++) cells.push(null)
+            for (let d=1; d<=daysInMonth; d++) cells.push(d)
+            return (
+              <div key={mi}>
+                <div style={{ fontSize:10.5, fontWeight:700, color:T.ink, textAlign:'center', marginBottom:4 }}>
+                  {(lang==='ru'?MONTHS_RU:MONTHS_FR)[mi]}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+                  {cells.map((d,i) => {
+                    const on = d!=null && marks.has(`${month}-${d}`)
+                    return (
+                      <div key={i} style={{ aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:7.5, borderRadius:3, color: on?'#fff':T.mute,
+                        background: on?T.clay:(d!=null?T.card:'transparent') }}>
+                        {d!=null ? (on?'●':d) : ''}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div style={{ padding:'0 20px 18px', fontSize:11, color:T.mute, lineHeight:1.5 }}>
+          {lang==='ru'?'Точки отмечают дни, когда это животное уже наблюдали (все годы вместе).'
+            :'Les points marquent les dates où cet animal a déjà été observé (toutes années confondues).'}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function PromoteSheet({ sp, ind, lang, wide, onClose, onDone }) {
   const [name, setName] = useState(ind.displayName || ind.n)

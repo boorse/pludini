@@ -335,7 +335,7 @@ export function PhotoManager({ target, label, lang, onClose }) {
 }
 
 // ── Point focal : le sujet reste visible quel que soit le cadrage ──
-function FocalPicker({ target, photo, lang, onClose }) {
+export function FocalPicker({ target, photo, lang, onClose }) {
   const [pos, setPos] = useState(photo.pos || '50% 50%')
   const boxRef = useRef(null)
   const [px, py] = pos.replace(/%/g,'').split(' ').map(Number)

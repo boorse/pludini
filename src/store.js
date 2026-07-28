@@ -255,6 +255,14 @@ export async function setPixelated(spId, player, isPixelated) {
   const prev = S.edits[spId]?.fields || {}
   await editSpecies(spId, { ...prev, pixelated })
 }
+// ── Photo de près / très bonne qualité (×2 points) — mammifères et oiseaux uniquement ──
+export async function setQuality(spId, player, isHighQuality) {
+  const sp = allSpecies().find(s => s.id === spId); if (!sp) return
+  const quality = { ...(sp.quality || {}) }
+  if (isHighQuality) quality[player] = true; else delete quality[player]
+  const prev = S.edits[spId]?.fields || {}
+  await editSpecies(spId, { ...prev, quality })
+}
 
 // ══════ CHAPITRES DE PLUDINI HOST (titres/textes éditables) ══════
 export function activityEditsFor(id) { return S.activityEdits[id] || null }
@@ -295,14 +303,28 @@ export async function removeSighting(spId, indName) {
   }
 }
 
+// ══════ TYPE D'ESPÈCE (détermine quel formulaire d'ajout d'observation s'applique) ══════
+// 1 = mammifères/oiseaux (formulaire complet, assistant guidé)
+// 3 = humains/animaux domestiques (formulaire simplifié, mais avec la notion de passage)
+// 2 = tout le reste : végétaux, champignons, insectes… (formulaire simplifié, sans passage)
+export function speciesType(sp) {
+  if (['mammiferes','oiseaux'].includes(sp.cat)) return 1
+  if (['humains','domestiques'].includes(sp.cat)) return 3
+  return 2
+}
+
 // ══════ SCORES (tiennent compte des ajouts) ══════
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
 const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
 export function calcPtsLive(sp, player) {
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
+  // "photo floue" (malus) remplacée par "photo de près / très bonne qualité" (bonus) —
+  // le malus reste calculé pour ne pas changer rétroactivement les scores déjà
+  // enregistrés, mais l'interface ne permet plus d'en cocher de nouvelles
   const blurMult = sp.blurry?.[player] ? 0.5 : 1
   const pixelMult = sp.pixelated?.[player] ? 0.5 : 1
+  const qualityMult = sp.quality?.[player] ? 2 : 1
   const bonusPts = (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
   const rarityPts = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1)
   const myInds = (sp.inds || []).filter(i => i.by === player)
@@ -323,7 +345,7 @@ export function calcPtsLive(sp, player) {
     const best = methods.reduce((b,m)=>(METHODS[m]?.mult||0)>(METHODS[b]?.mult||0)?m:b, methods[0])
     base = rarityPts * (METHODS[best]?.mult || 1)
   }
-  return Math.round((base + bonusPts) * catMult * blurMult * pixelMult)
+  return Math.round((base + bonusPts) * catMult * blurMult * pixelMult * qualityMult)
 }
 export function speciesPtsLive(player) {
   return allSpecies().reduce((s, sp) => s + calcPtsLive(sp, player), 0)

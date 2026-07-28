@@ -1,24 +1,51 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
-         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated,
-         individualCovers, setCover, clearCover } from './store.js'
+         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType,
+         individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
 import { RARITY, METHODS, SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
-import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
+import { LUT, uploadPhotoFile, usePhotos, FocalPicker } from './photoui.jsx'
 import SatMap from './satmap.jsx'
 import { CENTER } from './territory.js'
 
-const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
+export const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
   mute:'#9A9081', line:'#D3C7AE', clay:'#B5602F', sageDark:'#4A5D32', gold:'#C9A046' }
 
-const Modal = ({ children, onClose, wide, max=460 }) => (
+export const Modal = ({ children, onClose, wide, max=460 }) => (
   <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.62)', zIndex:150,
     display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
     <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%',
       maxWidth:max, maxHeight:'88vh', overflow:'auto', border:`1px solid ${T.line}` }}>{children}</div>
   </div>
 )
-const label = { fontSize:11, color:T.mute, display:'block', marginBottom:4, marginTop:11 }
+export const label = { fontSize:11, color:T.mute, display:'block', marginBottom:4, marginTop:11 }
+
+// input file caché mais toujours cliquable via son <label> englobant — un
+// simple <div onClick={()=>ref.click()}> autour d'un input hidden déclenche
+// un input.click() qui remonte (bubble) jusqu'à ce même onClick et le
+// redéclenche, ce qui bloque le sélecteur natif au second essai sur certains
+// navigateurs mobiles (Safari iOS notamment). L'association native via
+// <label> évite complètement ce problème : aucun JS requis pour ouvrir le sélecteur.
+export const visuallyHiddenFileInput = { position:'absolute', width:1, height:1, padding:0, margin:-1,
+  overflow:'hidden', clipPath:'inset(50%)', whiteSpace:'nowrap', border:0 }
+
+// ══════ Trois niveaux de qualité de photo, mutuellement exclusifs — mammifères et oiseaux uniquement ══════
+export function PhotoQualityPicker({ lang, value, onChange }) {
+  const opts = [
+    ['low', lang==='ru'?'Издалека (÷2)':'De loin (÷2)'],
+    ['normal', lang==='ru'?'Обычная':'Normal'],
+    ['high', lang==='ru'?'Крупным планом (×2)':'De près (×2)'],
+  ]
+  return (
+    <div style={{ display:'flex', gap:5, marginTop:9 }}>
+      {opts.map(([k,l])=>(
+        <button key={k} onClick={()=>onChange(k)} style={{ flex:1, fontSize:11.5, padding:'9px 6px', borderRadius:10,
+          border:`1px solid ${value===k?T.clay:T.line}`, background:value===k?'#F0DDD0':'transparent',
+          color:T.ink, fontWeight:value===k?700:400, textAlign:'center' }}>{l}</button>
+      ))}
+    </div>
+  )
+}
 
 // ══════ Confirmation (remplace window.confirm — bloque tout le navigateur et casse l'auto-clôture) ══════
 export function ConfirmDialog({ lang, title, message, onCancel, onConfirm, busy }) {
@@ -43,7 +70,7 @@ export function ConfirmDialog({ lang, title, message, onCancel, onConfirm, busy 
     </div>
   )
 }
-const input = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+export const input = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
   background:T.card, fontSize:13.5, color:T.ink }
 
 // ══════ Choix d'identité ══════
@@ -217,14 +244,16 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
           ))}
         </div>
 
-        <label style={label}>{lang==='ru'?'Размер':'Taille'}</label>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {[['xs','Très petit'],['s','Petit'],['m','Moyen'],['l','Grand'],['xl','Géant']].map(([k,l])=>(
-            <button key={k} onClick={()=>setSz(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
-              border:`1px solid ${sz===k?T.clay:T.line}`, background:sz===k?'#F0DDD0':'transparent',
-              color:T.soft }}>{l} ×{SIZE_MULT[k]}</button>
-          ))}
-        </div>
+        {speciesType({ cat })!==2 && <>
+          <label style={label}>{lang==='ru'?'Размер':'Taille'}</label>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+            {[['xs','Très petit'],['s','Petit'],['m','Moyen'],['l','Grand'],['xl','Géant']].map(([k,l])=>(
+              <button key={k} onClick={()=>setSz(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
+                border:`1px solid ${sz===k?T.clay:T.line}`, background:sz===k?'#F0DDD0':'transparent',
+                color:T.soft }}>{l} ×{SIZE_MULT[k]}</button>
+            ))}
+          </div>
+        </>}
 
         <label style={label}>{lang==='ru'?'Питание':'Alimentation'}</label>
         <textarea value={alim} onChange={ev=>setAlim(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
@@ -311,10 +340,17 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const [err, setErr] = useState(null)
   const [mapPick, setMapPick] = useState(false)
   const [stagedFiles, setStagedFiles] = useState([])
-  const [blurry, setBlurryLocal] = useState(() => !!editSp?.blurry?.[editInd?.by])
-  const [pixelated, setPixelatedLocal] = useState(() => !!editSp?.pixelated?.[editInd?.by])
-  const fileRef = useRef(null)
-  const { photos: existingPhotos } = usePhotos(isEdit ? `ind:${editSp?.id}:${editInd?.n}` : '')
+  // trois options mutuellement exclusives : de près (×2), normal, de loin (÷2) —
+  // réservé aux mammifères et oiseaux
+  const [photoQuality, setPhotoQuality] = useState(() => {
+    if (editSp?.quality?.[editInd?.by]) return 'high'
+    if (editSp?.pixelated?.[editInd?.by]) return 'low'
+    return 'normal'
+  })
+  const photoTarget = isEdit ? `ind:${editSp?.id}:${editInd?.n}` : ''
+  const { photos: existingPhotos } = usePhotos(photoTarget)
+  const coverId = coverIdFor(photoTarget)
+  const [focalPhoto, setFocalPhoto] = useState(null)
 
   const sp = isEdit ? editSp : species.find(s=>s.id===spId)
   // seuls mammifères et oiseaux se prêtent à l'affût/caméra — le reste (végétal, champignons, insectes…) s'observe à l'œil nu
@@ -343,8 +379,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
         else if (wasNamed) await demote(spId, editInd.n)
         for (const f of stagedFiles) await uploadPhotoFile(`ind:${spId}:${editInd.n}`, f, '', by)
-        await setBlurry(spId, by, blurry)
-        await setPixelated(spId, by, pixelated)
+        await setPixelated(spId, by, photoQuality==='low')
+        await setQuality(spId, by, photoQuality==='high')
         onSaved?.(spId); onClose()
         return
       }
@@ -362,8 +398,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       // marquer aussi l'espèce comme observée par cette personne
       const cur = sp?.obs?.[by] || []
       if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
-      if (blurry) await setBlurry(spId, by, true)
-      if (pixelated) await setPixelated(spId, by, true)
+      if (photoQuality==='low') await setPixelated(spId, by, true)
+      if (photoQuality==='high') await setQuality(spId, by, true)
       onSaved?.(spId); onClose()
     } catch (e) {
       // sans ce filet, un échec réseau/upload laissait le bouton bloqué sur
@@ -474,24 +510,45 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         <label style={label}>{lang==='ru'?'Фото':'Photo(s)'}</label>
         {isEdit && existingPhotos.length>0 && (
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-            {existingPhotos.map(p=>(
-              <div key={p.id} style={{ width:56, height:56, borderRadius:9, overflow:'hidden', border:`1px solid ${T.line}` }}>
-                <img src={p.thumbUrl||p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
-              </div>
-            ))}
+            {existingPhotos.map((p,i)=>{
+              const isCover = coverId ? coverId===p.id : i===0
+              return (
+                <div key={p.id} style={{ position:'relative', width:72, height:72, borderRadius:9, overflow:'hidden',
+                  border:`1px solid ${isCover?T.clay:T.line}` }}>
+                  <img src={p.thumbUrl||p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
+                    objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />
+                  <button onClick={()=>setFocalPhoto(p)} title={lang==='ru'?'Точка фокуса':'Point focal'}
+                    style={{ position:'absolute', top:3, left:3, width:18, height:18, borderRadius:'50%',
+                      background:'rgba(0,0,0,.55)', color:'#fff', fontSize:10, display:'flex',
+                      alignItems:'center', justifyContent:'center' }}>
+                    <i className="ti ti-focus-2" style={{ fontSize:10 }} aria-hidden="true" />
+                  </button>
+                  <button onClick={()=>removePhoto(photoTarget, p.id, p.path)} title={lang==='ru'?'Удалить':'Supprimer'}
+                    style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%',
+                      background:'rgba(0,0,0,.55)', color:'#fff', fontSize:10 }}>✕</button>
+                  <button onClick={()=>isCover ? clearPhotoCover(photoTarget) : setPhotoCover(photoTarget, p.id)}
+                    title={isCover ? (lang==='ru'?'Обложка (сбросить)':'Vignette actuelle (clique pour réinitialiser)')
+                                   : (lang==='ru'?'Сделать обложкой':'Choisir comme vignette')}
+                    style={{ position:'absolute', bottom:3, right:3, width:18, height:18, borderRadius:'50%',
+                      background: isCover ? T.clay : 'rgba(0,0,0,.55)', color:'#fff', fontSize:10, display:'flex',
+                      alignItems:'center', justifyContent:'center' }}>
+                    <i className="ti ti-star" style={{ fontSize:10 }} aria-hidden="true" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
-        <div onDrop={e=>{ e.preventDefault(); addFiles(e.dataTransfer.files) }} onDragOver={e=>e.preventDefault()}
-          onClick={()=>fileRef.current?.click()}
-          style={{ border:`2px dashed ${T.line}`, borderRadius:12, padding:'14px', textAlign:'center',
+        <label onDrop={e=>{ e.preventDefault(); addFiles(e.dataTransfer.files) }} onDragOver={e=>e.preventDefault()}
+          style={{ display:'block', border:`2px dashed ${T.line}`, borderRadius:12, padding:'14px', textAlign:'center',
             cursor:'pointer', background:T.card }}>
           <i className="ti ti-camera-plus" style={{ fontSize:20, color:T.clay }} aria-hidden="true" />
           <div style={{ fontSize:11.5, color:T.soft, marginTop:4 }}>
             {lang==='ru'?'Добавить фото':'Ajoute une ou plusieurs photos'}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+          <input type="file" accept="image/*" multiple style={visuallyHiddenFileInput}
             onChange={e=>{ addFiles(e.target.files); e.target.value='' }} />
-        </div>
+        </label>
         {stagedFiles.length>0 && (
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>
             {stagedFiles.map((f,i)=>(
@@ -504,27 +561,9 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
           </div>
         )}
 
-        <button onClick={()=>setBlurryLocal(v=>!v)} style={{ display:'flex', alignItems:'center', gap:8,
-          width:'100%', marginTop:9, padding:'9px 11px', borderRadius:10,
-          border:`1px solid ${blurry?T.clay:T.line}`, background:blurry?'#F0DDD0':'transparent', textAlign:'left' }}>
-          <span style={{ width:18, height:18, borderRadius:5, flexShrink:0,
-            border:`2px solid ${blurry?T.clay:T.line}`, background:blurry?T.clay:'transparent',
-            color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{blurry?'✓':''}</span>
-          <span style={{ fontSize:12, color:T.ink }}>
-            {lang==='ru'?'Фото нечёткое (очки ÷ 2)':'Photo floue (points divisés par deux)'}
-          </span>
-        </button>
-
-        <button onClick={()=>setPixelatedLocal(v=>!v)} style={{ display:'flex', alignItems:'center', gap:8,
-          width:'100%', marginTop:6, padding:'9px 11px', borderRadius:10,
-          border:`1px solid ${pixelated?T.clay:T.line}`, background:pixelated?'#F0DDD0':'transparent', textAlign:'left' }}>
-          <span style={{ width:18, height:18, borderRadius:5, flexShrink:0,
-            border:`2px solid ${pixelated?T.clay:T.line}`, background:pixelated?T.clay:'transparent',
-            color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{pixelated?'✓':''}</span>
-          <span style={{ fontSize:12, color:T.ink }}>
-            {lang==='ru'?'Фото издалека (очки ÷ 2)':'Photo de loin (points divisés par deux)'}
-          </span>
-        </button>
+        {sp && speciesType(sp)===1 && (
+          <PhotoQualityPicker lang={lang} value={photoQuality} onChange={setPhotoQuality} />
+        )}
 
         {isPlant ? (
           <>
@@ -599,12 +638,13 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       {mapPick && <GpsMapPicker lat={lat} lon={lon} lang={lang}
         onCancel={()=>setMapPick(false)}
         onPick={(p)=>{ setLat(p.lat.toFixed(5)); setLon(p.lon.toFixed(5)); setMapPick(false) }} />}
+      {focalPhoto && <FocalPicker target={photoTarget} photo={focalPhoto} lang={lang} onClose={()=>setFocalPhoto(null)} />}
     </Modal>
   )
 }
 
 // ══════ Sélection d'un point GPS sur la carte satellite du site ══════
-function GpsMapPicker({ lat, lon, lang, onCancel, onPick }) {
+export function GpsMapPicker({ lat, lon, lang, onCancel, onPick }) {
   const [pos, setPos] = useState((lat && lon) ? { lat:parseFloat(lat), lon:parseFloat(lon) } : null)
   const center = pos || CENTER
   return (
