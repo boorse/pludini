@@ -289,6 +289,11 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const isEdit = !!editing
   const [spId, setSpId] = useState(editSp?.id || presetSp?.id || '')
   const [q, setQ] = useState('')
+  // choix en deux temps quand on ouvre le formulaire sans espèce déjà choisie :
+  // d'abord le règne, puis l'animal — avant, il fallait deviner le nom exact
+  // à taper, ce qui rendait le bouton "Noter une observation" inutilisable
+  const [pickCat, setPickCat] = useState(null)
+  const cats = allCats()
   const [named, setNamed] = useState(editInd ? !!editInd.named : false)
   const [name, setName] = useState(editInd?.displayName || editInd?.n || '')
   const [note, setNote] = useState(editInd?.note || '')
@@ -314,8 +319,9 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const sp = isEdit ? editSp : species.find(s=>s.id===spId)
   // seuls mammifères et oiseaux se prêtent à l'affût/caméra — le reste (végétal, champignons, insectes…) s'observe à l'œil nu
   const isPlant = sp && !['mammiferes','oiseaux'].includes(sp.cat)
-  const results = !isEdit && q.trim()
-    ? species.filter(s=>s.n.toLowerCase().includes(q.toLowerCase().trim())).slice(0,8)
+  // dans un règne choisi : tous ses animaux, filtrés par la recherche si tapée
+  const catResults = !isEdit && pickCat
+    ? species.filter(s=>s.cat===pickCat && (!q.trim() || s.n.toLowerCase().includes(q.toLowerCase().trim())))
     : []
 
   useEffect(() => { if (isPlant && method !== 'eye') setMethod('eye') }, [isPlant])
@@ -397,24 +403,42 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
               </button>
             )}
           </div>
-        ) : (
+        ) : pickCat ? (
           <>
+            <button onClick={()=>{ setPickCat(null); setQ('') }}
+              style={{ display:'flex', alignItems:'center', gap:5, color:T.clay, fontSize:12, fontWeight:600, marginBottom:8 }}>
+              <i className="ti ti-arrow-left" style={{ fontSize:13 }} aria-hidden="true" />
+              {lang==='ru'?'Все царства':'Tous les règnes'}
+            </button>
             <input value={q} onChange={e=>setQ(e.target.value)} autoFocus style={input}
-              placeholder={lang==='ru'?'Начните вводить…':'Tape les premières lettres…'} />
-            {results.length>0 && (
-              <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4, maxHeight:190, overflowY:'auto' }}>
-                {results.map(s2=>(
-                  <button key={s2.id} onClick={()=>{ setSpId(s2.id); setQ('') }}
-                    style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:9,
-                      border:`1px solid ${T.line}`, background:T.card, textAlign:'left' }}>
-                    <span style={{ fontSize:17 }}>{s2.e}</span>
-                    <span style={{ fontSize:12.5, color:T.ink, flex:1 }}>{s2.n}</span>
-                    <span style={{ fontSize:10.5, color:T.mute, fontStyle:'italic' }}>{s2.lat}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+              placeholder={lang==='ru'?'Начните вводить…':'Tape les premières lettres… (facultatif)'} />
+            <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4, maxHeight:220, overflowY:'auto' }}>
+              {catResults.length>0 ? catResults.map(s2=>(
+                <button key={s2.id} onClick={()=>{ setSpId(s2.id); setQ('') }}
+                  style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:9,
+                    border:`1px solid ${T.line}`, background:T.card, textAlign:'left' }}>
+                  <span style={{ fontSize:17 }}>{s2.e}</span>
+                  <span style={{ fontSize:12.5, color:T.ink, flex:1 }}>{s2.n}</span>
+                  <span style={{ fontSize:10.5, color:T.mute, fontStyle:'italic' }}>{s2.lat}</span>
+                </button>
+              )) : (
+                <div style={{ fontSize:12, color:T.mute, padding:'8px 2px', fontStyle:'italic' }}>
+                  {lang==='ru'?'Ничего не найдено.':'Aucun résultat.'}
+                </div>
+              )}
+            </div>
           </>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(110px,1fr))', gap:6 }}>
+            {cats.map(c=>(
+              <button key={c.id} onClick={()=>setPickCat(c.id)}
+                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'11px 6px',
+                  borderRadius:11, border:`1px solid ${T.line}`, background:T.card, textAlign:'center' }}>
+                <span style={{ fontSize:22 }}>{c.e}</span>
+                <span style={{ fontSize:11, color:T.ink, fontWeight:600, lineHeight:1.2 }}>{c.n}</span>
+              </button>
+            ))}
+          </div>
         )}
 
         <label style={label}>{lang==='ru'?'Тип':'Type de rencontre'}</label>
@@ -498,7 +522,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
             border:`2px solid ${pixelated?T.clay:T.line}`, background:pixelated?T.clay:'transparent',
             color:'#fff', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{pixelated?'✓':''}</span>
           <span style={{ fontSize:12, color:T.ink }}>
-            {lang==='ru'?'Фото пикселизировано (очки ÷ 2)':'Photo pixelisée (points divisés par deux)'}
+            {lang==='ru'?'Фото издалека (очки ÷ 2)':'Photo de loin (points divisés par deux)'}
           </span>
         </button>
 
