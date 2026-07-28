@@ -232,7 +232,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
 
       <div style={{ position:'relative', height: wide?300:220, margin: wide?'26px 40px 60px':'20px 16px 44px',
         borderRadius:18, overflow:'hidden' }}>
-        <PhotoBg target="site:contact" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
+        <PhotoBg target="site:card:contact" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,20,12,.6), transparent 55%)' }} />
         {edit && (
           <button onClick={()=>onEditCard({ k:'contact', title:lang==='ru'?'Контакты':'Contact' })} style={{ position:'absolute', top:10, right:10, zIndex:6,
