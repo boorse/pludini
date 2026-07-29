@@ -30,6 +30,7 @@ const TXT = {
     storyText:'Le cidre se presse encore comme au temps de notre grand-père, un lynx passe parfois devant nos pièges photo, et la nuit ici n’a pas la moindre lumière parasite. Plus qu’une liste d’activités, c’est un lieu vivant — où la forêt, la ferme et le silence se partagent.',
     seasonAll:'Toute l’année', seasons:{ spring:'Printemps', summer:'Été', autumn:'Automne', winter:'Hiver' },
     comfortLine:'Un intérieur chaleureux, entre bois brut et lumière du matin.',
+    mapTitle:'Localisation', mapSub:'Voir sur Google Maps',
   },
   ru: {
     tag:'Гостевой дом', heroTitle:'Ночь в лесу',
@@ -45,6 +46,7 @@ const TXT = {
     storyText:'Сидр здесь до сих пор давят так же, как во времена нашего деда, рысь порой проходит перед нашими фотоловушками, а ночью здесь нет ни единого постороннего огня. Это не список развлечений — это живое место, где лес, ферма и тишина делятся с гостями.',
     seasonAll:'Круглый год', seasons:{ spring:'Весна', summer:'Лето', autumn:'Осень', winter:'Зима' },
     comfortLine:'Тёплый интерьер — необработанное дерево и утренний свет.',
+    mapTitle:'Расположение', mapSub:'Посмотреть на Google Maps',
   },
   en: {
     tag:'Guest house', heroTitle:'A night in the forest',
@@ -60,6 +62,7 @@ const TXT = {
     storyText:'Cider is still pressed here the way our grandfather did it, a lynx sometimes walks past our camera traps, and at night there isn’t a single stray light. More than a list of activities, this is a living place — where the forest, the farm and the silence are shared.',
     seasonAll:'Year-round', seasons:{ spring:'Spring', summer:'Summer', autumn:'Autumn', winter:'Winter' },
     comfortLine:'A warm interior, raw wood and morning light.',
+    mapTitle:'Location', mapSub:'View on Google Maps',
   },
 }
 
@@ -682,10 +685,31 @@ export default function Experience({ wide, onBack }) {
             </div>
             <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
           </div>
-          <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 60px':'20px 16px 44px',
+          <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 0':'20px 16px 0',
             borderRadius:18, overflow:'hidden' }}>
             <PhotoBg target="exp:story" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
+          </div>
+
+          <div style={{ position:'relative', height: wide?280:200, margin: wide?'20px 40px 60px':'16px 16px 44px',
+            borderRadius:18, overflow:'hidden' }}>
+            <a href="https://maps.app.goo.gl/59rg3q9UWsyECMyX7" target="_blank" rel="noopener noreferrer"
+              style={{ display:'block', position:'absolute', inset:0 }}>
+              <PhotoBg target="exp:map" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
+              <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,20,12,.6), transparent 55%)' }} />
+              <div style={{ position:'absolute', left: wide?24:16, right: wide?24:16, bottom: wide?24:16, borderRadius:16,
+                backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', background:'rgba(237,231,216,.62)',
+                padding: wide?'20px 24px':'16px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+                <div>
+                  <div className="serif" style={{ fontSize: wide?17:15, fontWeight:800, color:'#2B2620', marginBottom:6 }}>
+                    {l.mapTitle}
+                  </div>
+                  <div style={{ fontSize:12.5, color:'#6B6357', lineHeight:1.7 }}>{l.mapSub}</div>
+                </div>
+                <i className="ti ti-external-link" style={{ fontSize:20, color:'#B5602F', flexShrink:0 }} aria-hidden="true" />
+              </div>
+            </a>
+            {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:map', label:l.mapTitle })} />}
           </div>
         </>
       )}
