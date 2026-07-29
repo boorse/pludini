@@ -13,6 +13,7 @@ import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
+import { ForumPage } from './forum.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -255,23 +256,34 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
         </div>
       </div>
 
-      {!installed && (
-        <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', justifyContent:'space-between',
-          margin: wide?'0 40px 40px':'0 16px 30px', padding: wide?'16px 22px':'14px 16px',
-          borderRadius:16, border:'1px solid #D3C7AE', background:'#E6DDC8' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <i className="ti ti-device-mobile-plus" style={{ fontSize:20, color:'#B5602F' }} aria-hidden="true" />
-            <div style={{ fontSize:12.5, color:'#6B6357', lineHeight:1.5 }}>
-              {lang==='ru'?'Добавьте Pludini на главный экран телефона.':'Ajoute Pludini à l’écran d’accueil de ton téléphone.'}
-            </div>
+      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap', justifyContent:'space-between',
+        margin: wide?'0 40px 40px':'0 16px 30px', padding: wide?'16px 22px':'14px 16px',
+        borderRadius:16, border:'1px solid #D3C7AE', background:'#E6DDC8' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <i className={`ti ${installed?'ti-message-circle':'ti-device-mobile-plus'}`} style={{ fontSize:20, color:'#B5602F' }} aria-hidden="true" />
+          <div style={{ fontSize:12.5, color:'#6B6357', lineHeight:1.5 }}>
+            {installed
+              ? (lang==='ru'?'Обсуждения и идеи для сайта.':'Discussions et idées pour le site.')
+              : (lang==='ru'?'Добавьте Pludini на главный экран телефона.':'Ajoute Pludini à l’écran d’accueil de ton téléphone.')}
           </div>
-          <button onClick={onInstallClick} className="serif" style={{ flexShrink:0, padding:'9px 16px', borderRadius:12,
-            background:'#B5602F', color:'#fff', fontSize:12.5, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
-            <i className="ti ti-download" style={{ fontSize:14 }} aria-hidden="true" />
-            {lang==='ru'?'Установить':'Installer l’app'}
+        </div>
+        <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+          {!installed && (
+            <button onClick={onInstallClick} className="serif" style={{ padding:'9px 16px', borderRadius:12,
+              background:'#B5602F', color:'#fff', fontSize:12.5, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>
+              <i className="ti ti-download" style={{ fontSize:14 }} aria-hidden="true" />
+              {lang==='ru'?'Установить':'Installer l’app'}
+            </button>
+          )}
+          <button onClick={()=>go('forum')} className="serif" style={{ padding:'9px 16px', minWidth:165, borderRadius:12,
+            background:'#B5602F', color:'#fff', fontSize:12.5, fontWeight:700, display:'flex', alignItems:'center',
+            justifyContent:'center', gap:6 }}>
+            <i className="ti ti-message-circle-2" style={{ fontSize:14 }} aria-hidden="true" />
+            {lang==='ru'?'Форум':'Forum'}
           </button>
         </div>
-      )}
+      </div>
+
       {installHint && <InstallHint lang={lang} isIOS={isIOS} onClose={()=>setInstallHint(false)} />}
       <EditToggleBtn editMode={editMode} onToggle={onToggleEdit} lang={lang} />
     </div>
@@ -476,6 +488,16 @@ export default function App() {
       <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
         pageTitle={lang==='ru'?'Викторина':'Le Quiz'}>
         <Quiz wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} />
+      </Shell>
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
+      {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+    </>
+  )
+  if (screen === 'forum')    return (
+    <>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
+        pageTitle={lang==='ru'?'Форум':'Le Forum'}>
+        <ForumPage wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} />
       </Shell>
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}

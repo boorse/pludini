@@ -18,6 +18,8 @@ const S = {
   activityEdits: {}, // activityId -> { fr:{title,text}, ru:{...}, en:{...} } (Pludini Host)
   quizQuestions: [],  // questions du quiz ajoutées depuis l'éditeur
   quizEdits: {},      // questionId -> champs modifiés (y compris celles de quizdata.js)
+  forumTopics: [],    // sujets du forum
+  forumPosts: [],      // messages du forum (topicId, author, text, createdAt)
   ready: false,
 }
 const subs = new Set()
@@ -42,6 +44,7 @@ export async function loadAll() {
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   S.activityEdits = {}
   S.quizQuestions = []; S.quizEdits = {}
+  S.forumTopics = []; S.forumPosts = []
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -53,6 +56,8 @@ export async function loadAll() {
     if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
     if (r.kind === 'quizq')     S.quizQuestions.push({ ...r.value, key: r.key })
     if (r.kind === 'quizqedit') S.quizEdits[r.value.id] = r.value
+    if (r.kind === 'forumtopic') S.forumTopics.push({ ...r.value, key: r.key })
+    if (r.kind === 'forumpost')  S.forumPosts.push({ ...r.value, key: r.key })
   })
   S.ready = true
   notify()
@@ -321,7 +326,7 @@ export function speciesType(sp) {
 
 // ══════ SCORES (tiennent compte des ajouts) ══════
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
-const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
+export const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
 export function calcPtsLive(sp, player) {
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
@@ -420,6 +425,54 @@ export async function removeQuizQuestion(id) {
     const prev = S.quizEdits[id]?.fields || {}
     await editQuizQuestion(id, { ...prev, removed: true })
   }
+}
+
+// ══════ FORUM (sujets + messages) ══════
+export function allForumTopics() {
+  return [...S.forumTopics].sort((a, b) => b.createdAt - a.createdAt)
+}
+export function forumPostsFor(topicId) {
+  return S.forumPosts.filter(p => p.topicId === topicId).sort((a, b) => a.createdAt - b.createdAt)
+}
+export function forumPostCount(topicId) {
+  return S.forumPosts.filter(p => p.topicId === topicId).length
+}
+// crée le sujet et son premier message ensemble — un sujet sans message n'a pas de sens
+export async function addForumTopic(title, author, text) {
+  const id = 'ftopic_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+  const postId = 'fpost_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+  const createdAt = Date.now()
+  const topic = { id, title, author, createdAt }
+  const post = { id: postId, topicId: id, author, text, createdAt }
+  S.forumTopics.push({ ...topic, key: 'forumtopic_' + id })
+  S.forumPosts.push({ ...post, key: 'forumpost_' + postId })
+  notify()
+  await Promise.all([
+    sb.from('overrides').upsert({ kind: 'forumtopic', key: 'forumtopic_' + id, value: topic, updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+    sb.from('overrides').upsert({ kind: 'forumpost', key: 'forumpost_' + postId, value: post, updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+  ])
+  return id
+}
+export async function addForumPost(topicId, author, text) {
+  const id = 'fpost_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+  const post = { id, topicId, author, text, createdAt: Date.now() }
+  S.forumPosts.push({ ...post, key: 'forumpost_' + id }); notify()
+  await sb.from('overrides').upsert({ kind: 'forumpost', key: 'forumpost_' + id, value: post, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  return id
+}
+export async function removeForumTopic(id) {
+  const posts = S.forumPosts.filter(p => p.topicId === id)
+  S.forumTopics = S.forumTopics.filter(t => t.id !== id)
+  S.forumPosts = S.forumPosts.filter(p => p.topicId !== id)
+  notify()
+  await Promise.all([
+    sb.from('overrides').delete().eq('key', 'forumtopic_' + id),
+    ...posts.map(p => sb.from('overrides').delete().eq('key', 'forumpost_' + p.id)),
+  ])
+}
+export async function removeForumPost(id) {
+  S.forumPosts = S.forumPosts.filter(p => p.id !== id); notify()
+  await sb.from('overrides').delete().eq('key', 'forumpost_' + id)
 }
 
 // ══════ IDENTITÉ ══════

@@ -235,16 +235,18 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
         <input value={newSub} onChange={ev=>setNewSub(ev.target.value)} style={{ ...input, fontSize:12.5 }}
           placeholder={lang==='ru'?'…или новое семейство':'…ou créer une nouvelle famille'} />
 
-        <label style={label}>{lang==='ru'?'Редкость':'Rareté'}</label>
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {Object.entries(RARITY).map(([k,v])=>(
-            <button key={k} onClick={()=>setR(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
-              border:`1px solid ${r===k?v.c:T.line}`, background:r===k?v.c:'transparent',
-              color:r===k?'#fff':T.soft }}>{v.l} · {v.p}</button>
-          ))}
-        </div>
+        {speciesType({ cat })!==3 && <>
+          <label style={label}>{lang==='ru'?'Редкость':'Rareté'}</label>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+            {Object.entries(RARITY).map(([k,v])=>(
+              <button key={k} onClick={()=>setR(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
+                border:`1px solid ${r===k?v.c:T.line}`, background:r===k?v.c:'transparent',
+                color:r===k?'#fff':T.soft }}>{v.l} · {v.p}</button>
+            ))}
+          </div>
+        </>}
 
-        {speciesType({ cat })!==2 && <>
+        {speciesType({ cat })===1 && <>
           <label style={label}>{lang==='ru'?'Размер':'Taille'}</label>
           <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
             {[['xs','Très petit'],['s','Petit'],['m','Moyen'],['l','Grand'],['xl','Géant']].map(([k,l])=>(
