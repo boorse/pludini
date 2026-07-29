@@ -363,15 +363,21 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
   )
 }
 
+// URLs partagées directement vers un écran précis — / (implicite) reste landing
+const PATH_SCREENS = { '/host': 'experience', '/pokedex': 'app' }
+const SCREEN_PATHS = { landing: '/', experience: '/host', app: '/pokedex' }
+
 // ══════════════════ APP ══════════════════
 export default function App() {
   const wide = useWide()
-  // /host est une vraie URL partageable (aperçu de lien dédié via middleware.js) :
-  // elle doit toujours ouvrir Pludini Host, même si le dernier écran mémorisé
-  // était différent — sinon un lien partagé n'amènerait pas au bon endroit
+  // /host et /pokedex sont de vraies URLs partageables (aperçu de lien dédié
+  // pour /host via middleware.js) : elles doivent toujours ouvrir le bon écran,
+  // même si le dernier écran mémorisé était différent — sinon un lien partagé
+  // n'amènerait pas au bon endroit
   const [screen, setScreen] = useState(() => {
     try {
-      if (window.location.pathname.replace(/\/$/, '') === '/host') return 'experience'
+      const fromPath = PATH_SCREENS[window.location.pathname.replace(/\/$/, '')]
+      if (fromPath) return fromPath
       return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing'
     } catch { return 'landing' }
   })
@@ -429,22 +435,21 @@ export default function App() {
   // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
   // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
   const scrollPos = useRef({})
-  // seuls landing et experience ("Pludini Host") ont une URL dédiée (/ et /host) —
-  // ce sont les deux seules pages qu'on partage avec un aperçu de lien propre ;
-  // les autres écrans restent de simples états internes, comme avant
+  // seuls landing, experience ("Pludini Host") et app ("Le Pokédex") ont une
+  // URL dédiée (/, /host, /pokedex) — ce sont les seules pages qu'on partage
+  // avec un lien direct (aperçu de lien propre pour / et /host) ; les autres
+  // écrans restent de simples états internes, comme avant
   const goScreen = (s) => {
     scrollPos.current[screen] = window.scrollY
     setScreen(s)
-    try {
-      if (s === 'experience') window.history.pushState({ screen: s }, '', '/host')
-      else if (s === 'landing') window.history.pushState({ screen: s }, '', '/')
-    } catch {}
+    const path = SCREEN_PATHS[s]
+    if (path) { try { window.history.pushState({ screen: s }, '', path) } catch {} }
   }
   useEffect(() => { window.scrollTo(0, scrollPos.current[screen] || 0) }, [screen])
   useEffect(() => {
     const onPop = () => {
-      const isHost = window.location.pathname.replace(/\/$/, '') === '/host'
-      setScreen(isHost ? 'experience' : 'landing')
+      const path = window.location.pathname.replace(/\/$/, '') || '/'
+      setScreen(PATH_SCREENS[path] || 'landing')
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
