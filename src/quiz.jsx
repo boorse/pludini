@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { allSpecies, allCats, speciesPhotos, photosFor, removePhoto,
-         allQuizQuestions, addQuizQuestion, editQuizQuestion, removeQuizQuestion } from './store.js'
+         allQuizQuestions, addQuizQuestion, editQuizQuestion, removeQuizQuestion,
+         allQuizScores, addQuizScore, getMe } from './store.js'
 import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf } from './i18n.js'
-import { T, Modal, label, input, ValidateBar, ConfirmDialog, visuallyHiddenFileInput } from './editui.jsx'
+import { T, Modal, label, input, ValidateBar, ConfirmDialog, visuallyHiddenFileInput, IdentityPicker } from './editui.jsx'
 
 const QUESTIONS_PER_GAME = 10
 
@@ -46,6 +47,16 @@ function photoFor(q, sp) {
   return sp ? speciesPhotos(sp)[0]?.photo : null
 }
 
+// classement par joueur — total des bonnes réponses ("réussites") cumulées sur toutes ses parties
+function leaderboard() {
+  const byPlayer = {}
+  allQuizScores().forEach(s => {
+    const e = byPlayer[s.player] || (byPlayer[s.player] = { player: s.player, games: 0, correct: 0, total: 0 })
+    e.games += 1; e.correct += s.score; e.total += s.total
+  })
+  return Object.values(byPlayer).sort((a, b) => b.correct - a.correct)
+}
+
 export default function Quiz({ wide, lang, onBack, edit }) {
   const t = UI[lang]
   const [phase, setPhase] = useState('intro') // 'intro' | 'playing' | 'end'
@@ -55,8 +66,12 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   const [score, setScore] = useState(0)
   const [managing, setManaging] = useState(false)
   const [editingQ, setEditingQ] = useState(null) // null | {} (nouvelle) | {...existante}
+  const [idPicker, setIdPicker] = useState(false)
 
-  const start = () => { setRounds(buildRounds()); setIdx(0); setSelected(null); setScore(0); setPhase('playing') }
+  const start = () => {
+    if (!getMe()) { setIdPicker(true); return }
+    setRounds(buildRounds()); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
+  }
 
   if (managing) {
     if (editingQ) return (
@@ -70,6 +85,7 @@ export default function Quiz({ wide, lang, onBack, edit }) {
 
   if (phase === 'intro') {
     const total = allQuizQuestions().length
+    const board = leaderboard()
     return (
       <div style={{ padding: wide?'16px 40px 40px':'14px 18px 30px', maxWidth:560, margin:'0 auto' }}>
         <Back onBack={onBack} label={t.home} />
@@ -96,7 +112,35 @@ export default function Quiz({ wide, lang, onBack, edit }) {
               {lang==='ru'?'Управление вопросами':'Gérer les questions'}
             </button>
           )}
+          {board.length>0 && (
+            <div style={{ marginTop:32, textAlign:'left' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:T.mute, textTransform:'uppercase',
+                letterSpacing:'.5px', marginBottom:10, textAlign:'center' }}>
+                {lang==='ru'?'Рейтинг':'Classement'}
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {board.map((e,i)=>{
+                  const pct = e.total ? Math.round((e.correct/e.total)*100) : 0
+                  return (
+                    <div key={e.player} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 13px',
+                      borderRadius:12, border:`1px solid ${T.line}`, background: i===0?'#F0DDD0':T.card }}>
+                      <span className="serif" style={{ width:20, textAlign:'center', fontSize:13.5, fontWeight:900,
+                        color: i===0?T.clay:T.mute, flexShrink:0 }}>{i+1}</span>
+                      <span style={{ flex:1, fontSize:13, fontWeight:700, color:T.ink }}>{e.player}</span>
+                      <span style={{ fontSize:11.5, color:T.soft, flexShrink:0 }}>
+                        {e.games} {lang==='ru'?'игр':(e.games>1?'parties':'partie')}
+                      </span>
+                      <span className="serif" style={{ fontSize:14, fontWeight:800, color:T.clay, flexShrink:0 }}>
+                        {e.correct} <span style={{ fontSize:10.5, color:T.mute, fontWeight:500 }}>({pct}%)</span>
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
+        {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
       </div>
     )
   }
@@ -146,7 +190,11 @@ export default function Quiz({ wide, lang, onBack, edit }) {
     if (i === round.correctIndex) setScore(s => s + 1)
   }
   const next = () => {
-    if (idx + 1 >= rounds.length) { setPhase('end'); return }
+    if (idx + 1 >= rounds.length) {
+      if (getMe()) addQuizScore(getMe(), score, rounds.length)
+      setPhase('end')
+      return
+    }
     setIdx(idx + 1); setSelected(null)
   }
 
@@ -187,13 +235,15 @@ export default function Quiz({ wide, lang, onBack, edit }) {
           const isCorrect = i === round.correctIndex
           const isPicked = i === selected
           let bg = T.card, border = T.line, color = T.ink, icon = null
-          if (answered && isCorrect) { bg = '#DDEBD0'; border = T.sageDark; color = '#2F4A22'; icon = 'ti-circle-check' }
-          else if (answered && isPicked && !isCorrect) { bg = '#F5DCD5'; border = '#B5602F'; color = '#7A2E1C'; icon = 'ti-circle-x' }
+          if (answered && isPicked) {
+            if (isCorrect) { bg = '#DDEBD0'; border = T.sageDark; color = '#2F4A22'; icon = 'ti-circle-check' }
+            else { bg = '#F5DCD5'; border = '#B5602F'; color = '#7A2E1C'; icon = 'ti-circle-x' }
+          }
           return (
             <button key={i} onClick={()=>pick(i)} disabled={answered} style={{ display:'flex', alignItems:'center',
               gap:10, width:'100%', padding: wide?'16px 18px':'15px 16px', borderRadius:14,
               border:`2px solid ${border}`, background:bg, textAlign:'left', color, fontSize: wide?14.5:13.5,
-              fontWeight: (answered && (isCorrect||isPicked)) ? 700 : 500, lineHeight:1.4 }}>
+              fontWeight: (answered && isPicked) ? 700 : 500, lineHeight:1.4 }}>
               {icon && <i className={`ti ${icon}`} style={{ fontSize:19, flexShrink:0 }} aria-hidden="true" />}
               <span>{a}</span>
             </button>

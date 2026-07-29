@@ -9,7 +9,7 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry, speciesType, photosFor } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, isFish, photosFor } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -226,11 +226,21 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           </h2>
           <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
         </div>
-        <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:'#6B6357' }}>
-          {lang==='ru'
-            ? 'Документировать всё живое вокруг нас, сезон за сезоном, чтобы научиться узнавать и беречь это. Четыре наблюдателя, общая коллекция, которую можно пополнять откуда угодно, и простое желание — не упустить ничего незамеченным.'
-            : 'Documenter ce qui vit autour de nous, saison après saison, pour apprendre à le reconnaître et à le protéger. Quatre observateurs, une collection collaborative que chacun peut nourrir d’où il se trouve, et une envie simple : ne rien laisser filer sans le noter.'}
-        </p>
+        {(lang==='ru' ? [
+          'Всё началось с фотоловушки, закреплённой на дереве в глубине леса. Я просто хотел увидеть, кто проходит здесь по ночам.',
+          'Через несколько недель — сотни фотографий. Лиса на рассвете, косуля, щиплющая траву, и однажды — пятнистый силуэт, бесшумно пересекающий кадр: рысь.',
+          'Понять что-либо в этой дикой жизни, разбросанной по тысячам файлов, было невозможно. Всё это нужно было классифицировать, дать имена, даты, места. Знать, кто здесь живёт, кто проходит мимо, кто возвращается.',
+          'Желание навести порядок во всём, что меня окружает, было слишком сильным — но никакой унылой таблицы. Мне хотелось игру, коллекцию, Покедекс живой природы, где каждый замеченный вид — маленькая победа. Не только животные: деревья, грибы, цветы — всё, что населяет эти леса, озёра и эту реку.',
+          'Ничего этого не было бы без Елены, придумавшей это чудесное — сотворить такой райский сад. Спасибо, что подарила нам такое место — исследовать и любить.',
+        ] : [
+          'Tout a commencé avec une caméra piège, accrochée à un arbre au fond de la forêt. Je voulais juste voir qui passait par là, la nuit.',
+          'Quelques semaines plus tard : des centaines de photos. Un renard au petit matin, un chevreuil qui broute, et un jour une silhouette tachetée qui traverse le cadre sans un bruit — un lynx.',
+          'Impossible de comprendre quoi que ce soit à une vie sauvage éparpillée dans des milliers de fichiers. Il fallait classer tout ça, mettre des noms, des dates, des lieux. Savoir qui vit ici, qui passe, qui revient.',
+          'L’envie d’ordonner tout ce qui m’entoure était trop forte — mais pas question d’un tableur triste. Je voulais un jeu, une collection, un Pokédex du vivant où chaque espèce observée est une petite victoire. Pas seulement les animaux : les arbres, les champignons, les fleurs, tout ce qui peuple ces forêts, ces lacs et cette rivière.',
+          'Rien de tout cela n’existerait sans Elena, qui a eu la merveilleuse idée de façonner ce jardin d’Éden. Merci de nous avoir offert un endroit pareil à explorer et à aimer.',
+        ]).map((p,i)=>(
+          <p key={i} style={{ fontSize: wide?14:13, lineHeight:1.8, color:'#6B6357', textAlign:'left', marginTop: i===0?0:14 }}>{p}</p>
+        ))}
       </div>
 
       <div style={{ position:'relative', height: wide?300:220, margin: wide?'26px 40px 60px':'20px 16px 44px',
@@ -782,7 +792,7 @@ export default function App() {
                       padding:'7px 14px', borderRadius:14, background:T.clay, color:'#fff', fontWeight:600,
                       display:'flex', alignItems:'center', gap:5 }}>
                       <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
-                      {lang==='ru'?'Наблюдение':'Observation'}
+                      {isFish(sp) ? (lang==='ru'?'Поймана':'Pêché') : (lang==='ru'?'Наблюдение':'Observation')}
                     </button>
                   )}
                 </div>
@@ -824,7 +834,7 @@ export default function App() {
                   <div>
                     <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
                       letterSpacing:'.6px', marginBottom:8 }}>
-                      {lang==='ru'?'Наблюдения':'Observations'} ({entries.length})
+                      {isFish(sp) ? (lang==='ru'?'Рыбалка':'Pêches') : (lang==='ru'?'Наблюдения':'Observations')} ({entries.length})
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?110:90}px,1fr))`, gap:8 }}>
                       {entries.map(({ ind, photos }, i)=>(
@@ -838,6 +848,11 @@ export default function App() {
                               <i className="ti ti-eye" style={{ fontSize:18, color:T.mute }} aria-hidden="true" />
                               {ind.note && <div style={{ fontSize:9, color:T.soft, marginTop:4, lineHeight:1.3 }}>{ind.note}</div>}
                             </div>
+                          )}
+                          {ind.size && (
+                            <span style={{ position:'absolute', top:4, left:4, background:'rgba(20,18,14,.6)',
+                              color:'#fff', fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:8,
+                              textTransform:'capitalize' }}>{ind.size}</span>
                           )}
                           {photos.length>1 && (
                             <span style={{ position:'absolute', bottom:4, left:4, background:'rgba(20,18,14,.6)',

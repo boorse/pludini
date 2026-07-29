@@ -4,10 +4,10 @@
 // à un seul écran (Type 3 garde la notion de passage à l'affichage, mais le
 // formulaire de saisie lui-même est identique à celui du Type 2).
 import { useState } from 'react'
-import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType } from './store.js'
+import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish } from './store.js'
 import { METHODS } from './data'
 import { uploadPhotoFile } from './photoui.jsx'
-import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker } from './editui.jsx'
+import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker, FishSizePicker } from './editui.jsx'
 
 const bigBtn = { display:'flex', flexDirection:'column', alignItems:'center', gap:6, padding:'16px 8px',
   borderRadius:14, border:`1px solid ${T.line}`, background:T.card, textAlign:'center' }
@@ -278,8 +278,10 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
 // Familiers pour le Type 3).
 function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
   const me = getMe() || allPlayers()[0]?.name || ''
+  const fish = isFish(sp)
   const [stagedFiles, setStagedFiles] = useState([])
   const [note, setNote] = useState('')
+  const [fishSize, setFishSize] = useState('moyen')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -290,9 +292,10 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
     setBusy(true); setErr(null)
     try {
       const now = new Date()
-      const dlabel = `Passage du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
+      const dlabel = `${fish?'Pêche':'Passage'} du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
       const ind = { n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
-        time:'', by: me, method:'eye', weather:'', story:'', desc:'', b:[], traits:'' }
+        time:'', by: me, method:'eye', weather:'', story:'', desc:'', b:[], traits:'',
+        ...(fish ? { size: fishSize } : {}) }
       await addSighting(sp.id, ind)
       for (const f of stagedFiles) await uploadPhotoFile(`ind:${sp.id}:${dlabel}`, f, '', me)
       const cur = sp.obs?.[me] || []
@@ -308,7 +311,8 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
   return (
     <>
       <WizardHeader lang={lang} step={1} total={1} onClose={onClose}
-        title={lang==='ru'?'Новое наблюдение':'Nouvelle observation'} subtitle={sp.n} />
+        title={fish ? (lang==='ru'?'Поймана рыба':'Poisson pêché') : (lang==='ru'?'Новое наблюдение':'Nouvelle observation')}
+        subtitle={sp.n} />
       <div style={{ padding:'14px 22px 12px' }}>
         {onBackToSpecies && <BackLink onClick={onBackToSpecies}>{lang==='ru'?'Изменить вид':'Changer d’espèce'}</BackLink>}
         <label onDrop={e=>{ e.preventDefault(); addFiles(e.dataTransfer.files) }} onDragOver={e=>e.preventDefault()}
@@ -332,6 +336,10 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
             ))}
           </div>
         )}
+        {fish && (<>
+          <label style={label}>{lang==='ru'?'Размер':'Taille'}</label>
+          <FishSizePicker lang={lang} sp={sp} value={fishSize} onChange={setFishSize} />
+        </>)}
         <label style={label}>{lang==='ru'?'Кратко':'Un petit mot (facultatif)'}</label>
         <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3}
           style={{ ...input, fontSize:12.5, resize:'vertical' }}

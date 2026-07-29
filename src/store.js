@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 import { sb, publicUrl } from './supabase.js'
 import { SPECIES as BASE_SPECIES, CATS as BASE_CATS, PLAYERS as BASE_PLAYERS,
-         RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS } from './data'
+         RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS } from './data'
 import { QUIZ_QUESTIONS as BASE_QUIZ } from './quizdata.js'
 
 const S = {
@@ -20,6 +20,7 @@ const S = {
   quizEdits: {},      // questionId -> champs modifiés (y compris celles de quizdata.js)
   forumTopics: [],    // sujets du forum
   forumPosts: [],      // messages du forum (topicId, author, text, createdAt)
+  quizScores: [],     // parties de quiz jouées (player, score, total, createdAt)
   ready: false,
 }
 const subs = new Set()
@@ -45,6 +46,7 @@ export async function loadAll() {
   S.activityEdits = {}
   S.quizQuestions = []; S.quizEdits = {}
   S.forumTopics = []; S.forumPosts = []
+  S.quizScores = []
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -58,6 +60,7 @@ export async function loadAll() {
     if (r.kind === 'quizqedit') S.quizEdits[r.value.id] = r.value
     if (r.kind === 'forumtopic') S.forumTopics.push({ ...r.value, key: r.key })
     if (r.kind === 'forumpost')  S.forumPosts.push({ ...r.value, key: r.key })
+    if (r.kind === 'quizscore') S.quizScores.push({ ...r.value, key: r.key })
   })
   S.ready = true
   notify()
@@ -324,6 +327,9 @@ export function speciesType(sp) {
   return 2
 }
 
+// ══════ POISSONS : "pêché" remplace "observation", taille remplace qualité de photo ══════
+export function isFish(sp) { return sp.cat === 'poissons' }
+
 // ══════ SCORES (tiennent compte des ajouts) ══════
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
 export const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
@@ -345,8 +351,9 @@ export function calcPtsLive(sp, player) {
     // seul le tout premier passage ajouté rapporte 100% des points de base,
     // les suivants n'en rapportent que 10% (sinon cumuler les photos d'un
     // même animal déjà reconnu gonflerait le score sans limite)
+    const isFishSp = isFish(sp)
     base = myInds.reduce((sum, ind, i) => {
-      const mult = METHODS[ind.method]?.mult || 1
+      const mult = isFishSp ? (FISH_SIZE_MULT[ind.size] || 1) : (METHODS[ind.method]?.mult || 1)
       return sum + rarityPts * mult * (i === 0 ? 1 : 0.1)
     }, 0)
   } else {
@@ -473,6 +480,18 @@ export async function removeForumTopic(id) {
 export async function removeForumPost(id) {
   S.forumPosts = S.forumPosts.filter(p => p.id !== id); notify()
   await sb.from('overrides').delete().eq('key', 'forumpost_' + id)
+}
+
+// ══════ QUIZ — scores (une entrée par partie jouée, pour le classement) ══════
+export function allQuizScores() {
+  return [...S.quizScores]
+}
+export async function addQuizScore(player, score, total) {
+  const id = 'qscore_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+  const value = { id, player, score, total, createdAt: Date.now() }
+  S.quizScores.push({ ...value, key: 'quizscore_' + id }); notify()
+  await sb.from('overrides').upsert({ kind: 'quizscore', key: 'quizscore_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  return id
 }
 
 // ══════ IDENTITÉ ══════

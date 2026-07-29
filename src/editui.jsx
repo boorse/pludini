@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
          removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType,
          individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
-import { RARITY, METHODS, SIZE_MULT } from './data'
+import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
 import { LUT, uploadPhotoFile, usePhotos, FocalPicker } from './photoui.jsx'
 import SatMap from './satmap.jsx'
@@ -42,6 +42,29 @@ export function PhotoQualityPicker({ lang, value, onChange }) {
         <button key={k} onClick={()=>onChange(k)} style={{ flex:1, fontSize:11.5, padding:'9px 6px', borderRadius:10,
           border:`1px solid ${value===k?T.clay:T.line}`, background:value===k?'#F0DDD0':'transparent',
           color:T.ink, fontWeight:value===k?700:400, textAlign:'center' }}>{l}</button>
+      ))}
+    </div>
+  )
+}
+
+// ══════ Trois paliers de taille pêchée, mutuellement exclusifs — poissons uniquement ══════
+// remplace le choix de qualité de photo pour cette catégorie : le multiplicateur
+// de points dépend de la taille du poisson plutôt que de la netteté du cliché
+export function FishSizePicker({ lang, sp, value, onChange }) {
+  const [a, b] = sp?.tailleCm || [20, 40]
+  const opts = [
+    ['petit', lang==='ru'?`Мелкая (< ${a} см)`:`Petit (< ${a} cm)`],
+    ['moyen', lang==='ru'?`Средняя (${a}–${b} см)`:`Moyen (${a}–${b} cm)`],
+    ['grand', lang==='ru'?`Крупная (> ${b} см)`:`Grand (> ${b} cm)`],
+  ]
+  return (
+    <div style={{ display:'flex', gap:5, marginTop:9 }}>
+      {opts.map(([k,l])=>(
+        <button key={k} onClick={()=>onChange(k)} style={{ flex:1, fontSize:11, padding:'9px 6px', borderRadius:10,
+          border:`1px solid ${value===k?T.clay:T.line}`, background:value===k?'#F0DDD0':'transparent',
+          color:T.ink, fontWeight:value===k?700:400, textAlign:'center', lineHeight:1.35 }}>
+          {l}<br/><span style={{ fontSize:10, color:T.mute }}>×{FISH_SIZE_MULT[k]} pts</span>
+        </button>
       ))}
     </div>
   )
@@ -241,7 +264,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
             {Object.entries(RARITY).map(([k,v])=>(
               <button key={k} onClick={()=>setR(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
                 border:`1px solid ${r===k?v.c:T.line}`, background:r===k?v.c:'transparent',
-                color:r===k?'#fff':T.soft }}>{v.l} · {v.p}</button>
+                color:r===k?'#fff':T.soft }}>{v.l} · {v.p} pts</button>
             ))}
           </div>
         </>}
@@ -252,7 +275,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
             {[['xs','Très petit'],['s','Petit'],['m','Moyen'],['l','Grand'],['xl','Géant']].map(([k,l])=>(
               <button key={k} onClick={()=>setSz(k)} style={{ fontSize:11.5, padding:'6px 11px', borderRadius:14,
                 border:`1px solid ${sz===k?T.clay:T.line}`, background:sz===k?'#F0DDD0':'transparent',
-                color:T.soft }}>{l} ×{SIZE_MULT[k]}</button>
+                color:T.soft }}>{l} ×{SIZE_MULT[k]} pts</button>
             ))}
           </div>
         </>}

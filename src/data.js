@@ -11,6 +11,11 @@ export const RARITY = {
 
 export const SIZE_MULT = { xs:1, s:1.5, m:2, l:2.5, xl:3 }
 
+// multiplicateur de points selon la taille du poisson pêché (remplace la
+// qualité de photo pour cette catégorie — trois paliers par espèce, définis
+// via son champ tailleCm)
+export const FISH_SIZE_MULT = { petit:1, moyen:1.6, grand:2.5 }
+
 export const METHODS = {
   eye:   { l:'Vue directe',     mult:3,   c:'#4A5D32', on:'#EDE7D8' },
   scope: { l:'Longue-vue',      mult:2.5, c:'#6B7F4E', on:'#EDE7D8' },
@@ -69,6 +74,9 @@ export const CATS = [
   { id:'insectes', e:'🦋', n:'Insectes', lat:'Insecta', subs:[
       { id:'Lépidoptères', lat:'Lepidoptera' }, { id:'Coléoptères', lat:'Coleoptera' },
       { id:'Odonates', lat:'Odonata' }, { id:'Hyménoptères', lat:'Hymenoptera' },
+  ]},
+  { id:'poissons', e:'🐟', n:'Poissons', lat:'Pisces', subs:[
+      { id:'Esocidés', lat:'Esocidae' }, { id:'Percidés', lat:'Percidae' }, { id:'Cyprinidés', lat:'Cyprinidae' },
   ]},
 ]
 
@@ -351,6 +359,40 @@ export const SPECIES = [
     obs:{}, bonus:{}, inds:[],
     alim:'Nectar et pollen. Pollinisateur majeur.',
     hab:'Prairies, jardins. Niche au sol. Bande jaune.', dng:'Piqûre possible si menacé.' },
+
+  // ═══ POISSONS ═══
+  // tailleCm:[a,b] définit les trois paliers pêchés : petit <a, moyen a–b, grand >b
+  { id:'brochet', n:'Brochet', lat:'Esox lucius', e:'🐟', cat:'poissons', sub:'Esocidés', r:'peu_commun', sz:'l',
+    obs:{}, bonus:{}, inds:[], tailleCm:[50,80],
+    alim:'Carnassier à l\'affût : perches, gardons, petits poissons, grenouilles.',
+    hab:'Herbiers et eaux calmes des lacs et de la Līčupe.',
+    dng:'Dents acérées — prudence en le décrochant.' },
+  { id:'perche', n:'Perche commune', lat:'Perca fluviatilis', e:'🐟', cat:'poissons', sub:'Percidés', r:'commun', sz:'s',
+    obs:{}, bonus:{}, inds:[], tailleCm:[15,25],
+    alim:'Alevins, larves, petits invertébrés aquatiques.',
+    hab:'En bancs près des herbiers et des berges, lacs et rivière.',
+    dng:'Nageoire dorsale épineuse — attention en la tenant.' },
+  { id:'sandre', n:'Sandre', lat:'Sander lucioperca', e:'🐟', cat:'poissons', sub:'Percidés', r:'rare', sz:'l',
+    obs:{}, bonus:{}, inds:[], tailleCm:[40,65],
+    alim:'Carnassier crépusculaire : gardons, perches, petits poissons.',
+    hab:'Eaux profondes et troubles des grands lacs.',
+    dng:'Dents canines proéminentes — prudence.' },
+  { id:'gardon', n:'Gardon', lat:'Rutilus rutilus', e:'🐟', cat:'poissons', sub:'Cyprinidés', r:'commun', sz:'xs',
+    obs:{}, bonus:{}, inds:[], tailleCm:[12,20],
+    alim:'Algues, larves, petits invertébrés. Omnivore.',
+    hab:'En bancs en eaux calmes, lacs et rivière.', dng:'—' },
+  { id:'breme', n:'Brème commune', lat:'Abramis brama', e:'🐟', cat:'poissons', sub:'Cyprinidés', r:'peu_commun', sz:'m',
+    obs:{}, bonus:{}, inds:[], tailleCm:[25,40],
+    alim:'Vers, larves, mollusques fouillés dans la vase.',
+    hab:'Fonds vaseux des lacs calmes, en bancs.', dng:'—' },
+  { id:'tanche', n:'Tanche', lat:'Tinca tinca', e:'🐟', cat:'poissons', sub:'Cyprinidés', r:'rare', sz:'m',
+    obs:{}, bonus:{}, inds:[], tailleCm:[25,40],
+    alim:'Vers, larves, végétation aquatique fouillés dans la vase.',
+    hab:'Fonds vaseux et herbiers denses, eaux calmes.', dng:'—' },
+  { id:'carassin', n:'Carassin commun', lat:'Carassius carassius', e:'🐟', cat:'poissons', sub:'Cyprinidés', r:'peu_commun', sz:'xs',
+    obs:{}, bonus:{}, inds:[], tailleCm:[15,25],
+    alim:'Végétation aquatique, larves, détritus.',
+    hab:'Eaux calmes et peu profondes, tolère le manque d\'oxygène.', dng:'—' },
 
   // ═══ HUMAINS ═══
   { id:'h_ferdinand', n:'Ferdinand', lat:'Homo sapiens', e:'🧔', cat:'humains', sub:'Résidents', r:'commun', sz:'m',
