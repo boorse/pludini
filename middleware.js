@@ -15,7 +15,7 @@ const PAGES = {
   },
   '/host': {
     title: 'Pludini Host — Une nuit dans la forêt',
-    description: 'Faune sauvage, autosuffisance et nuits sans une seule lumière — une propriété familiale nichée dans la forêt du Vidzeme, à vivre le temps d’une nuit.',
+    description: 'Faune sauvage, autosuffisance et nuits sans une seule lumière — une propriété familiale nichée dans la forêt du Vidzeme.',
     image: '/og-image-host.png',
   },
 }
