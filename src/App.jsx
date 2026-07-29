@@ -218,10 +218,10 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
         </div>
       </div>
 
-      <div style={{ padding: wide?'40px 40px 20px':'28px 22px 14px', textAlign:'center', maxWidth:640, margin:'0 auto' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+      <div style={{ padding: wide?'22px 40px 10px':'16px 22px 8px', textAlign:'center', maxWidth:720, margin:'0 auto' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:12 }}>
           <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
-          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:'#2B2620', whiteSpace:'nowrap' }}>
+          <h2 className="serif" style={{ fontSize: wide?18:15, fontWeight:600, color:'#9A9081', whiteSpace:'nowrap' }}>
             {lang==='ru'?'Наша история':'Notre histoire'}
           </h2>
           <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
@@ -239,7 +239,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           'L’envie d’ordonner tout ce qui m’entoure était trop forte — mais pas question d’un tableur triste. Je voulais un jeu, une collection, un Pokédex du vivant où chaque espèce observée est une petite victoire. Pas seulement les animaux : les arbres, les champignons, les fleurs, tout ce qui peuple ces forêts, ces lacs et cette rivière.',
           'Rien de tout cela n’existerait sans Elena, qui a eu la merveilleuse idée de façonner ce jardin d’Éden. Merci de nous avoir offert un endroit pareil à explorer et à aimer.',
         ]).map((p,i)=>(
-          <p key={i} style={{ fontSize: wide?14:13, lineHeight:1.8, color:'#6B6357', textAlign:'left', marginTop: i===0?0:14 }}>{p}</p>
+          <p key={i} style={{ fontSize: wide?12:11, lineHeight:1.55, color:'#9A9081', textAlign:'left', marginTop: i===0?0:7 }}>{p}</p>
         ))}
       </div>
 
