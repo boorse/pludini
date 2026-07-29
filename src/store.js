@@ -4,6 +4,7 @@
 import { sb, publicUrl } from './supabase.js'
 import { SPECIES as BASE_SPECIES, CATS as BASE_CATS, PLAYERS as BASE_PLAYERS,
          RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS } from './data'
+import { QUIZ_QUESTIONS as BASE_QUIZ } from './quizdata.js'
 
 const S = {
   photos: {},        // target -> [{id,url,caption,by,path}]
@@ -15,6 +16,8 @@ const S = {
   sightEdits: {},    // "sedit_spId::indName" -> {fields}
   covers: {},        // target -> id de la photo choisie comme vignette
   activityEdits: {}, // activityId -> { fr:{title,text}, ru:{...}, en:{...} } (Pludini Host)
+  quizQuestions: [],  // questions du quiz ajoutées depuis l'éditeur
+  quizEdits: {},      // questionId -> champs modifiés (y compris celles de quizdata.js)
   ready: false,
 }
 const subs = new Set()
@@ -38,6 +41,7 @@ export async function loadAll() {
   })
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   S.activityEdits = {}
+  S.quizQuestions = []; S.quizEdits = {}
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -47,6 +51,8 @@ export async function loadAll() {
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
     if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
     if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
+    if (r.kind === 'quizq')     S.quizQuestions.push({ ...r.value, key: r.key })
+    if (r.kind === 'quizqedit') S.quizEdits[r.value.id] = r.value
   })
   S.ready = true
   notify()
@@ -381,6 +387,39 @@ export function allCats() {
   return BASE_CATS.map(c => extra[c.id]
     ? { ...c, subs: [...c.subs, ...[...extra[c.id]].map(id => ({ id, lat: '' }))] }
     : c)
+}
+
+// ══════ QUIZ (questions ajoutées/modifiées depuis l'éditeur) ══════
+// même principe que les espèces : base statique (quizdata.js) + surcharges
+// (édition d'une question existante, ou question entièrement nouvelle)
+export function allQuizQuestions() {
+  const custom = S.quizQuestions.map(c => ({ answers:['','','',''], correct:0, explain:'', ...c }))
+  const merged = [...BASE_QUIZ, ...custom]
+  return merged
+    .map(q => S.quizEdits[q.id] ? { ...q, ...S.quizEdits[q.id].fields } : q)
+    .filter(q => !q.removed)
+}
+export async function addQuizQuestion(q) {
+  const id = q.id || ('quizq_' + Date.now().toString(36))
+  const value = { ...q, id }
+  S.quizQuestions.push({ ...value, key: 'quizq_' + id }); notify()
+  await sb.from('overrides').upsert({ kind: 'quizq', key: 'quizq_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  return id
+}
+export async function editQuizQuestion(id, fields) {
+  const value = { id, fields: { ...(S.quizEdits[id]?.fields || {}), ...fields } }
+  S.quizEdits[id] = value; notify()
+  await sb.from('overrides').upsert({ kind: 'quizqedit', key: 'quizqedit_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+}
+export async function removeQuizQuestion(id) {
+  const isCustom = S.quizQuestions.some(q => q.id === id)
+  if (isCustom) {
+    S.quizQuestions = S.quizQuestions.filter(q => q.id !== id); notify()
+    await sb.from('overrides').delete().eq('key', 'quizq_' + id)
+  } else {
+    const prev = S.quizEdits[id]?.fields || {}
+    await editQuizQuestion(id, { ...prev, removed: true })
+  }
 }
 
 // ══════ IDENTITÉ ══════

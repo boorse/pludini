@@ -12,6 +12,7 @@ import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote
          removeSighting, setObservation, setBlurry, speciesType, photosFor } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
+import Quiz from './quiz.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -425,7 +426,7 @@ export default function App() {
   if (screen === 'lang') return <LangPicker onPick={(c)=>{ setLang(c); setScreen('landing') }} />
   if (screen === 'landing') return (
     <>
-      <Landing lang={lang} setLang={setLang} go={goScreen} onQuiz={()=>showToast(t.quizSoon)}
+      <Landing lang={lang} setLang={setLang} go={goScreen} onQuiz={()=>goScreen('quiz')}
         edit={canEditImages} editMode={edit} onToggleEdit={toggleEdit}
         onEditHero={()=>setPhotoTarget({ target:'site:hero', label:lang==='ru'?'Главное фото':'Image d\u2019accueil' })}
         onEditCard={(c)=>setPhotoTarget({ target:`site:card:${c.k}`, label:c.title })} />
@@ -465,6 +466,16 @@ export default function App() {
       <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
         pageTitle={lang==='ru'?'Галерея':'Galerie'}>
         <Gallery wide={wide} lang={lang} onBack={()=>goScreen('landing')} />
+      </Shell>
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
+      {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+    </>
+  )
+  if (screen === 'quiz')      return (
+    <>
+      <Shell lang={lang} setLang={setLang} onHome={()=>goScreen('landing')} edit={edit} onToggleEdit={toggleEdit}
+        pageTitle={lang==='ru'?'Викторина':'Le Quiz'}>
+        <Quiz wide={wide} lang={lang} onBack={()=>goScreen('landing')} edit={edit} />
       </Shell>
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
