@@ -366,8 +366,14 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
 // ══════════════════ APP ══════════════════
 export default function App() {
   const wide = useWide()
+  // /host est une vraie URL partageable (aperçu de lien dédié via middleware.js) :
+  // elle doit toujours ouvrir Pludini Host, même si le dernier écran mémorisé
+  // était différent — sinon un lien partagé n'amènerait pas au bon endroit
   const [screen, setScreen] = useState(() => {
-    try { return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing' } catch { return 'landing' }
+    try {
+      if (window.location.pathname.replace(/\/$/, '') === '/host') return 'experience'
+      return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing'
+    } catch { return 'landing' }
   })
   // langue par défaut à la toute première ouverture : celle du téléphone si
   // elle est prise en charge (russe), sinon français — puis mémorisée dès
@@ -423,8 +429,26 @@ export default function App() {
   // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
   // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
   const scrollPos = useRef({})
-  const goScreen = (s) => { scrollPos.current[screen] = window.scrollY; setScreen(s) }
+  // seuls landing et experience ("Pludini Host") ont une URL dédiée (/ et /host) —
+  // ce sont les deux seules pages qu'on partage avec un aperçu de lien propre ;
+  // les autres écrans restent de simples états internes, comme avant
+  const goScreen = (s) => {
+    scrollPos.current[screen] = window.scrollY
+    setScreen(s)
+    try {
+      if (s === 'experience') window.history.pushState({ screen: s }, '', '/host')
+      else if (s === 'landing') window.history.pushState({ screen: s }, '', '/')
+    } catch {}
+  }
   useEffect(() => { window.scrollTo(0, scrollPos.current[screen] || 0) }, [screen])
+  useEffect(() => {
+    const onPop = () => {
+      const isHost = window.location.pathname.replace(/\/$/, '') === '/host'
+      setScreen(isHost ? 'experience' : 'landing')
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   const SPECIES = allSpecies()
   const CATS = allCats()
