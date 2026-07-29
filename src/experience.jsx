@@ -677,21 +677,7 @@ export default function Experience({ wide, onBack }) {
             </div>
           </div>
 
-          <div style={{ padding: wide?'64px 40px 20px':'46px 22px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
-              <div style={{ flex:1, height:1, background:T.line }} />
-              <h2 className="serif" style={{ fontSize: wide?32:23, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
-              <div style={{ flex:1, height:1, background:T.line }} />
-            </div>
-            <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
-          </div>
-          <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 0':'20px 16px 0',
-            borderRadius:18, overflow:'hidden' }}>
-            <PhotoBg target="exp:story" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
-            {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
-          </div>
-
-          <div style={{ position:'relative', height: wide?280:200, margin: wide?'20px 40px 60px':'16px 16px 44px',
+          <div style={{ position:'relative', height: wide?280:200, margin: wide?'26px 40px 0':'20px 16px 0',
             borderRadius:18, overflow:'hidden' }}>
             <a href="https://maps.app.goo.gl/59rg3q9UWsyECMyX7" target="_blank" rel="noopener noreferrer"
               style={{ display:'block', position:'absolute', inset:0 }}>
@@ -710,6 +696,20 @@ export default function Experience({ wide, onBack }) {
               </div>
             </a>
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:map', label:l.mapTitle })} />}
+          </div>
+
+          <div style={{ padding: wide?'64px 40px 20px':'46px 22px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+              <div style={{ flex:1, height:1, background:T.line }} />
+              <h2 className="serif" style={{ fontSize: wide?32:23, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
+              <div style={{ flex:1, height:1, background:T.line }} />
+            </div>
+            <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
+          </div>
+          <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 60px':'20px 16px 44px',
+            borderRadius:18, overflow:'hidden' }}>
+            <PhotoBg target="exp:story" thumb={false} fallback="linear-gradient(150deg,#3E5233 0%,#7A8B5C 100%)" />
+            {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:story', label:l.storyTitle })} />}
           </div>
         </>
       )}
