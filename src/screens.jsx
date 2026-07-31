@@ -632,6 +632,10 @@ export function Gallery({ wide, lang, onBack }) {
         const sp = SPECIES.find(x => x.id === spId)
         if (!sp) return
         const ind = kind === 'ind' ? (sp.inds || []).find(i => i.n === indName) : null
+        // une photo dont l'individu n'existe plus (observation supprimée) ne
+        // doit jamais apparaître — la suppression est censée l'avoir déjà
+        // effacée elle aussi, mais on ne l'affiche jamais dans le doute
+        if (kind === 'ind' && !ind) return
         items.push({ sp, ind, url: p.url, caption: p.caption, by: p.by || ind?.by })
       })
       SPECIES.filter(isObserved).forEach(sp => (sp.inds || []).forEach(ind => {

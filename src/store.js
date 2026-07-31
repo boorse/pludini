@@ -115,6 +115,13 @@ export async function removePhoto(target, id, path) {
   if (S.covers[target] === id) delete S.covers[target]
   notify()
 }
+// supprime toutes les photos d'une cible (fichiers + lignes) — appelé quand
+// l'observation/l'espèce/la question à laquelle elles sont rattachées est
+// elle-même supprimée, pour qu'aucune photo ne reste hébergée "orpheline"
+export async function removePhotosFor(target) {
+  const list = S.photos[target] || []
+  await Promise.all(list.map(p => removePhoto(target, p.id, p.path)))
+}
 // écrit l'aperçu tout de suite (réactif), mais différe l'envoi réseau : sans
 // ça, cliquer plusieurs fois de suite pour affiner le point envoie une
 // requête par clic, et rien ne garantit que la dernière arrivée au serveur
@@ -239,6 +246,8 @@ export async function editSpecies(id, fields) {
   await sb.from('overrides').upsert({ kind: 'spedit', key: 'edit_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
 export async function removeSpecies(id) {
+  const sp = allSpecies().find(s => s.id === id)
+  if (sp) await Promise.all((sp.inds || []).map(ind => removePhotosFor(`ind:${id}:${ind.n}`)))
   const isCustom = S.species.some(s => s.id === id)
   if (isCustom) {
     S.species = S.species.filter(s => s.id !== id); notify()
@@ -320,6 +329,7 @@ export async function editSighting(spId, indName, fields) {
 export async function removeSighting(spId, indName) {
   const orig = (S.sightings[spId] || []).find(x => x.ind?.n === indName)
   const seKey = `sedit_${spId}::${indName}`
+  await removePhotosFor(`ind:${spId}:${indName}`)
   if (orig) {
     S.sightings[spId] = S.sightings[spId].filter(x => x.key !== orig.key)
     delete S.sightEdits[seKey]; notify()
@@ -458,6 +468,7 @@ export async function editQuizQuestion(id, fields) {
   await sb.from('overrides').upsert({ kind: 'quizqedit', key: 'quizqedit_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
 export async function removeQuizQuestion(id) {
+  await removePhotosFor(`quiz:${id}`)
   const isCustom = S.quizQuestions.some(q => q.id === id)
   if (isCustom) {
     S.quizQuestions = S.quizQuestions.filter(q => q.id !== id); notify()
