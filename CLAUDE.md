@@ -19,6 +19,9 @@ manquante) que seul le navigateur révèle. Ouvrir la console (Cmd+Option+J).
 GitHub (boorse/pludini) → Vercel déploie automatiquement à chaque push sur main.
 IMPORTANT : dans index.html le script doit être "./src/main.jsx" (chemin relatif),
 jamais "/src/main.jsx" — une barre initiale casse le build Vercel.
+Domaine de production : pludini.lv (acheté le 29/07/2026, 5 ans, via le
+registrar du .lv). À brancher côté Vercel (Project Settings → Domains) puis
+côté registrar (enregistrements DNS fournis par Vercel).
 
 ## Backend — Supabase (déjà configuré)
 - URL et clé publique dans src/supabase.js

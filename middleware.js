@@ -1,22 +1,26 @@
-// Aperçu de lien distinct pour l'accueil (Pludini Doc) et Pludini Host —
-// intercepte uniquement ces deux URLs et sert un index.html dont les balises
+// Aperçu de lien distinct pour Pludini Host (racine du domaine) et Pludini
+// Doc (/doc) — intercepte ces URLs et sert un index.html dont les balises
 // og:*/twitter:* sont adaptées à la page. Le reste du site (React, assets)
 // n'est pas concerné : c'est le même bundle, juste des balises différentes
 // pour les robots d'aperçu (WhatsApp, iMessage, réseaux sociaux…).
+// /host reste servi à l'identique de / pour ne pas casser d'anciens liens.
 export const config = {
-  matcher: ['/', '/host'],
+  matcher: ['/', '/host', '/doc'],
+}
+
+const HOST_PAGE = {
+  title: 'Pludini Host — Une nuit dans la forêt',
+  description: 'Faune sauvage, autosuffisance et nuits sans une seule lumière — une propriété familiale nichée dans la forêt du Vidzeme.',
+  image: '/og-image-host.png',
 }
 
 const PAGES = {
-  '/': {
-    title: 'Pludini — Inventaire naturaliste',
+  '/': HOST_PAGE,
+  '/host': HOST_PAGE,
+  '/doc': {
+    title: 'Pludini Doc — Inventaire naturaliste',
     description: 'Inventaire naturaliste collaboratif de la forêt, des lacs et de la rivière — faune, flore et souvenirs partagés en famille.',
     image: '/og-image.png',
-  },
-  '/host': {
-    title: 'Pludini Host — Une nuit dans la forêt',
-    description: 'Faune sauvage, autosuffisance et nuits sans une seule lumière — une propriété familiale nichée dans la forêt du Vidzeme.',
-    image: '/og-image-host.png',
   },
 }
 

@@ -363,9 +363,11 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
   )
 }
 
-// URLs partagées directement vers un écran précis — / (implicite) reste landing
-const PATH_SCREENS = { '/host': 'experience', '/pokedex': 'app' }
-const SCREEN_PATHS = { landing: '/', experience: '/host', app: '/pokedex' }
+// URLs partagées directement vers un écran précis — / est Pludini Host (page
+// publique du domaine), Pludini Doc (l'inventaire) vit sur /doc ; /host reste
+// une redirection d'écran pour ne pas casser d'anciens liens déjà partagés
+const PATH_SCREENS = { '/': 'experience', '/host': 'experience', '/doc': 'landing', '/pokedex': 'app' }
+const SCREEN_PATHS = { landing: '/doc', experience: '/', app: '/pokedex' }
 
 // ══════════════════ APP ══════════════════
 export default function App() {
@@ -376,7 +378,7 @@ export default function App() {
   // n'amènerait pas au bon endroit
   const [screen, setScreen] = useState(() => {
     try {
-      const fromPath = PATH_SCREENS[window.location.pathname.replace(/\/$/, '')]
+      const fromPath = PATH_SCREENS[window.location.pathname.replace(/\/$/, '') || '/']
       if (fromPath) return fromPath
       return localStorage.getItem('pludini_screen') || localStorage.getItem('pluduni_screen') || 'landing'
     } catch { return 'landing' }
@@ -435,10 +437,10 @@ export default function App() {
   // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
   // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
   const scrollPos = useRef({})
-  // seuls landing, experience ("Pludini Host") et app ("Le Pokédex") ont une
-  // URL dédiée (/, /host, /pokedex) — ce sont les seules pages qu'on partage
-  // avec un lien direct (aperçu de lien propre pour / et /host) ; les autres
-  // écrans restent de simples états internes, comme avant
+  // seuls landing ("Pludini Doc"), experience ("Pludini Host") et app ("Le
+  // Pokédex") ont une URL dédiée (/doc, /, /pokedex) — ce sont les seules
+  // pages qu'on partage avec un lien direct (aperçu de lien propre pour
+  // chacune) ; les autres écrans restent de simples états internes
   const goScreen = (s) => {
     scrollPos.current[screen] = window.scrollY
     setScreen(s)
