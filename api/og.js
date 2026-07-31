@@ -3,6 +3,9 @@
 // (Host/Doc/Farm) — se met donc à jour automatiquement dès qu'on change
 // cette photo, sans rien à régénérer à la main. Repli sur un dégradé (ou,
 // pour Farm, la photo de remplacement) tant qu'aucune photo n'est importée.
+// Pas de JSX ici (extension .js, zéro-config hors Next.js) : les éléments
+// sont construits à la main via React.createElement.
+import { createElement as h } from 'react'
 import { ImageResponse } from '@vercel/og'
 
 export const config = { runtime: 'edge' }
@@ -65,29 +68,32 @@ export default async function handler(req) {
   const photoUrl = await heroPhotoUrl(page.target)
   const bg = photoUrl || page.fallbackImage || null
 
-  return new ImageResponse(
-    (
-      <div style={{ display:'flex', flexDirection:'column', justifyContent:'flex-end',
-        width:'1200px', height:'630px', position:'relative', background: bg ? '#1E2418' : page.fallback }}>
-        {bg && (
-          <img src={bg} width={1200} height={630}
-            style={{ position:'absolute', top:0, left:0, width:'1200px', height:'630px', objectFit:'cover' }} />
-        )}
-        <div style={{ position:'absolute', inset:0,
-          background:'linear-gradient(to top, rgba(16,14,10,.85) 0%, rgba(16,14,10,.05) 55%, rgba(16,14,10,.3) 100%)' }} />
-        <div style={{ position:'relative', display:'flex', alignItems:'center', gap:18, padding:'0 56px 48px' }}>
-          <img src={LOGO_URL} width={54} height={54} style={{ borderRadius:12 }} />
-          <div style={{ display:'flex', flexDirection:'column' }}>
-            <div style={{ fontSize:44, fontWeight:700, color:'#F2EEE2', letterSpacing:'-1px' }}>{page.title}</div>
-            <div style={{ fontSize:23, color:'rgba(242,238,226,.85)', marginTop:4 }}>{page.subtitle}</div>
-          </div>
-        </div>
-      </div>
-    ),
-    {
-      width: 1200,
-      height: 630,
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' },
+  const tree = h('div', {
+    style: { display:'flex', flexDirection:'column', justifyContent:'flex-end',
+      width:'1200px', height:'630px', position:'relative', background: bg ? '#1E2418' : page.fallback },
+  },
+    bg && h('img', {
+      src: bg, width: 1200, height: 630,
+      style: { position:'absolute', top:0, left:0, width:'1200px', height:'630px', objectFit:'cover' },
+    }),
+    h('div', {
+      style: { position:'absolute', inset:0,
+        background:'linear-gradient(to top, rgba(16,14,10,.85) 0%, rgba(16,14,10,.05) 55%, rgba(16,14,10,.3) 100%)' },
+    }),
+    h('div', {
+      style: { position:'relative', display:'flex', alignItems:'center', gap:18, padding:'0 56px 48px' },
     },
+      h('img', { src: LOGO_URL, width: 54, height: 54, style: { borderRadius:12 } }),
+      h('div', { style: { display:'flex', flexDirection:'column' } },
+        h('div', { style: { fontSize:44, fontWeight:700, color:'#F2EEE2', letterSpacing:'-1px' } }, page.title),
+        h('div', { style: { fontSize:23, color:'rgba(242,238,226,.85)', marginTop:4 } }, page.subtitle),
+      ),
+    ),
   )
+
+  return new ImageResponse(tree, {
+    width: 1200,
+    height: 630,
+    headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' },
+  })
 }
