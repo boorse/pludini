@@ -227,7 +227,10 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide }) {
     <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         {siteTitle
-          ? <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>{siteTitle}</div>
+          ? <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <img src="/icons/bobber-mark.png" width={22} height={22} alt="" aria-hidden="true" />
+              <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>{siteTitle}</div>
+            </div>
           : <div />}
         <div style={{ display:'flex', gap:5 }}>
           {['fr','ru','en'].map(c => (

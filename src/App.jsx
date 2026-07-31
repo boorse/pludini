@@ -167,7 +167,10 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
         )}
         <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>Pludini Doc</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <BobberIcon size={22} />
+              <div className="serif" style={{ fontSize: wide?21.6:19.2, fontWeight:600, color:'#F2EEE2' }}>Pludini Doc</div>
+            </div>
             <div style={{ display:'flex', gap:5 }}>
               {['fr','ru'].map(c=>(
                 <button key={c} onClick={()=>setLang(c)} style={{ fontSize:10.5, padding:'4px 9px', borderRadius:12,
