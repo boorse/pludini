@@ -243,14 +243,14 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide, extraLinks 
           ))}
         </div>
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:6, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:6, alignItems:'flex-start' }}>
         <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
           <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
         </button>
         {extraLinks?.map(l => (
-          <button key={l.label} onClick={l.onClick} style={{ color:'rgba(242,238,226,.75)', fontSize: wide?14:13,
-            textDecoration:'underline', textUnderlineOffset:3 }}>
-            {l.label}
+          <button key={l.label} onClick={l.onClick} style={{ display:'flex', alignItems:'center', gap:6,
+            color:'rgba(242,238,226,.75)', fontSize: wide?14:13 }}>
+            <i className="ti ti-arrow-left" aria-hidden="true" />{l.label}
           </button>
         ))}
       </div>

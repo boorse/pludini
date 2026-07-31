@@ -16,6 +16,7 @@ const S = {
   sightEdits: {},    // "sedit_spId::indName" -> {fields}
   covers: {},        // target -> id de la photo choisie comme vignette
   activityEdits: {}, // activityId -> { fr:{title,text}, ru:{...}, en:{...} } (Pludini Host)
+  farmTextEdits: {}, // id -> { fr:{...}, ru:{...}, en:{...} } (Pludini Farm)
   quizQuestions: [],  // questions du quiz ajoutées depuis l'éditeur
   quizEdits: {},      // questionId -> champs modifiés (y compris celles de quizdata.js)
   quizThemes: [],     // thèmes de quiz créés depuis l'éditeur (en plus des 5 prévus)
@@ -45,6 +46,7 @@ export async function loadAll() {
   })
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   S.activityEdits = {}
+  S.farmTextEdits = {}
   S.quizQuestions = []; S.quizEdits = {}; S.quizThemes = []
   S.forumTopics = []; S.forumPosts = []
   S.quizScores = []
@@ -57,6 +59,7 @@ export async function loadAll() {
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
     if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
     if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
+    if (r.kind === 'farmtextedit') S.farmTextEdits[r.value.id] = r.value
     if (r.kind === 'quizq')     S.quizQuestions.push({ ...r.value, key: r.key })
     if (r.kind === 'quizqedit') S.quizEdits[r.value.id] = r.value
     if (r.kind === 'quiztheme') S.quizThemes.push({ ...r.value, key: r.key })
@@ -288,6 +291,16 @@ export async function editActivity(id, lang, fields) {
   const value = { ...prev, [lang]: { ...(prev[lang] || {}), ...fields } }
   S.activityEdits[id] = value; notify()
   await sb.from('overrides').upsert({ kind:'activityedit', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+
+// ══════ TEXTES ÉDITABLES DE PLUDINI FARM (accueil, thèmes, histoire, contact) ══════
+export function farmTextEditsFor(id) { return S.farmTextEdits[id] || null }
+export async function editFarmText(id, lang, fields) {
+  const key = `farmtext_${id}`
+  const prev = S.farmTextEdits[id] || { id }
+  const value = { ...prev, [lang]: { ...(prev[lang] || {}), ...fields } }
+  S.farmTextEdits[id] = value; notify()
+  await sb.from('overrides').upsert({ kind:'farmtextedit', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
 
 // ══════ OBSERVATIONS ══════

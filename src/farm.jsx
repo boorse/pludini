@@ -4,9 +4,12 @@
 // produit. Les images sont soit les vraies photos importées via le système
 // de photos existant (usePhotos/PhotoManager), soit — tant qu'aucune n'a été
 // importée — des photos Unsplash libres de droit, en simple remplacement.
+// Mode édition indépendant (mot de passe propre à Farm), comme sur Host :
+// tout le monde peut modifier les textes une fois débloqué, seul Ferdinand
+// peut remplacer les photos.
 import { useState, useEffect, useRef } from 'react'
 import { usePhotos, PhotoManager, LUT } from './photoui.jsx'
-import { getMe } from './store.js'
+import { getMe, subscribe, farmTextEditsFor, editFarmText } from './store.js'
 
 const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357', mute:'#9A9081', line:'#D3C7AE', clay:'#B5602F' }
 
@@ -64,23 +67,36 @@ const TXT = {
     storyTitle:'Notre histoire et nos valeurs',
     storyText:'Tout ici pousse, mûrit et se transforme au même endroit, sans hâte : le verger donne ses pommes, les chèvres leur lait, les ruches leur miel. Nous cultivons peu, mais bien, en petites quantités et sans intrants chimiques, avec le souci de préserver la terre qui nous les donne. Chaque produit porte l’empreinte d’une saison et d’un geste transmis dans la famille.',
     contactTitle:'Envie d’en savoir plus ?', contactSub:'Pour goûter nos produits ou vous fournir chez nous, écrivez-nous directement.',
-    contactBtn:'Nous contacter', back:'Pludini Doc', photos:'Photos' },
+    contactBtn:'Nous contacter', back:'Pludini Doc', photos:'Photos', text:'Texte', edit:'Édition' },
   ru:{ tag:'Семейная ферма', heroTitle:'Продукция нашей фермы',
     heroSub:'Сидр, облепиха, мёд, козий сыр и овощи с огорода — небольшое семейное хозяйство, живущее в ритме сезонов Видземе.',
     storyTitle:'Наша история и наши ценности',
     storyText:'Здесь всё растёт, зреет и перерабатывается на одном месте, без спешки: сад даёт яблоки, козы — молоко, улья — мёд. Мы выращиваем немного, но качественно, небольшими партиями и без химических добавок, заботясь о земле, которая нам всё это даёт. Каждый продукт несёт отпечаток сезона и семейного мастерства.',
     contactTitle:'Хотите узнать больше?', contactSub:'Чтобы попробовать нашу продукцию или стать поставщиком, напишите нам напрямую.',
-    contactBtn:'Связаться с нами', back:'Pludini Doc', photos:'Фото' },
+    contactBtn:'Связаться с нами', back:'Pludini Doc', photos:'Фото', text:'Текст', edit:'Правка' },
   en:{ tag:'Family farm', heroTitle:'Products from our farm',
     heroSub:'Cider, sea buckthorn, honey, goat cheese and garden vegetables — a small family production, shaped by the seasons of Vidzeme.',
     storyTitle:'Our story and our values',
     storyText:'Everything here grows, ripens and is transformed in the same place, without haste: the orchard gives its apples, the goats their milk, the hives their honey. We grow little, but well, in small batches and without chemical inputs, mindful of preserving the land that gives us all this. Every product carries the mark of a season and a gesture passed down in the family.',
     contactTitle:'Want to know more?', contactSub:'To taste our products or become a supplier, write to us directly.',
-    contactBtn:'Contact us', back:'Pludini Doc', photos:'Photos' },
+    contactBtn:'Contact us', back:'Pludini Doc', photos:'Photos', text:'Text', edit:'Edit' },
+}
+
+// re-rendu forcé quand le magasin change — les textes édités n'ont pas de snapshot figé possible
+function useStoreTick() {
+  const [, tick] = useState(0)
+  useEffect(() => subscribe(() => tick(x => x + 1)), [])
+}
+
+// fusionne une éventuelle surcharge par-dessus le texte de base, sans rien changer tant qu'aucune surcharge
+function textFor(id, lang, base) {
+  const ov = farmTextEditsFor(id)
+  return ov?.[lang] ? { ...base, ...ov[lang] } : base
 }
 
 // extraLinks : autres pages principales atteignables directement d'ici
-// (ex. Pludini Host depuis Pludini Farm), affichées à côté du retour
+// (ex. Pludini Host depuis Pludini Farm) — empilées sous le retour, chacune
+// avec la même flèche, dans l'ordre où elles sont données
 function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide, extraLinks }) {
   return (
     <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
@@ -98,14 +114,14 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide, extraLinks 
           ))}
         </div>
       </div>
-      <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:6, flexWrap:'wrap' }}>
+      <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:6, alignItems:'flex-start' }}>
         <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
           <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
         </button>
         {extraLinks?.map(l => (
-          <button key={l.label} onClick={l.onClick} style={{ color:'rgba(242,238,226,.75)', fontSize: wide?14:13,
-            textDecoration:'underline', textUnderlineOffset:3 }}>
-            {l.label}
+          <button key={l.label} onClick={l.onClick} style={{ display:'flex', alignItems:'center', gap:6,
+            color:'rgba(242,238,226,.75)', fontSize: wide?14:13 }}>
+            <i className="ti ti-arrow-left" aria-hidden="true" />{l.label}
           </button>
         ))}
       </div>
@@ -113,13 +129,89 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide, extraLinks 
   )
 }
 
-function EditBtn({ onClick, style }) {
+function EditBtn({ onClick, style, icon = 'ti-camera-plus' }) {
   return (
     <button onClick={(e)=>{ e.stopPropagation(); onClick() }} style={{ position:'absolute', zIndex:6,
       background:'rgba(0,0,0,.5)', color:'#fff', borderRadius:14, padding:'6px 10px', fontSize:11.5,
       fontWeight:600, display:'flex', alignItems:'center', gap:5, ...style }}>
-      <i className="ti ti-camera-plus" style={{ fontSize:13 }} aria-hidden="true" />
+      <i className={`ti ${icon}`} style={{ fontSize:13 }} aria-hidden="true" />
     </button>
+  )
+}
+
+function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
+  const l = TXT[lang]
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.45)', display:'flex',
+      alignItems:'center', justifyContent:'center', zIndex:170, padding:20 }} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:24,
+        width:'100%', maxWidth:320, border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:18, fontWeight:900, color:T.ink, marginBottom:12 }}>{l.edit}</div>
+        <input type="password" value={pw} onChange={e=>setPw(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&onSubmit()} placeholder="•••" autoFocus
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+            background:T.card, fontSize:13, marginBottom:12, color:T.ink }} />
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'9px', borderRadius:10, border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>✕</button>
+          <button onClick={onSubmit} className="serif" style={{ flex:1, padding:'9px', borderRadius:10,
+            background:T.clay, color:'#fff', fontSize:13, fontWeight:600 }}>OK</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Formulaire générique d'édition de texte (titre/texte, un id + une liste de champs) ──
+function FarmTextEditor({ id, lang, fields, current, onClose }) {
+  const [values, setValues] = useState(() => Object.fromEntries(fields.map(f => [f.key, current[f.key] || ''])))
+  const [busy, setBusy] = useState(false)
+  const set = (k, v) => setValues(s => ({ ...s, [k]: v }))
+  const save = async () => {
+    setBusy(true)
+    await editFarmText(id, lang, Object.fromEntries(fields.map(f => [f.key, (values[f.key]||'').trim()])))
+    setBusy(false)
+    onClose()
+  }
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.45)', display:'flex',
+      alignItems:'center', justifyContent:'center', zIndex:170, padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:22,
+        width:'100%', maxWidth:480, maxHeight:'86vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink, marginBottom:3 }}>
+          {lang==='ru'?'Изменить текст':lang==='en'?'Edit text':'Modifier ce texte'} ({lang.toUpperCase()})
+        </div>
+        <div style={{ fontSize:11.5, color:T.mute, marginBottom:14, lineHeight:1.5 }}>
+          {lang==='ru'?'Смените язык вверху страницы, чтобы изменить каждую версию.'
+            :lang==='en'?'Switch language at the top of the page to edit each version.'
+            :'Change de langue en haut de la page pour éditer chaque version.'}
+        </div>
+        {fields.map(f => (
+          <div key={f.key}>
+            <label style={{ fontSize:11, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', display:'block', marginBottom:5, marginTop:12 }}>
+              {f.label}
+            </label>
+            {f.type === 'textarea' ? (
+              <textarea value={values[f.key]} onChange={e=>set(f.key, e.target.value)} rows={4}
+                style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+                  background:T.card, fontSize:13, lineHeight:1.6, color:T.ink, resize:'vertical' }} />
+            ) : (
+              <input value={values[f.key]} onChange={e=>set(f.key, e.target.value)}
+                style={{ width:'100%', padding:'9px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+                  background:T.card, fontSize:14, color:T.ink }} />
+            )}
+          </div>
+        ))}
+        <div style={{ display:'flex', gap:8, marginTop:18 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10, border:`1px solid ${T.line}`, color:T.soft, fontSize:13 }}>
+            {lang==='ru'?'Отмена':lang==='en'?'Cancel':'Annuler'}
+          </button>
+          <button onClick={save} disabled={busy} className="serif" style={{ flex:1, padding:'10px', borderRadius:10,
+            background:T.clay, color:'#fff', fontSize:13, fontWeight:600, opacity:busy?.6:1 }}>
+            {busy ? '…' : (lang==='ru'?'Сохранить':lang==='en'?'Save':'Enregistrer')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -199,8 +291,8 @@ function ThemeStrip({ target, placeholders, wide }) {
   )
 }
 
-function ThemeSection({ t, lang, wide, canEditImages, onEditPhoto }) {
-  const tx = t[lang]
+function ThemeSection({ t, lang, wide, edit, canEditImages, onEditPhoto, onEditText }) {
+  const tx = textFor(t.key, lang, t[lang])
   return (
     <div style={{ padding: wide?'30px 0':'22px 0' }}>
       <div style={{ padding: wide?'0 32px 14px':'0 16px 10px', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
@@ -211,27 +303,55 @@ function ThemeSection({ t, lang, wide, canEditImages, onEditPhoto }) {
           </div>
           <p style={{ fontSize: wide?13.5:12.5, color:T.soft, lineHeight:1.6 }}>{tx.text}</p>
         </div>
-        {canEditImages && (
-          <button onClick={onEditPhoto} style={{ flexShrink:0, display:'flex', alignItems:'center', gap:6,
-            padding:'7px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
-            color:T.clay, fontSize:11.5, fontWeight:600 }}>
-            <i className="ti ti-camera-plus" style={{ fontSize:14 }} aria-hidden="true" />
-            {TXT[lang].photos}
-          </button>
-        )}
+        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+          {edit && (
+            <button onClick={onEditText} style={{ display:'flex', alignItems:'center', gap:6,
+              padding:'7px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
+              color:T.soft, fontSize:11.5, fontWeight:600 }}>
+              <i className="ti ti-pencil" style={{ fontSize:14 }} aria-hidden="true" />
+              {TXT[lang].text}
+            </button>
+          )}
+          {canEditImages && (
+            <button onClick={onEditPhoto} style={{ display:'flex', alignItems:'center', gap:6,
+              padding:'7px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
+              color:T.clay, fontSize:11.5, fontWeight:600 }}>
+              <i className="ti ti-camera-plus" style={{ fontSize:14 }} aria-hidden="true" />
+              {TXT[lang].photos}
+            </button>
+          )}
+        </div>
       </div>
       <ThemeStrip target={t.target} placeholders={t.placeholders} wide={wide} />
     </div>
   )
 }
 
-export default function Farm({ wide, onBack, edit, onGoHost }) {
+export default function Farm({ wide, onBack, onGoHost }) {
+  useStoreTick()
   const [lang, setLang] = useState('fr')
   const [photoTarget, setPhotoTarget] = useState(null)
+  const [textEditor, setTextEditor] = useState(null) // {id, fields, current}
+  const [edit, setEdit] = useState(() => { try { return localStorage.getItem('pludini_editFarm') === '1' } catch { return false } })
+  const [pwOpen, setPwOpen] = useState(false)
+  const [pw, setPw] = useState('')
   const l = TXT[lang]
-  // comme pour Pludini Host, seul Ferdinand peut remplacer les photos —
-  // le mode édition (mot de passe partagé) reste actif pour tous
+  // comme sur Pludini Host : tout le monde peut modifier les textes une fois
+  // le mode édition débloqué, seul Ferdinand peut remplacer les photos
   const canEditImages = edit && getMe() === 'Ferdinand'
+
+  const submitPw = () => {
+    if (pw === 'baliste') { setEdit(true); setPwOpen(false); setPw(''); try { localStorage.setItem('pludini_editFarm', '1') } catch {} }
+    else setPw('')
+  }
+  const toggleEdit = () => {
+    if (edit) { setEdit(false); try { localStorage.setItem('pludini_editFarm', '0') } catch {} }
+    else setPwOpen(true)
+  }
+
+  const heroText = textFor('hero', lang, { tag:l.tag, heroTitle:l.heroTitle, heroSub:l.heroSub })
+  const storyText = textFor('story', lang, { storyTitle:l.storyTitle, storyText:l.storyText })
+  const contactText = textFor('contact', lang, { contactTitle:l.contactTitle, contactSub:l.contactSub, contactBtn:l.contactBtn })
 
   return (
     <div style={{ minHeight:'100vh', background:T.bg }}>
@@ -243,49 +363,101 @@ export default function Farm({ wide, onBack, edit, onGoHost }) {
           background:'linear-gradient(180deg, rgba(16,14,10,.52) 0%, rgba(16,14,10,.15) 40%, rgba(16,14,10,.64) 100%)' }} />
         <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel={l.back} siteTitle="Pludini Farm" wide={wide}
           extraLinks={onGoHost ? [{ label:'Pludini Host', onClick:onGoHost }] : null} />
+        {edit && (
+          <EditBtn icon="ti-pencil" onClick={()=>setTextEditor({ id:'hero',
+            fields:[
+              { key:'tag', label:lang==='ru'?'Метка':lang==='en'?'Tag':'Étiquette' },
+              { key:'heroTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
+              { key:'heroSub', label:lang==='ru'?'Подзаголовок':lang==='en'?'Subtitle':'Sous-titre', type:'textarea' },
+            ], current:heroText })} style={{ top:64, right: canEditImages?70:20 }} />
+        )}
         {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'farm:hero', label:'Hero' })} style={{ top:64, right:20 }} />}
         <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', alignItems:'center',
           justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
-          <span style={{ fontSize:11, letterSpacing:'2px', textTransform:'uppercase', color:'#C8DBA4', fontWeight:700, marginBottom:14 }}>{l.tag}</span>
+          <span style={{ fontSize:11, letterSpacing:'2px', textTransform:'uppercase', color:'#C8DBA4', fontWeight:700, marginBottom:14 }}>{heroText.tag}</span>
           <h1 className="serif" style={{ fontSize: wide?58:33, fontWeight:600, color:'#F2EEE2', letterSpacing:'-1.2px', lineHeight:1.08, marginBottom:16 }}>
-            {l.heroTitle}
+            {heroText.heroTitle}
           </h1>
-          <p style={{ fontSize: wide?15:13, color:'rgba(237,231,216,.88)', maxWidth:520, lineHeight:1.65 }}>{l.heroSub}</p>
+          <p style={{ fontSize: wide?15:13, color:'rgba(237,231,216,.88)', maxWidth:520, lineHeight:1.65 }}>{heroText.heroSub}</p>
         </div>
       </div>
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         background:T.bg, paddingTop: wide?18:12 }}>
         {THEMES.map(t => (
-          <ThemeSection key={t.key} t={t} lang={lang} wide={wide} canEditImages={canEditImages}
-            onEditPhoto={()=>setPhotoTarget({ target:t.target, label:t[lang].title })} />
+          <ThemeSection key={t.key} t={t} lang={lang} wide={wide} edit={edit} canEditImages={canEditImages}
+            onEditPhoto={()=>setPhotoTarget({ target:t.target, label:textFor(t.key,lang,t[lang]).title })}
+            onEditText={()=>setTextEditor({ id:t.key,
+              fields:[
+                { key:'title', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
+                { key:'text', label:lang==='ru'?'Текст':lang==='en'?'Text':'Texte', type:'textarea' },
+              ], current:textFor(t.key,lang,t[lang]) })} />
         ))}
       </div>
 
-      <div style={{ padding: wide?'46px 40px 16px':'34px 20px 12px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
+      <div style={{ position:'relative', padding: wide?'46px 40px 16px':'34px 20px 12px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
+        {edit && (
+          <button onClick={()=>setTextEditor({ id:'story',
+            fields:[
+              { key:'storyTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
+              { key:'storyText', label:lang==='ru'?'Текст':lang==='en'?'Text':'Texte', type:'textarea' },
+            ], current:storyText })}
+            style={{ position:'absolute', top: wide?46:34, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
+              padding:'6px 10px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.soft, fontSize:11 }}>
+            <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+          </button>
+        )}
         <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
           <div style={{ flex:1, height:1, background:T.line }} />
-          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
+          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{storyText.storyTitle}</h2>
           <div style={{ flex:1, height:1, background:T.line }} />
         </div>
-        <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
+        <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{storyText.storyText}</p>
       </div>
 
-      <div style={{ textAlign:'center', padding: wide?'20px 40px 70px':'14px 22px 54px' }}>
-        <div className="serif" style={{ fontSize: wide?19:16, fontWeight:700, color:T.ink, marginBottom:6 }}>{l.contactTitle}</div>
+      <div style={{ position:'relative', textAlign:'center', padding: wide?'20px 40px 70px':'14px 22px 54px' }}>
+        {edit && (
+          <button onClick={()=>setTextEditor({ id:'contact',
+            fields:[
+              { key:'contactTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
+              { key:'contactSub', label:lang==='ru'?'Подзаголовок':lang==='en'?'Subtitle':'Sous-titre', type:'textarea' },
+              { key:'contactBtn', label:lang==='ru'?'Текст кнопки':lang==='en'?'Button label':'Texte du bouton' },
+            ], current:contactText })}
+            style={{ position:'absolute', top: wide?20:14, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
+              padding:'6px 10px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.soft, fontSize:11 }}>
+            <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+          </button>
+        )}
+        <div className="serif" style={{ fontSize: wide?19:16, fontWeight:700, color:T.ink, marginBottom:6 }}>{contactText.contactTitle}</div>
         <p style={{ fontSize:12.5, color:T.soft, marginBottom:18, maxWidth:420, marginLeft:'auto', marginRight:'auto', lineHeight:1.6 }}>
-          {l.contactSub}
+          {contactText.contactSub}
         </p>
         <a href="mailto:contact@pludini.lv" className="serif" style={{ display:'inline-flex', alignItems:'center', gap:8,
           background:T.clay, color:'#fff', padding: wide?'14px 30px':'12px 24px', borderRadius:18,
           fontSize: wide?15:13.5, fontWeight:700, boxShadow:'0 10px 28px rgba(0,0,0,.18)' }}>
           <i className="ti ti-mail" style={{ fontSize:16 }} aria-hidden="true" />
-          {l.contactBtn}
+          {contactText.contactBtn}
         </a>
       </div>
 
+      {edit ? (
+        <button onClick={toggleEdit} style={{ position:'fixed', bottom:16, right:16, zIndex:20,
+          background:'rgba(181,96,47,.85)', color:'#fff', borderRadius:20, padding:'8px 14px',
+          fontSize:11.5, display:'flex', alignItems:'center', gap:5 }}>
+          <i className="ti ti-check" style={{ fontSize:13 }} aria-hidden="true" />{l.edit}
+        </button>
+      ) : (
+        <button onClick={()=>setPwOpen(true)} style={{ position:'fixed', bottom:16, right:16, zIndex:20,
+          background:'rgba(43,38,32,.72)', color:'#EDE7D8', borderRadius:20, padding:'8px 14px',
+          fontSize:11.5, display:'flex', alignItems:'center', gap:5 }}>
+          <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />{l.edit}
+        </button>
+      )}
+      {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw} onClose={()=>{ setPwOpen(false); setPw('') }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label}
         lang={lang==='en'?'fr':lang} onClose={()=>setPhotoTarget(null)} />}
+      {textEditor && <FarmTextEditor id={textEditor.id} lang={lang} fields={textEditor.fields}
+        current={textEditor.current} onClose={()=>setTextEditor(null)} />}
     </div>
   )
 }

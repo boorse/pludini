@@ -184,13 +184,12 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
               ))}
             </div>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:6, flexWrap:'wrap' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:6, alignItems:'flex-start' }}>
             <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
               <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
             </button>
-            <button onClick={()=>go('farm')} style={{ color:'rgba(242,238,226,.75)', fontSize: wide?14:13,
-              textDecoration:'underline', textUnderlineOffset:3 }}>
-              Pludini Farm
+            <button onClick={()=>go('farm')} style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(242,238,226,.75)', fontSize: wide?14:13 }}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Farm
             </button>
           </div>
         </div>
@@ -370,8 +369,8 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
 // URLs partagées directement vers un écran précis — / est Pludini Host (page
 // publique du domaine), Pludini Doc (l'inventaire) vit sur /doc ; /host reste
 // une redirection d'écran pour ne pas casser d'anciens liens déjà partagés
-const PATH_SCREENS = { '/': 'experience', '/host': 'experience', '/doc': 'landing', '/pokedex': 'app' }
-const SCREEN_PATHS = { landing: '/doc', experience: '/', app: '/pokedex' }
+const PATH_SCREENS = { '/': 'experience', '/host': 'experience', '/doc': 'landing', '/pokedex': 'app', '/farm': 'farm' }
+const SCREEN_PATHS = { landing: '/doc', experience: '/', app: '/pokedex', farm: '/farm' }
 
 // ══════════════════ APP ══════════════════
 export default function App() {
@@ -497,7 +496,7 @@ export default function App() {
     </>
   )
   if (screen === 'experience') return <Experience wide={wide} onBack={()=>goScreen('landing')} onGoFarm={()=>goScreen('farm')} />
-  if (screen === 'farm') return <Farm wide={wide} onBack={()=>goScreen('landing')} edit={edit} onGoHost={()=>goScreen('experience')} />
+  if (screen === 'farm') return <Farm wide={wide} onBack={()=>goScreen('landing')} onGoHost={()=>goScreen('experience')} />
   // Calendrier/Territoire/Galerie : même bouton flottant que sur Accueil pour
   // entrer/quitter le mode édition, plus le mot de passe qui va avec — ces
   // pages n'avaient jusqu'ici aucun moyen d'y accéder ni d'en sortir
