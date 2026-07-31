@@ -79,13 +79,16 @@ function ThemeCard({ theme, lang, onPick, edit, onManage }) {
   )
 }
 
-// classement par joueur — total des bonnes réponses ("réussites") cumulées sur toutes ses parties
-function leaderboard() {
+// classement par joueur — total des bonnes réponses ("réussites") cumulées sur
+// toutes ses parties, filtrable par thème (ou 'all' pour tous confondus)
+function leaderboard(themeId) {
   const byPlayer = {}
-  allQuizScores().forEach(s => {
-    const e = byPlayer[s.player] || (byPlayer[s.player] = { player: s.player, games: 0, correct: 0, total: 0 })
-    e.games += 1; e.correct += s.score; e.total += s.total
-  })
+  allQuizScores()
+    .filter(s => !themeId || themeId === 'all' || s.theme === themeId)
+    .forEach(s => {
+      const e = byPlayer[s.player] || (byPlayer[s.player] = { player: s.player, games: 0, correct: 0, total: 0 })
+      e.games += 1; e.correct += s.score; e.total += s.total
+    })
   return Object.values(byPlayer).sort((a, b) => b.correct - a.correct)
 }
 
@@ -102,6 +105,7 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   const [idPicker, setIdPicker] = useState(false)
   const [pendingTheme, setPendingTheme] = useState(null) // thème choisi en attente d'identité
   const [theme, setTheme] = useState('all') // thème de la partie en cours
+  const [boardTheme, setBoardTheme] = useState('all') // thème affiché dans le classement
 
   const start = (themeId) => {
     if (!getMe()) { setPendingTheme(themeId); setIdPicker(true); return }
@@ -122,7 +126,8 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   if (phase === 'intro') {
     const total = allQuizQuestions().length
     const themes = allQuizThemes()
-    const board = leaderboard()
+    const hasScores = allQuizScores().length > 0
+    const board = leaderboard(boardTheme)
     const allCard = { id:'all', icon:'🧠', count: total, playable: total >= QUIZ_THEME_MIN_QUESTIONS,
       name: { fr:'Tous les thèmes', ru:'Все темы' } }
     return (
@@ -154,31 +159,49 @@ export default function Quiz({ wide, lang, onBack, edit }) {
           )}
         </div>
         <div style={{ textAlign:'center' }}>
-          {board.length>0 && (
+          {hasScores && (
             <div style={{ marginTop:24, textAlign:'left' }}>
               <div style={{ fontSize:11, fontWeight:700, color:T.mute, textTransform:'uppercase',
                 letterSpacing:'.5px', marginBottom:10, textAlign:'center' }}>
                 {lang==='ru'?'Рейтинг':'Classement'}
               </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {board.map((e,i)=>{
-                  const pct = e.total ? Math.round((e.correct/e.total)*100) : 0
-                  return (
-                    <div key={e.player} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 13px',
-                      borderRadius:12, border:`1px solid ${T.line}`, background: i===0?'#F0DDD0':T.card }}>
-                      <span className="serif" style={{ width:20, textAlign:'center', fontSize:13.5, fontWeight:900,
-                        color: i===0?T.clay:T.mute, flexShrink:0 }}>{i+1}</span>
-                      <span style={{ flex:1, fontSize:13, fontWeight:700, color:T.ink }}>{e.player}</span>
-                      <span style={{ fontSize:11.5, color:T.soft, flexShrink:0 }}>
-                        {e.games} {lang==='ru'?'игр':(e.games>1?'parties':'partie')}
-                      </span>
-                      <span className="serif" style={{ fontSize:14, fontWeight:800, color:T.clay, flexShrink:0 }}>
-                        {e.correct} <span style={{ fontSize:10.5, color:T.mute, fontWeight:500 }}>({pct}%)</span>
-                      </span>
-                    </div>
-                  )
-                })}
+              <div style={{ display:'flex', gap:6, overflowX:'auto', paddingBottom:8, marginBottom:4 }}>
+                {[allCard, ...themes].map(th => (
+                  <button key={th.id} onClick={()=>setBoardTheme(th.id)} style={{ flexShrink:0,
+                    display:'flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:20,
+                    border:`1px solid ${boardTheme===th.id?T.clay:T.line}`,
+                    background: boardTheme===th.id?T.clay:T.card,
+                    color: boardTheme===th.id?'#fff':T.soft, fontSize:12, fontWeight:600, whiteSpace:'nowrap' }}>
+                    <span>{th.icon}</span>
+                    <span>{th.name[lang]||th.name.fr}</span>
+                  </button>
+                ))}
               </div>
+              {board.length>0 ? (
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {board.map((e,i)=>{
+                    const pct = e.total ? Math.round((e.correct/e.total)*100) : 0
+                    return (
+                      <div key={e.player} style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 13px',
+                        borderRadius:12, border:`1px solid ${T.line}`, background: i===0?'#F0DDD0':T.card }}>
+                        <span className="serif" style={{ width:20, textAlign:'center', fontSize:13.5, fontWeight:900,
+                          color: i===0?T.clay:T.mute, flexShrink:0 }}>{i+1}</span>
+                        <span style={{ flex:1, fontSize:13, fontWeight:700, color:T.ink }}>{e.player}</span>
+                        <span style={{ fontSize:11.5, color:T.soft, flexShrink:0 }}>
+                          {e.games} {lang==='ru'?'игр':(e.games>1?'parties':'partie')}
+                        </span>
+                        <span className="serif" style={{ fontSize:14, fontWeight:800, color:T.clay, flexShrink:0 }}>
+                          {e.correct} <span style={{ fontSize:10.5, color:T.mute, fontWeight:500 }}>({pct}%)</span>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize:12.5, color:T.mute, textAlign:'center', padding:'12px 0', fontStyle:'italic' }}>
+                  {lang==='ru'?'Никто ещё не играл в этой теме.':'Personne n’a encore joué sur ce thème.'}
+                </div>
+              )}
             </div>
           )}
         </div>
