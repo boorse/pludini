@@ -222,7 +222,9 @@ function EditBtn({ onClick, style }) {
   )
 }
 
-function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide }) {
+// extraLinks : autres pages principales atteignables directement d'ici
+// (ex. Pludini Farm depuis Pludini Host), affichées à côté du retour
+function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide, extraLinks }) {
   return (
     <div style={{ position:'absolute', top:0, left:0, right:0, zIndex:5, padding: wide?'20px 32px':'16px 18px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -241,9 +243,17 @@ function TopBar({ lang, setLang, onBack, backLabel, siteTitle, wide }) {
           ))}
         </div>
       </div>
-      <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13, marginTop:6 }}>
-        <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
-      </button>
+      <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:6, flexWrap:'wrap' }}>
+        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
+          <i className="ti ti-arrow-left" aria-hidden="true" />{backLabel}
+        </button>
+        {extraLinks?.map(l => (
+          <button key={l.label} onClick={l.onClick} style={{ color:'rgba(242,238,226,.75)', fontSize: wide?14:13,
+            textDecoration:'underline', textUnderlineOffset:3 }}>
+            {l.label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -595,7 +605,7 @@ function Booking({ lang, onBack }) {
   )
 }
 
-export default function Experience({ wide, onBack }) {
+export default function Experience({ wide, onBack, onGoFarm }) {
   const [lang, setLang] = useState('fr')
   const [view, setView] = useState('home') // home | activity | booking
   const [activeId, setActiveId] = useState(null)
@@ -644,7 +654,8 @@ export default function Experience({ wide, onBack }) {
             {/* assombrit légèrement juste derrière le texte central, pas toute la photo */}
             <div style={{ position:'absolute', inset:0, pointerEvents:'none',
               background:'radial-gradient(ellipse 55% 42% at 50% 50%, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 72%)' }} />
-            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" wide={wide} />
+            <TopBar lang={lang} setLang={setLang} onBack={onBack} backLabel="Pludini Doc" siteTitle="Pludini Host" wide={wide}
+              extraLinks={onGoFarm ? [{ label:'Pludini Farm', onClick:onGoFarm }] : null} />
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:hero', label:'Hero' })} style={{ top:64 }} />}
             <div style={{ position:'relative', height:`${wide?92:70}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
               justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>

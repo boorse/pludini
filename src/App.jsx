@@ -15,6 +15,7 @@ import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
 import { ForumPage } from './forum.jsx'
 import { RewardBurst, tierFor } from './reward.jsx'
+import Farm from './farm.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -147,6 +148,8 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
     { k:'calendar',  tag:t.plan,    title:t.calendar,  sub: lang==='ru'?'Работы и наблюдения по месяцам':'Travaux et observations mois par mois' },
     { k:'gallery',   tag:t.browse,  title:t.gallery,   sub: lang==='ru'?'Все снимки особей':'Tous les clichés d\'individus' },
     { k:'quiz',      tag:t.play,    title:t.quiz,      sub: lang==='ru'?'Карточки-угадайки из ваших наблюдений':'Des cartes à deviner, tirées de vos observations' },
+    { k:'farm',      tag: lang==='ru'?'Открыть':'Découvrir', title:'Pludini Farm',
+      sub: lang==='ru'?'Сидр, мёд, козий сыр и овощи с фермы':'Cidre, miel, fromage de chèvre et légumes de la ferme' },
   ]
   const heroH = wide ? 66 : 54
   const bleed = wide ? 80 : 60
@@ -181,9 +184,15 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
               ))}
             </div>
           </div>
-          <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13, marginTop:6 }}>
-            <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
-          </button>
+          <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:6, flexWrap:'wrap' }}>
+            <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
+            </button>
+            <button onClick={()=>go('farm')} style={{ color:'rgba(242,238,226,.75)', fontSize: wide?14:13,
+              textDecoration:'underline', textUnderlineOffset:3 }}>
+              Pludini Farm
+            </button>
+          </div>
         </div>
         <div style={{ position:'relative', height:`${heroH}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
           justifyContent:'center', textAlign:'center', padding: wide?'0 40px':'0 22px' }}>
@@ -487,7 +496,8 @@ export default function App() {
       {toast && <Toast msg={toast} />}
     </>
   )
-  if (screen === 'experience') return <Experience wide={wide} onBack={()=>goScreen('landing')} />
+  if (screen === 'experience') return <Experience wide={wide} onBack={()=>goScreen('landing')} onGoFarm={()=>goScreen('farm')} />
+  if (screen === 'farm') return <Farm wide={wide} onBack={()=>goScreen('landing')} edit={edit} onGoHost={()=>goScreen('experience')} />
   // Calendrier/Territoire/Galerie : même bouton flottant que sur Accueil pour
   // entrer/quitter le mode édition, plus le mot de passe qui va avec — ces
   // pages n'avaient jusqu'ici aucun moyen d'y accéder ni d'en sortir
