@@ -4,7 +4,7 @@
 import { sb, publicUrl } from './supabase.js'
 import { SPECIES as BASE_SPECIES, CATS as BASE_CATS, PLAYERS as BASE_PLAYERS,
          RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS } from './data'
-import { QUIZ_QUESTIONS as BASE_QUIZ } from './quizdata.js'
+import { QUIZ_QUESTIONS as BASE_QUIZ, QUIZ_THEMES, QUIZ_THEME_MIN_QUESTIONS } from './quizdata.js'
 
 const S = {
   photos: {},        // target -> [{id,url,caption,by,path}]
@@ -404,16 +404,26 @@ export function allCats() {
 // ══════ QUIZ (questions ajoutées/modifiées depuis l'éditeur) ══════
 // même principe que les espèces : base statique (quizdata.js) + surcharges
 // (édition d'une question existante, ou question entièrement nouvelle)
-export function allQuizQuestions() {
-  const custom = S.quizQuestions.map(c => ({ answers:['','','',''], correct:0, explain:'', ...c }))
+export function allQuizQuestions(themeId) {
+  const custom = S.quizQuestions.map(c => ({ answers:['','','',''], correct:0, explain:'', theme:'animaux', ...c }))
   const merged = [...BASE_QUIZ, ...custom]
-  return merged
+  const all = merged
     .map(q => S.quizEdits[q.id] ? { ...q, ...S.quizEdits[q.id].fields } : q)
     .filter(q => !q.removed)
+  return (themeId && themeId !== 'all') ? all.filter(q => q.theme === themeId) : all
+}
+// un thème n'est jouable qu'à partir de QUIZ_THEME_MIN_QUESTIONS questions —
+// en dessous il reste visible mais « en préparation », non lançable
+export function allQuizThemes() {
+  const all = allQuizQuestions()
+  return QUIZ_THEMES.map(t => {
+    const count = all.filter(q => q.theme === t.id).length
+    return { ...t, count, playable: count >= QUIZ_THEME_MIN_QUESTIONS }
+  })
 }
 export async function addQuizQuestion(q) {
   const id = q.id || ('quizq_' + Date.now().toString(36))
-  const value = { ...q, id }
+  const value = { theme: 'animaux', ...q, id }
   S.quizQuestions.push({ ...value, key: 'quizq_' + id }); notify()
   await sb.from('overrides').upsert({ kind: 'quizq', key: 'quizq_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   return id
@@ -486,9 +496,9 @@ export async function removeForumPost(id) {
 export function allQuizScores() {
   return [...S.quizScores]
 }
-export async function addQuizScore(player, score, total) {
+export async function addQuizScore(player, score, total, theme = 'all') {
   const id = 'qscore_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-  const value = { id, player, score, total, createdAt: Date.now() }
+  const value = { id, player, score, total, theme, createdAt: Date.now() }
   S.quizScores.push({ ...value, key: 'quizscore_' + id }); notify()
   await sb.from('overrides').upsert({ kind: 'quizscore', key: 'quizscore_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   return id

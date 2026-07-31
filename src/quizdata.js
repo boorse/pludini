@@ -7,7 +7,19 @@
 // L'ordre des réponses n'est PAS mélangé ici : ça se fait à l'affichage,
 // pour que la bonne réponse ne soit jamais figée à une position.
 
-export const QUIZ_QUESTIONS = [
+// ── Thèmes ── un thème n'est proposable en partie que s'il atteint ce
+// nombre de questions ; en dessous il s'affiche « en préparation »
+export const QUIZ_THEME_MIN_QUESTIONS = 15
+
+export const QUIZ_THEMES = [
+  { id: 'animaux',  icon: '🦌', name: { fr: 'Animaux',                       ru: 'Животные' } },
+  { id: 'arbres',   icon: '🌳', name: { fr: 'Arbres & plantes',              ru: 'Деревья и растения' } },
+  { id: 'foret',    icon: '🪓', name: { fr: 'Vie en forêt / savoir-faire',   ru: 'Жизнь в лесу' } },
+  { id: 'astro',    icon: '🌌', name: { fr: 'Astronomie',                    ru: 'Астрономия' } },
+  { id: 'histoire', icon: '📜', name: { fr: 'Histoire',                     ru: 'История' } },
+]
+
+const ANIMAL_QUESTIONS = [
   // ── Lynx boréal ──
   {
     id: 'lynx-1', spId: 'lynx',
@@ -238,3 +250,5 @@ export const QUIZ_QUESTIONS = [
     correct: 0,
   },
 ]
+
+export const QUIZ_QUESTIONS = ANIMAL_QUESTIONS.map(q => ({ theme: 'animaux', ...q }))

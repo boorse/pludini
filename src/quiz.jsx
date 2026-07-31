@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { allSpecies, allCats, speciesPhotos, photosFor, removePhoto,
-         allQuizQuestions, addQuizQuestion, editQuizQuestion, removeQuizQuestion,
+         allQuizQuestions, allQuizThemes, addQuizQuestion, editQuizQuestion, removeQuizQuestion,
          allQuizScores, addQuizScore, getMe } from './store.js'
 import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf } from './i18n.js'
 import { T, Modal, label, input, ValidateBar, ConfirmDialog, visuallyHiddenFileInput, IdentityPicker } from './editui.jsx'
+import { QUIZ_THEME_MIN_QUESTIONS } from './quizdata.js'
 
 const QUESTIONS_PER_GAME = 10
 
@@ -30,8 +31,8 @@ function shuffle(arr) {
 // une partie = un tirage de questions (ordre mélangé, sous-ensemble) + pour
 // chacune, un ordre de réponses mélangé et son nouvel index correct associé —
 // calculé une seule fois au démarrage, jamais recalculé au fil des rendus
-function buildRounds() {
-  const all = allQuizQuestions()
+function buildRounds(themeId) {
+  const all = allQuizQuestions(themeId)
   const picked = shuffle(all).slice(0, Math.min(QUESTIONS_PER_GAME, all.length))
   return picked.map(q => {
     const order = shuffle([0, 1, 2, 3])
@@ -45,6 +46,26 @@ function photoFor(q, sp) {
   const own = photosFor(`quiz:${q.id}`)[0]
   if (own) return own
   return sp ? speciesPhotos(sp)[0]?.photo : null
+}
+
+// une carte par thème — cliquable et lance la partie si assez de questions,
+// sinon affichée grisée avec la mention « en préparation »
+function ThemeCard({ theme, lang, onPick }) {
+  const name = theme.name[lang] || theme.name.fr
+  return (
+    <button onClick={onPick} disabled={!theme.playable} style={{ display:'flex', flexDirection:'column',
+      alignItems:'center', gap:5, padding:'16px 10px', borderRadius:16, textAlign:'center',
+      border:`1.5px solid ${theme.playable?T.line:T.lineSoft}`, background: theme.playable?T.card:'#EFE9DC',
+      opacity: theme.playable?1:.6 }}>
+      <span style={{ fontSize:26 }}>{theme.icon}</span>
+      <span className="serif" style={{ fontSize:13, fontWeight:700, color:T.ink, lineHeight:1.25 }}>{name}</span>
+      <span style={{ fontSize:10.5, color: theme.playable?T.soft:T.mute, fontWeight:600 }}>
+        {theme.playable
+          ? `${theme.count} ${lang==='ru'?'вопрос(ов)':(theme.count>1?'questions':'question')}`
+          : (lang==='ru'?`Скоро (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`:`En préparation (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`)}
+      </span>
+    </button>
+  )
 }
 
 // classement par joueur — total des bonnes réponses ("réussites") cumulées sur toutes ses parties
@@ -67,10 +88,13 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   const [managing, setManaging] = useState(false)
   const [editingQ, setEditingQ] = useState(null) // null | {} (nouvelle) | {...existante}
   const [idPicker, setIdPicker] = useState(false)
+  const [pendingTheme, setPendingTheme] = useState(null) // thème choisi en attente d'identité
+  const [theme, setTheme] = useState('all') // thème de la partie en cours
 
-  const start = () => {
-    if (!getMe()) { setIdPicker(true); return }
-    setRounds(buildRounds()); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
+  const start = (themeId) => {
+    if (!getMe()) { setPendingTheme(themeId); setIdPicker(true); return }
+    setTheme(themeId)
+    setRounds(buildRounds(themeId)); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
   }
 
   if (managing) {
@@ -85,35 +109,39 @@ export default function Quiz({ wide, lang, onBack, edit }) {
 
   if (phase === 'intro') {
     const total = allQuizQuestions().length
+    const themes = allQuizThemes()
     const board = leaderboard()
+    const allCard = { id:'all', icon:'🧠', count: total, playable: total >= QUIZ_THEME_MIN_QUESTIONS,
+      name: { fr:'Tous les thèmes', ru:'Все темы' } }
     return (
       <div style={{ padding: wide?'16px 40px 40px':'14px 18px 30px', maxWidth:560, margin:'0 auto' }}>
         <Back onBack={onBack} label={t.home} />
-        <div style={{ textAlign:'center', padding: wide?'40px 20px':'24px 10px' }}>
+        <div style={{ textAlign:'center', padding: wide?'32px 20px 0':'18px 10px 0' }}>
           <div style={{ fontSize:44, marginBottom:10 }}>🧠</div>
           <h2 className="serif" style={{ fontSize: wide?30:23, fontWeight:900, color:T.ink, marginBottom:8 }}>
             {lang==='ru'?'Викторина':'Le Quiz'}
           </h2>
-          <p style={{ fontSize:13, color:T.soft, lineHeight:1.65, marginBottom:24, maxWidth:420, marginLeft:'auto', marginRight:'auto' }}>
+          <p style={{ fontSize:13, color:T.soft, lineHeight:1.65, marginBottom:22, maxWidth:420, marginLeft:'auto', marginRight:'auto' }}>
             {lang==='ru'
-              ? `${Math.min(QUESTIONS_PER_GAME, total)} вопросов о животных Покедекса, иллюстрированных фотографиями из вашей галереи. Порядок вопросов и ответов каждый раз новый.`
-              : `${Math.min(QUESTIONS_PER_GAME, total)} questions sur les animaux du Pokédex, illustrées par les photos de votre galerie. L'ordre change à chaque partie.`}
+              ? 'Выбери тему, чтобы начать партию.'
+              : 'Choisis un thème pour lancer une partie.'}
           </p>
-          <button onClick={start} disabled={total===0} className="serif" style={{ padding:'14px 32px', borderRadius:14,
-            background: total===0?'#DDD3BE':T.clay, color: total===0?T.mute:'#fff', fontSize:15.5, fontWeight:700,
-            display:'inline-flex', alignItems:'center', gap:8 }}>
-            <i className="ti ti-player-play" style={{ fontSize:18 }} aria-hidden="true" />
-            {lang==='ru'?'Начать':'Commencer'}
-          </button>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns: wide?'repeat(3,1fr)':'repeat(2,1fr)', gap:10, marginBottom:18 }}>
+          {[allCard, ...themes].map(th => (
+            <ThemeCard key={th.id} theme={th} lang={lang} onPick={()=>start(th.id)} />
+          ))}
+        </div>
+        <div style={{ textAlign:'center' }}>
           {edit && (
             <button onClick={()=>setManaging(true)} style={{ display:'flex', alignItems:'center', gap:6,
-              margin:'18px auto 0', color:T.soft, fontSize:12.5, fontWeight:600 }}>
+              margin:'0 auto 8px', color:T.soft, fontSize:12.5, fontWeight:600 }}>
               <i className="ti ti-settings" style={{ fontSize:15 }} aria-hidden="true" />
               {lang==='ru'?'Управление вопросами':'Gérer les questions'}
             </button>
           )}
           {board.length>0 && (
-            <div style={{ marginTop:32, textAlign:'left' }}>
+            <div style={{ marginTop:24, textAlign:'left' }}>
               <div style={{ fontSize:11, fontWeight:700, color:T.mute, textTransform:'uppercase',
                 letterSpacing:'.5px', marginBottom:10, textAlign:'center' }}>
                 {lang==='ru'?'Рейтинг':'Classement'}
@@ -140,7 +168,11 @@ export default function Quiz({ wide, lang, onBack, edit }) {
             </div>
           )}
         </div>
-        {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
+        {idPicker && <IdentityPicker lang={lang} onClose={()=>{
+          setIdPicker(false)
+          if (pendingTheme && getMe()) { const th = pendingTheme; setPendingTheme(null); start(th) }
+          else setPendingTheme(null)
+        }} />}
       </div>
     )
   }
@@ -162,7 +194,7 @@ export default function Quiz({ wide, lang, onBack, edit }) {
           </div>
           <p style={{ fontSize:14, color:T.ink, marginTop:10, marginBottom:26, fontWeight:600 }}>{msg}</p>
           <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-            <button onClick={start} className="serif" style={{ padding:'13px 26px', borderRadius:13,
+            <button onClick={()=>start(theme)} className="serif" style={{ padding:'13px 26px', borderRadius:13,
               background:T.clay, color:'#fff', fontSize:14.5, fontWeight:700, display:'flex',
               alignItems:'center', gap:7 }}>
               <i className="ti ti-refresh" style={{ fontSize:16 }} aria-hidden="true" />
@@ -191,7 +223,7 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   }
   const next = () => {
     if (idx + 1 >= rounds.length) {
-      if (getMe()) addQuizScore(getMe(), score, rounds.length)
+      if (getMe()) addQuizScore(getMe(), score, rounds.length, theme)
       setPhase('end')
       return
     }
