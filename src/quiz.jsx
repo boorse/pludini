@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { allSpecies, allCats, speciesPhotos, photosFor, removePhoto,
          allQuizQuestions, allQuizThemes, addQuizQuestion, editQuizQuestion, removeQuizQuestion,
-         allQuizScores, addQuizScore, getMe } from './store.js'
+         addQuizTheme, allQuizScores, addQuizScore, getMe } from './store.js'
 import { LUT, uploadPhotoFile, usePhotos } from './photoui.jsx'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf } from './i18n.js'
@@ -49,22 +49,33 @@ function photoFor(q, sp) {
 }
 
 // une carte par thème — cliquable et lance la partie si assez de questions,
-// sinon affichée grisée avec la mention « en préparation »
-function ThemeCard({ theme, lang, onPick }) {
+// sinon affichée grisée avec la mention « en préparation » ; en mode édition,
+// un crayon dans le coin ouvre la gestion des questions de ce thème
+function ThemeCard({ theme, lang, onPick, edit, onManage }) {
   const name = theme.name[lang] || theme.name.fr
   return (
-    <button onClick={onPick} disabled={!theme.playable} style={{ display:'flex', flexDirection:'column',
-      alignItems:'center', gap:5, padding:'16px 10px', borderRadius:16, textAlign:'center',
-      border:`1.5px solid ${theme.playable?T.line:T.lineSoft}`, background: theme.playable?T.card:'#EFE9DC',
-      opacity: theme.playable?1:.6 }}>
-      <span style={{ fontSize:26 }}>{theme.icon}</span>
-      <span className="serif" style={{ fontSize:13, fontWeight:700, color:T.ink, lineHeight:1.25 }}>{name}</span>
-      <span style={{ fontSize:10.5, color: theme.playable?T.soft:T.mute, fontWeight:600 }}>
-        {theme.playable
-          ? `${theme.count} ${lang==='ru'?'вопрос(ов)':(theme.count>1?'questions':'question')}`
-          : (lang==='ru'?`Скоро (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`:`En préparation (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`)}
-      </span>
-    </button>
+    <div style={{ position:'relative' }}>
+      <button onClick={onPick} disabled={!theme.playable} style={{ display:'flex', flexDirection:'column',
+        alignItems:'center', gap:5, padding:'16px 10px', borderRadius:16, textAlign:'center', width:'100%',
+        border:`1.5px solid ${theme.playable?T.line:T.lineSoft}`, background: theme.playable?T.card:'#EFE9DC',
+        opacity: theme.playable?1:.6 }}>
+        <span style={{ fontSize:26 }}>{theme.icon}</span>
+        <span className="serif" style={{ fontSize:13, fontWeight:700, color:T.ink, lineHeight:1.25 }}>{name}</span>
+        <span style={{ fontSize:10.5, color: theme.playable?T.soft:T.mute, fontWeight:600 }}>
+          {theme.playable
+            ? `${theme.count} ${lang==='ru'?'вопрос(ов)':(theme.count>1?'questions':'question')}`
+            : (lang==='ru'?`Скоро (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`:`En préparation (${theme.count}/${QUIZ_THEME_MIN_QUESTIONS})`)}
+        </span>
+      </button>
+      {edit && onManage && (
+        <button onClick={(e)=>{ e.stopPropagation(); onManage() }}
+          title={lang==='ru'?'Управление вопросами':'Gérer les questions'}
+          style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%',
+            background:'rgba(43,38,32,.55)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <i className="ti ti-pencil" style={{ fontSize:12 }} aria-hidden="true" />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -85,8 +96,9 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   const [idx, setIdx] = useState(0)
   const [selected, setSelected] = useState(null)
   const [score, setScore] = useState(0)
-  const [managing, setManaging] = useState(false)
+  const [managingTheme, setManagingTheme] = useState(null) // id du thème dont on gère les questions
   const [editingQ, setEditingQ] = useState(null) // null | {} (nouvelle) | {...existante}
+  const [newThemeOpen, setNewThemeOpen] = useState(false)
   const [idPicker, setIdPicker] = useState(false)
   const [pendingTheme, setPendingTheme] = useState(null) // thème choisi en attente d'identité
   const [theme, setTheme] = useState('all') // thème de la partie en cours
@@ -97,13 +109,13 @@ export default function Quiz({ wide, lang, onBack, edit }) {
     setRounds(buildRounds(themeId)); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
   }
 
-  if (managing) {
+  if (managingTheme) {
     if (editingQ) return (
-      <QuestionEditor lang={lang} initial={editingQ.id ? editingQ : null}
+      <QuestionEditor lang={lang} theme={managingTheme} initial={editingQ.id ? editingQ : null}
         onClose={()=>setEditingQ(null)}
         onSaved={()=>setEditingQ(null)} />
     )
-    return <QuestionManager lang={lang} onClose={()=>setManaging(false)}
+    return <QuestionManager lang={lang} themeId={managingTheme} onClose={()=>setManagingTheme(null)}
       onEdit={q=>setEditingQ(q)} onAdd={()=>setEditingQ({})} />
   }
 
@@ -129,17 +141,19 @@ export default function Quiz({ wide, lang, onBack, edit }) {
         </div>
         <div style={{ display:'grid', gridTemplateColumns: wide?'repeat(3,1fr)':'repeat(2,1fr)', gap:10, marginBottom:18 }}>
           {[allCard, ...themes].map(th => (
-            <ThemeCard key={th.id} theme={th} lang={lang} onPick={()=>start(th.id)} />
+            <ThemeCard key={th.id} theme={th} lang={lang} onPick={()=>start(th.id)}
+              edit={edit && th.id!=='all'} onManage={()=>setManagingTheme(th.id)} />
           ))}
-        </div>
-        <div style={{ textAlign:'center' }}>
           {edit && (
-            <button onClick={()=>setManaging(true)} style={{ display:'flex', alignItems:'center', gap:6,
-              margin:'0 auto 8px', color:T.soft, fontSize:12.5, fontWeight:600 }}>
-              <i className="ti ti-settings" style={{ fontSize:15 }} aria-hidden="true" />
-              {lang==='ru'?'Управление вопросами':'Gérer les questions'}
+            <button onClick={()=>setNewThemeOpen(true)} style={{ display:'flex', flexDirection:'column',
+              alignItems:'center', justifyContent:'center', gap:5, padding:'16px 10px', borderRadius:16,
+              border:`1.5px dashed ${T.line}`, color:T.soft }}>
+              <i className="ti ti-plus" style={{ fontSize:22 }} aria-hidden="true" />
+              <span style={{ fontSize:11.5, fontWeight:700 }}>{lang==='ru'?'Новая тема':'Nouveau thème'}</span>
             </button>
           )}
+        </div>
+        <div style={{ textAlign:'center' }}>
           {board.length>0 && (
             <div style={{ marginTop:24, textAlign:'left' }}>
               <div style={{ fontSize:11, fontWeight:700, color:T.mute, textTransform:'uppercase',
@@ -173,6 +187,8 @@ export default function Quiz({ wide, lang, onBack, edit }) {
           if (pendingTheme && getMe()) { const th = pendingTheme; setPendingTheme(null); start(th) }
           else setPendingTheme(null)
         }} />}
+        {newThemeOpen && <NewThemeModal lang={lang} onClose={()=>setNewThemeOpen(false)}
+          onCreated={()=>setNewThemeOpen(false)} />}
       </div>
     )
   }
@@ -306,10 +322,11 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   )
 }
 
-// ══════ Gestion des questions (mode édition) ══════
-function QuestionManager({ lang, onClose, onEdit, onAdd }) {
+// ══════ Gestion des questions d'un thème (mode édition) ══════
+function QuestionManager({ lang, themeId, onClose, onEdit, onAdd }) {
   const [confirmDel, setConfirmDel] = useState(null)
-  const questions = allQuizQuestions()
+  const questions = allQuizQuestions(themeId)
+  const themeMeta = allQuizThemes().find(t=>t.id===themeId)
   const SPECIES = allSpecies()
 
   return (
@@ -317,7 +334,7 @@ function QuestionManager({ lang, onClose, onEdit, onAdd }) {
       <div style={{ padding:'20px 22px 0', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
         <div>
           <div className="serif" style={{ fontSize:19, fontWeight:900, color:T.ink }}>
-            {lang==='ru'?'Вопросы викторины':'Questions du quiz'}
+            {themeMeta ? `${themeMeta.icon} ${themeMeta.name[lang]||themeMeta.name.fr}` : (lang==='ru'?'Вопросы викторины':'Questions du quiz')}
           </div>
           <div style={{ fontSize:12, color:T.soft, marginTop:3 }}>
             {questions.length} {lang==='ru'?'вопрос(ов)':'question'}{questions.length>1?'s':''}
@@ -339,6 +356,7 @@ function QuestionManager({ lang, onClose, onEdit, onAdd }) {
           {questions.map(q => {
             const sp = SPECIES.find(s=>s.id===q.spId)
             const photo = photoFor(q, sp)
+            const mine = !!q.by && q.by === getMe()
             return (
               <div key={q.id} style={{ display:'flex', alignItems:'center', gap:10, padding:9,
                 borderRadius:12, border:`1px solid ${T.line}`, background:T.card }}>
@@ -347,14 +365,26 @@ function QuestionManager({ lang, onClose, onEdit, onAdd }) {
                   {photo && <img src={photo.thumbUrl||photo.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:10.5, color:T.mute, fontWeight:600 }}>{sp ? nameOf(sp,lang).main : q.spId}</div>
+                  {sp && <div style={{ fontSize:10.5, color:T.mute, fontWeight:600 }}>{nameOf(sp,lang).main}</div>}
                   <div style={{ fontSize:12.5, color:T.ink, lineHeight:1.35, overflow:'hidden', textOverflow:'ellipsis',
                     display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{q.q}</div>
+                  {q.by && <div style={{ fontSize:10, color:T.mute, marginTop:2 }}>
+                    {lang==='ru'?`Добавил(а): ${q.by}`:`Ajoutée par ${q.by}`}
+                  </div>}
                 </div>
-                <button onClick={()=>onEdit(q)} style={{ width:30, height:30, borderRadius:'50%', flexShrink:0,
-                  border:`1px solid ${T.line}`, color:T.clay, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  <i className="ti ti-pencil" style={{ fontSize:14 }} aria-hidden="true" />
-                </button>
+                {mine ? (
+                  <button onClick={()=>onEdit(q)} style={{ width:30, height:30, borderRadius:'50%', flexShrink:0,
+                    border:`1px solid ${T.line}`, color:T.clay, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <i className="ti ti-pencil" style={{ fontSize:14 }} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <div title={lang==='ru'?'Изменить может только автор — чтобы не увидеть ответ заранее'
+                    :'Modifiable seulement par son auteur — pour ne pas voir la réponse à l’avance'}
+                    style={{ width:30, height:30, borderRadius:'50%', flexShrink:0, color:T.mute,
+                      display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <i className="ti ti-lock" style={{ fontSize:14 }} aria-hidden="true" />
+                  </div>
+                )}
                 <button onClick={()=>setConfirmDel(q)} style={{ width:30, height:30, borderRadius:'50%', flexShrink:0,
                   border:'1px solid #C9877C', color:'#8F4A22', display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <i className="ti ti-trash" style={{ fontSize:14 }} aria-hidden="true" />
@@ -378,9 +408,12 @@ function QuestionManager({ lang, onClose, onEdit, onAdd }) {
   )
 }
 
-// ══════ Formulaire d'une question — espèce, photo, texte, réponses, bonne réponse, explication ══════
-function QuestionEditor({ lang, initial, onClose, onSaved }) {
+// ══════ Formulaire d'une question — espèce (thème Animaux uniquement), photo,
+// texte, réponses, bonne réponse, explication ══════
+function QuestionEditor({ lang, theme, initial, onClose, onSaved }) {
   const isEdit = !!initial
+  const questionTheme = initial?.theme || theme
+  const isAnimalTheme = questionTheme === 'animaux'
   const [id] = useState(() => initial?.id || ('quizq_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5)))
   const [spId, setSpId] = useState(initial?.spId || '')
   const [pickCat, setPickCat] = useState(null)
@@ -400,13 +433,14 @@ function QuestionEditor({ lang, initial, onClose, onSaved }) {
   const catResults = pickCat ? SPECIES.filter(s => s.cat === pickCat) : []
 
   const setAnswer = (i, v) => setAnswers(a => a.map((x, idx) => idx === i ? v : x))
-  const valid = spId && q.trim() && answers.every(a => a.trim())
+  const valid = (!isAnimalTheme || spId) && q.trim() && answers.every(a => a.trim())
 
   const save = async () => {
     if (!valid) return
     setBusy(true); setErr(null)
     try {
-      const fields = { spId, q: q.trim(), answers: answers.map(a => a.trim()), correct, explain: explain.trim() }
+      const fields = { theme: questionTheme, spId: isAnimalTheme ? spId : '',
+        q: q.trim(), answers: answers.map(a => a.trim()), correct, explain: explain.trim() }
       if (isEdit) await editQuizQuestion(id, fields)
       else await addQuizQuestion({ id, ...fields })
       if (stagedFile) await uploadPhotoFile(target, stagedFile, '', '')
@@ -426,45 +460,49 @@ function QuestionEditor({ lang, initial, onClose, onSaved }) {
         </div>
       </div>
       <div style={{ padding:'0 22px 12px' }}>
-        <label style={label}>{lang==='ru'?'Вид':'Espèce concernée'}</label>
-        {sp ? (
-          <div style={{ display:'flex', alignItems:'center', gap:9, background:T.card,
-            border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px' }}>
-            <span style={{ fontSize:20 }}>{sp.e}</span>
-            <span style={{ flex:1, fontSize:13.5, fontWeight:600, color:T.ink }}>{sp.n}</span>
-            <button onClick={()=>{ setSpId(''); setPickCat(null) }} style={{ color:T.mute, fontSize:12 }}>
-              {lang==='ru'?'изменить':'changer'}
-            </button>
-          </div>
-        ) : pickCat ? (
+        {isAnimalTheme && (
           <>
-            <button onClick={()=>setPickCat(null)}
-              style={{ display:'flex', alignItems:'center', gap:5, color:T.clay, fontSize:12, fontWeight:600, marginBottom:8 }}>
-              <i className="ti ti-arrow-left" style={{ fontSize:13 }} aria-hidden="true" />
-              {lang==='ru'?'Все царства':'Tous les règnes'}
-            </button>
-            <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:200, overflowY:'auto' }}>
-              {catResults.map(s2=>(
-                <button key={s2.id} onClick={()=>setSpId(s2.id)}
-                  style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:9,
-                    border:`1px solid ${T.line}`, background:T.card, textAlign:'left' }}>
-                  <span style={{ fontSize:17 }}>{s2.e}</span>
-                  <span style={{ fontSize:12.5, color:T.ink, flex:1 }}>{s2.n}</span>
+            <label style={label}>{lang==='ru'?'Вид':'Espèce concernée'}</label>
+            {sp ? (
+              <div style={{ display:'flex', alignItems:'center', gap:9, background:T.card,
+                border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px' }}>
+                <span style={{ fontSize:20 }}>{sp.e}</span>
+                <span style={{ flex:1, fontSize:13.5, fontWeight:600, color:T.ink }}>{sp.n}</span>
+                <button onClick={()=>{ setSpId(''); setPickCat(null) }} style={{ color:T.mute, fontSize:12 }}>
+                  {lang==='ru'?'изменить':'changer'}
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : pickCat ? (
+              <>
+                <button onClick={()=>setPickCat(null)}
+                  style={{ display:'flex', alignItems:'center', gap:5, color:T.clay, fontSize:12, fontWeight:600, marginBottom:8 }}>
+                  <i className="ti ti-arrow-left" style={{ fontSize:13 }} aria-hidden="true" />
+                  {lang==='ru'?'Все царства':'Tous les règnes'}
+                </button>
+                <div style={{ display:'flex', flexDirection:'column', gap:4, maxHeight:200, overflowY:'auto' }}>
+                  {catResults.map(s2=>(
+                    <button key={s2.id} onClick={()=>setSpId(s2.id)}
+                      style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 10px', borderRadius:9,
+                        border:`1px solid ${T.line}`, background:T.card, textAlign:'left' }}>
+                      <span style={{ fontSize:17 }}>{s2.e}</span>
+                      <span style={{ fontSize:12.5, color:T.ink, flex:1 }}>{s2.n}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))', gap:6 }}>
+                {cats.map(c=>(
+                  <button key={c.id} onClick={()=>setPickCat(c.id)}
+                    style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'9px 6px',
+                      borderRadius:11, border:`1px solid ${T.line}`, background:T.card, textAlign:'center' }}>
+                    <span style={{ fontSize:20 }}>{c.e}</span>
+                    <span style={{ fontSize:10.5, color:T.ink, fontWeight:600, lineHeight:1.2 }}>{c.n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
-        ) : (
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(100px,1fr))', gap:6 }}>
-            {cats.map(c=>(
-              <button key={c.id} onClick={()=>setPickCat(c.id)}
-                style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'9px 6px',
-                  borderRadius:11, border:`1px solid ${T.line}`, background:T.card, textAlign:'center' }}>
-                <span style={{ fontSize:20 }}>{c.e}</span>
-                <span style={{ fontSize:10.5, color:T.ink, fontWeight:600, lineHeight:1.2 }}>{c.n}</span>
-              </button>
-            ))}
-          </div>
         )}
 
         <label style={label}>{lang==='ru'?'Фото':'Photo'}</label>
@@ -485,7 +523,9 @@ function QuestionEditor({ lang, initial, onClose, onSaved }) {
             cursor:'pointer', background:T.card }}>
           <i className="ti ti-camera-plus" style={{ fontSize:20, color:T.clay }} aria-hidden="true" />
           <div style={{ fontSize:11.5, color:T.soft, marginTop:4 }}>
-            {stagedFile ? stagedFile.name : (lang==='ru'?'Добавить фото (необязательно, иначе фото вида)':'Ajoute une photo (facultatif — sinon celle de l’espèce)')}
+            {stagedFile ? stagedFile.name : (isAnimalTheme
+              ? (lang==='ru'?'Добавить фото (необязательно, иначе фото вида)':'Ajoute une photo (facultatif — sinon celle de l’espèce)')
+              : (lang==='ru'?'Добавить фото (необязательно)':'Ajoute une photo (facultatif)'))}
           </div>
           <input type="file" accept="image/*" style={visuallyHiddenFileInput}
             onChange={e=>{ const f=e.target.files[0]; if(f) setStagedFile(f); e.target.value='' }} />
@@ -513,6 +553,57 @@ function QuestionEditor({ lang, initial, onClose, onSaved }) {
         <textarea value={explain} onChange={e=>setExplain(e.target.value)} rows={3}
           style={{ ...input, fontSize:12.5, resize:'vertical' }}
           placeholder={lang==='ru'?'Показано после ответа…':'Affichée après la réponse…'} />
+
+        {err && <div style={{ fontSize:12, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
+          borderRadius:9, padding:'8px 11px', marginTop:11 }}>{err}</div>}
+      </div>
+      <ValidateBar lang={lang} onCancel={onClose} onSave={save} busy={busy} disabled={!valid} />
+    </Modal>
+  )
+}
+
+// ══════ Nouveau thème (mode édition) — nom + icône, stocké côté cloud ══════
+const THEME_ICONS = ['🧩','🌳','🪓','🌌','📜','🏕️','🔥','🎣','🦉','🍄','🌲','⭐','🪐','🕰️','📚','🧭','🌾','🐾','🍂','🌊']
+
+function NewThemeModal({ lang, onClose, onCreated }) {
+  const [name, setName] = useState('')
+  const [icon, setIcon] = useState(THEME_ICONS[0])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const valid = name.trim().length > 0
+
+  const save = async () => {
+    if (!valid) return
+    setBusy(true); setErr(null)
+    try {
+      await addQuizTheme(name.trim(), icon)
+      onCreated()
+    } catch (e) {
+      setErr(e?.message || (lang==='ru'?'Не удалось сохранить. Проверьте соединение и попробуйте снова.'
+        :'Échec de l’enregistrement. Vérifie ta connexion et réessaie.'))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal onClose={onClose} max={420}>
+      <div style={{ padding:'20px 22px 0' }}>
+        <div className="serif" style={{ fontSize:19, fontWeight:900, color:T.ink }}>
+          {lang==='ru'?'Новая тема':'Nouveau thème'}
+        </div>
+      </div>
+      <div style={{ padding:'14px 22px 12px' }}>
+        <label style={label}>{lang==='ru'?'Название':'Nom du thème'}</label>
+        <input value={name} onChange={e=>setName(e.target.value)} style={input}
+          placeholder={lang==='ru'?'Например: Мифы и легенды':'Ex. Mythes et légendes'} />
+
+        <label style={label}>{lang==='ru'?'Иконка':'Icône'}</label>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {THEME_ICONS.map(x=>(
+            <button key={x} onClick={()=>setIcon(x)} style={{ width:36, height:36, borderRadius:10, fontSize:18,
+              border:`2px solid ${icon===x?T.sageDark:T.line}`, background: icon===x?'#E4EBD8':T.card }}>{x}</button>
+          ))}
+        </div>
 
         {err && <div style={{ fontSize:12, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
           borderRadius:9, padding:'8px 11px', marginTop:11 }}>{err}</div>}

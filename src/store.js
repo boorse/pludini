@@ -18,6 +18,7 @@ const S = {
   activityEdits: {}, // activityId -> { fr:{title,text}, ru:{...}, en:{...} } (Pludini Host)
   quizQuestions: [],  // questions du quiz ajoutées depuis l'éditeur
   quizEdits: {},      // questionId -> champs modifiés (y compris celles de quizdata.js)
+  quizThemes: [],     // thèmes de quiz créés depuis l'éditeur (en plus des 5 prévus)
   forumTopics: [],    // sujets du forum
   forumPosts: [],      // messages du forum (topicId, author, text, createdAt)
   quizScores: [],     // parties de quiz jouées (player, score, total, createdAt)
@@ -44,7 +45,7 @@ export async function loadAll() {
   })
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   S.activityEdits = {}
-  S.quizQuestions = []; S.quizEdits = {}
+  S.quizQuestions = []; S.quizEdits = {}; S.quizThemes = []
   S.forumTopics = []; S.forumPosts = []
   S.quizScores = []
   ;(ov.data || []).forEach(r => {
@@ -58,6 +59,7 @@ export async function loadAll() {
     if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
     if (r.kind === 'quizq')     S.quizQuestions.push({ ...r.value, key: r.key })
     if (r.kind === 'quizqedit') S.quizEdits[r.value.id] = r.value
+    if (r.kind === 'quiztheme') S.quizThemes.push({ ...r.value, key: r.key })
     if (r.kind === 'forumtopic') S.forumTopics.push({ ...r.value, key: r.key })
     if (r.kind === 'forumpost')  S.forumPosts.push({ ...r.value, key: r.key })
     if (r.kind === 'quizscore') S.quizScores.push({ ...r.value, key: r.key })
@@ -413,17 +415,26 @@ export function allQuizQuestions(themeId) {
   return (themeId && themeId !== 'all') ? all.filter(q => q.theme === themeId) : all
 }
 // un thème n'est jouable qu'à partir de QUIZ_THEME_MIN_QUESTIONS questions —
-// en dessous il reste visible mais « en préparation », non lançable
+// en dessous il reste visible mais « en préparation », non lançable ;
+// les 5 thèmes prévus + ceux créés depuis l'éditeur (mode édition)
 export function allQuizThemes() {
   const all = allQuizQuestions()
-  return QUIZ_THEMES.map(t => {
+  const custom = S.quizThemes.map(t => ({ id: t.id, icon: t.icon, name: t.name }))
+  return [...QUIZ_THEMES, ...custom].map(t => {
     const count = all.filter(q => q.theme === t.id).length
     return { ...t, count, playable: count >= QUIZ_THEME_MIN_QUESTIONS }
   })
 }
+export async function addQuizTheme(name, icon) {
+  const id = 'theme_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
+  const value = { id, icon, name: { fr: name, ru: name } }
+  S.quizThemes.push({ ...value, key: 'quiztheme_' + id }); notify()
+  await sb.from('overrides').upsert({ kind: 'quiztheme', key: 'quiztheme_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+  return id
+}
 export async function addQuizQuestion(q) {
   const id = q.id || ('quizq_' + Date.now().toString(36))
-  const value = { theme: 'animaux', ...q, id }
+  const value = { theme: 'animaux', by: getMe(), ...q, id }
   S.quizQuestions.push({ ...value, key: 'quizq_' + id }); notify()
   await sb.from('overrides').upsert({ kind: 'quizq', key: 'quizq_' + id, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
   return id
