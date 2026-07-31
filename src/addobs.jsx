@@ -4,7 +4,8 @@
 // à un seul écran (Type 3 garde la notion de passage à l'affichage, mais le
 // formulaire de saisie lui-même est identique à celui du Type 2).
 import { useState } from 'react'
-import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish } from './store.js'
+import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish,
+         allSpecies, calcPtsLive } from './store.js'
 import { METHODS } from './data'
 import { uploadPhotoFile } from './photoui.jsx'
 import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker, FishSizePicker } from './editui.jsx'
@@ -130,6 +131,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
   const save = async () => {
     setBusy(true); setErr(null)
     try {
+      const before = calcPtsLive(sp, me)
       const now = new Date()
       const dlabel = `Passage du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
       const gps = (lat && lon) ? [parseFloat(lat), parseFloat(lon)] : null
@@ -145,7 +147,8 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
       if (!cur.includes(method)) await setObservation(sp.id, me, [...cur, method])
       if (photoQuality==='high') await setQuality(sp.id, me, true)
       if (photoQuality==='low') await setPixelated(sp.id, me, true)
-      onSaved?.(sp.id); onClose()
+      const after = calcPtsLive(allSpecies().find(s=>s.id===sp.id) || sp, me)
+      onSaved?.(sp.id, after - before); onClose()
     } catch (e) {
       setErr(e?.message || (lang==='ru'?'Не удалось сохранить. Проверьте соединение и попробуйте снова.'
         :'Échec de l’enregistrement. Vérifie ta connexion et réessaie.'))
@@ -291,6 +294,7 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
   const save = async () => {
     setBusy(true); setErr(null)
     try {
+      const before = calcPtsLive(sp, me)
       const now = new Date()
       const dlabel = `${fish?'Pêche':'Passage'} du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
       const ind = { n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
@@ -300,7 +304,8 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
       for (const f of stagedFiles) await uploadPhotoFile(`ind:${sp.id}:${dlabel}`, f, '', me)
       const cur = sp.obs?.[me] || []
       if (!cur.includes('eye')) await setObservation(sp.id, me, [...cur, 'eye'])
-      onSaved?.(sp.id); onClose()
+      const after = calcPtsLive(allSpecies().find(s=>s.id===sp.id) || sp, me)
+      onSaved?.(sp.id, after - before); onClose()
     } catch (e) {
       setErr(e?.message || (lang==='ru'?'Не удалось сохранить. Проверьте соединение и попробуйте снова.'
         :'Échec de l’enregistrement. Vérifie ta connexion et réessaie.'))

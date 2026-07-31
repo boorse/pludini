@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
          removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType,
-         individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
+         individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover,
+         allSpecies, calcPtsLive } from './store.js'
 import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
 import { LUT, uploadPhotoFile, usePhotos, FocalPicker } from './photoui.jsx'
@@ -410,6 +411,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         return
       }
 
+      const before = calcPtsLive(sp, by)
       const label = named ? (name.trim() || 'Sans nom')
         : `Passage du ${new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
       const ind = {
@@ -425,7 +427,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       if (!cur.includes(method)) await setObservation(spId, by, [...cur, method])
       if (photoQuality==='low') await setPixelated(spId, by, true)
       if (photoQuality==='high') await setQuality(spId, by, true)
-      onSaved?.(spId); onClose()
+      const after = calcPtsLive(allSpecies().find(s=>s.id===spId) || sp, by)
+      onSaved?.(spId, after - before); onClose()
     } catch (e) {
       // sans ce filet, un échec réseau/upload laissait le bouton bloqué sur
       // "Enregistrement…" sans aucun message — donnait l'impression que la

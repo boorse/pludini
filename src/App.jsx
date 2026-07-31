@@ -14,6 +14,7 @@ import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
 import { ForumPage } from './forum.jsx'
+import { RewardBurst, tierFor } from './reward.jsx'
 
 const T = {
   bg:'#EDE7D8', surface:'#E3DAC5', card:'#E6DDC8',
@@ -402,6 +403,7 @@ export default function App() {
   const [pwOpen, setPwOpen] = useState(false)
   const [pw, setPw] = useState('')
   const [toast, setToast] = useState(null)
+  const [reward, setReward] = useState(null) // {points, tier} — feedback à l'enregistrement d'une observation
   const [mobileTab, setMobileTab] = useState('map')
   const [focus, setFocus] = useState(null)        // 'map' | 'matrix' | null
   const [curInd, setCurInd] = useState(null)      // individu ouvert
@@ -460,6 +462,7 @@ export default function App() {
   const catObj = CATS.find(c => c.id === curCat)
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null), 3200) }
+  const triggerReward = (points) => { if (points > 0) setReward({ points, tier: tierFor(points) }) }
   const selSpFull = (id) => { const s = SPECIES.find(x=>x.id===id); setCurCat(s?.cat); setCurSp(id); setDetTab('obs') }
 
   const submitPw = () => { if (pw==='arbalete'){ setEdit(true); setPwOpen(false); setPw(''); if(!getMe()) setIdPicker(true) } else setPw('') }
@@ -1485,13 +1488,14 @@ export default function App() {
         onDeleted={()=>{ setCurSp(null); setRefresh(r=>r+1) }} />}
       {sighting && sighting.editing && <SightingEditor lang={lang} species={SPECIES} editing={sighting.editing}
         onClose={()=>setSighting(null)}
-        onSaved={()=>{ setRefresh(r=>r+1); setCurInd(null) }} />}
+        onSaved={(id, pts)=>{ setRefresh(r=>r+1); setCurInd(null); triggerReward(pts) }} />}
       {sighting && !sighting.editing && <AddObservation lang={lang} species={SPECIES} presetSp={sighting.sp}
         onClose={()=>setSighting(null)}
-        onSaved={(id)=>{ setRefresh(r=>r+1); if(id) selSpFull(id) }} />}
+        onSaved={(id, pts)=>{ setRefresh(r=>r+1); if(id) selSpFull(id); triggerReward(pts) }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
       {showCalendar && <PassageCalendar sp={showCalendar} lang={lang} onClose={()=>setShowCalendar(null)} />}
       {toast && <Toast msg={toast} />}
+      {reward && <RewardBurst points={reward.points} tier={reward.tier} onDone={()=>setReward(null)} />}
 
       {pwOpen && <PwModal lang={lang} pw={pw} setPw={setPw} onSubmit={submitPw}
         onClose={()=>{ setPwOpen(false); setPw('') }} />}
