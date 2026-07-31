@@ -94,6 +94,8 @@ export default async function handler(req) {
   return new ImageResponse(tree, {
     width: 1200,
     height: 630,
-    headers: { 'Cache-Control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' },
+    // même casse que la valeur par défaut interne de @vercel/og, sinon les deux
+    // s'ajoutent (Headers les traite comme deux entrées) au lieu de se remplacer
+    headers: { 'cache-control': 'public, max-age=60, s-maxage=300, stale-while-revalidate=600' },
   })
 }
