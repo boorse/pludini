@@ -24,16 +24,7 @@ const T = {
 }
 
 function BobberIcon({ size = 20, style }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" style={style} aria-hidden="true">
-      <line x1="12" y1="2" x2="12" y2="6.8" stroke="#2B2620" strokeWidth="1.5" strokeLinecap="round"/>
-      <circle cx="12" cy="11.5" r="4.8" fill="#F2EEE2"/>
-      <path d="M7.2 11.5 A4.8 4.8 0 0 1 16.8 11.5 Z" fill="#B5602F"/>
-      <circle cx="12" cy="11.5" r="4.8" fill="none" stroke="#B5602F" strokeWidth="1"/>
-      <path d="M4.5 16.6 Q8.2 14.9 12 16.6 T19.5 16.6" fill="none" stroke="#7A8B5C" strokeWidth="1.5" strokeLinecap="round" opacity="0.7"/>
-      <path d="M5.5 19 Q9 17.5 12.5 19 T20.5 19" fill="none" stroke="#7A8B5C" strokeWidth="1.2" strokeLinecap="round" opacity="0.4"/>
-    </svg>
-  )
+  return <img src="/icons/bobber-mark.png" width={size} height={size} style={style} alt="" aria-hidden="true" />
 }
 
 function useWide() {
