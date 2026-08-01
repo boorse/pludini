@@ -219,7 +219,7 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
         </div>
       </div>
 
-      <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+      <div style={{ padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
         <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:'#2B2620' }}>
           {lang==='ru'?'Наша история':'Notre histoire'}
         </h2>

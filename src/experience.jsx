@@ -695,12 +695,12 @@ export default function Experience({ wide, onBack, onGoFarm }) {
 
           <div style={{ position:'relative', marginTop: -(wide?90:70), borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
             backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)' }}>
-            <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+            <div style={{ padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.cocoonTitle}</h2>
             </div>
             <ComfortStrip lang={lang} wide={wide} canEditImages={canEditImages}
               onEditPhoto={()=>setPhotoTarget({ target:'exp:comfort', label:l.comfortLine })} />
-            <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+            <div style={{ padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.activitiesTitle}</h2>
             </div>
 
@@ -713,7 +713,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             </div>
           </div>
 
-          <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+          <div style={{ padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
             <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.findUsTitle}</h2>
           </div>
 
@@ -738,7 +738,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:map', label:l.mapTitle })} />}
           </div>
 
-          <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+          <div style={{ padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
             <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.storyTitle}</h2>
           </div>
           <div style={{ padding: wide?'0 40px 20px':'0 16px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>

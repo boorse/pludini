@@ -403,7 +403,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         background:T.bg, overflow:'hidden' }}>
-        <div style={{ position:'relative', padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+        <div style={{ position:'relative', padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
           {edit && (
             <button onClick={()=>setTextEditor({ id:'productions',
               fields:[{ key:'productionsTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' }],
@@ -426,7 +426,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
         ))}
       </div>
 
-      <div style={{ position:'relative', padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+      <div style={{ position:'relative', padding: wide?'26px 40px 26px':'16px 16px 16px', textAlign:'center' }}>
         {edit && (
           <button onClick={()=>setTextEditor({ id:'story',
             fields:[
