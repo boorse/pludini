@@ -186,6 +186,9 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
             <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
               <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
             </button>
+            <button onClick={()=>go('farm')} style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(242,238,226,.75)', fontSize: wide?14:13 }}>
+              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Farm
+            </button>
           </div>
         </div>
         <div style={{ position:'relative', height:`${heroH}dvh`, display:'flex', flexDirection:'column', alignItems:'center',
