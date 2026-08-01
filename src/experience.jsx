@@ -378,7 +378,7 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
 
   if (!photos.length && !canEditImages) return null
   return (
-    <div style={{ padding: wide?'44px 0 6px':'30px 0 4px' }}>
+    <div style={{ padding: wide?'0 0 6px':'0 0 4px' }}>
       <div style={{ textAlign:'center', padding: wide?'0 40px 18px':'0 20px 12px' }}>
         <span style={{ fontSize: wide?14:12.5, color:T.soft, lineHeight:1.5 }}>{l.comfortLine}</span>
       </div>
@@ -705,7 +705,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:`repeat(${activityCols}, 1fr)`, gap:4,
-              padding: wide?'20px 40px 10px':'14px 16px 4px' }}>
+              padding: wide?'0 40px 10px':'0 16px 4px' }}>
               {activities.map(a => (
                 <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages} wide={wide}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
