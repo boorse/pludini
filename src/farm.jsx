@@ -284,7 +284,7 @@ function ThemeStrip({ target, placeholders, wide, speed = 0.5 }) {
 
   return (
     <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', overflowX:'auto',
-      WebkitOverflowScrolling:'touch', height:cardH }}>
+      WebkitOverflowScrolling:'touch', height:cardH, transform:'translateZ(0)', willChange:'scroll-position' }}>
       {display.map((p, i) => (
         <div key={`${p.id}-${i}`} style={{ position:'relative', flex:'0 0 auto', width:cardW, height:cardH,
           overflow:'hidden', background:'#1E2418' }}>
@@ -312,16 +312,13 @@ function ThemeSection({ t, i, lang, wide, edit, canEditImages, onEditPhoto, onEd
   const speed = THEME_SPEEDS[i % THEME_SPEEDS.length]
   return (
     <div style={{ display:'grid' }}>
-      <div style={{ gridArea:'1 / 1', zIndex:1 }}>
+      <div style={{ gridArea:'1 / 1', zIndex:1, minWidth:0, overflow:'hidden' }}>
         <ThemeStrip target={t.target} placeholders={t.placeholders} wide={wide} speed={speed} />
       </div>
-      <div style={{ gridArea:'1 / 1', zIndex:2, display:'flex', alignItems:'center', pointerEvents:'none',
-        background:'linear-gradient(to right, rgba(16,14,10,.82) 0%, rgba(16,14,10,.4) 20%, transparent 38%)' }}>
-        <div style={{ padding: wide?'0 0 0 44px':'0 0 0 20px', maxWidth: wide?440:260 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:7 }}>
-            <span style={{ fontSize: wide?28:21 }}>{t.icon}</span>
-            <h3 className="serif" style={{ fontSize: wide?28:20, fontWeight:800, color:'#F2EEE2', lineHeight:1.1 }}>{tx.title}</h3>
-          </div>
+      <div style={{ gridArea:'1 / 1', zIndex:2, display:'flex', alignItems:'flex-start', pointerEvents:'none',
+        background:'linear-gradient(135deg, rgba(16,14,10,.85) 0%, rgba(16,14,10,.55) 26%, transparent 50%)' }}>
+        <div style={{ padding: wide?'22px 0 0 30px':'14px 0 0 16px', maxWidth: wide?440:260 }}>
+          <h3 className="serif" style={{ fontSize: wide?28:20, fontWeight:800, color:'#F2EEE2', lineHeight:1.1, marginBottom:7 }}>{tx.title}</h3>
           <p style={{ fontSize: wide?14:11.5, color:'rgba(242,238,226,.88)', lineHeight:1.55 }}>{tx.text}</p>
         </div>
       </div>
