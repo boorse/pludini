@@ -226,10 +226,12 @@ function HeroImg({ target, placeholder }) {
 }
 
 // ── Bandeau d'images d'un thème : dérive automatiquement vers la droite, en
-// boucle infinie, et se laisse glisser au doigt/à la souris (met en pause la
-// dérive pendant qu'on glisse, reprend juste après) — même mécanique que le
-// bandeau "confort" de Pludini Host ──
-function ThemeStrip({ target, placeholders, wide }) {
+// boucle infinie et à une vitesse propre à chaque thème (pour que les
+// bandeaux empilés ne défilent jamais exactement en même temps), et se
+// laisse glisser au doigt/à la souris (met en pause la dérive pendant qu'on
+// glisse, reprend juste après) — même mécanique que le bandeau "confort" de
+// Pludini Host, en plus grand et collé bord à bord (pas d'arrondi, pas d'écart)
+function ThemeStrip({ target, placeholders, wide, speed = 0.5 }) {
   const { photos } = usePhotos(target)
   const items = photos.length ? photos : placeholders.map((url, i) => ({ id:`ph-${i}`, url, pos:'50% 50%' }))
   const trackRef = useRef(null)
@@ -259,7 +261,7 @@ function ThemeStrip({ target, placeholders, wide }) {
     const el = trackRef.current
     if (!el || !loop) return
     let raf
-    const tick = () => { if (!pausedRef.current) el.scrollLeft += 0.5; raf = requestAnimationFrame(tick) }
+    const tick = () => { if (!pausedRef.current) el.scrollLeft += speed; raf = requestAnimationFrame(tick) }
     raf = requestAnimationFrame(tick)
     const pause = () => { pausedRef.current = true }
     const resume = () => setTimeout(() => { pausedRef.current = false }, 2200)
@@ -272,17 +274,17 @@ function ThemeStrip({ target, placeholders, wide }) {
       el.removeEventListener('pointerup', resume)
       el.removeEventListener('pointercancel', resume)
     }
-  }, [loop])
+  }, [loop, speed])
 
-  const cardW = wide ? 300 : 216
-  const cardH = wide ? 220 : 162
+  const cardW = wide ? 600 : 340
+  const cardH = wide ? 440 : 300
 
   return (
-    <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', gap:10, overflowX:'auto',
-      WebkitOverflowScrolling:'touch', padding: wide?'0 32px':'0 16px' }}>
+    <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', overflowX:'auto',
+      WebkitOverflowScrolling:'touch', height:cardH }}>
       {display.map((p, i) => (
         <div key={`${p.id}-${i}`} style={{ position:'relative', flex:'0 0 auto', width:cardW, height:cardH,
-          borderRadius:16, overflow:'hidden', background:'#1E2418' }}>
+          overflow:'hidden', background:'#1E2418' }}>
           <img src={p.url} alt="" loading="lazy" decoding="async" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />
         </div>
@@ -291,38 +293,52 @@ function ThemeStrip({ target, placeholders, wide }) {
   )
 }
 
-function ThemeSection({ t, lang, wide, edit, canEditImages, onEditPhoto, onEditText }) {
+// une vitesse de dérive légèrement différente par thème, pour que les
+// bandeaux empilés ne se déplacent jamais exactement au même rythme
+const THEME_SPEEDS = [0.42, 0.58, 0.46, 0.62, 0.44, 0.6]
+
+// le texte (titre + description) est superposé directement sur les photos,
+// à gauche, sur un voile sombre qui s'estompe vers la droite — les boutons
+// d'édition restent en haut à droite du bandeau
+// empilé via CSS Grid (toutes les couches partagent la cellule 1/1) plutôt
+// que position:relative/absolute — un ancêtre position:relative au-dessus
+// d'un bandeau défilant très large empêchait Chrome de peindre les photos
+// (elles restaient "chargées" mais invisibles) ; Grid contourne le problème
+function ThemeSection({ t, i, lang, wide, edit, canEditImages, onEditPhoto, onEditText }) {
   const tx = textFor(t.key, lang, t[lang])
+  const speed = THEME_SPEEDS[i % THEME_SPEEDS.length]
   return (
-    <div style={{ padding: wide?'30px 0':'22px 0' }}>
-      <div style={{ padding: wide?'0 32px 14px':'0 16px 10px', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
-        <div style={{ maxWidth:560 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-            <span style={{ fontSize:20 }}>{t.icon}</span>
-            <h3 className="serif" style={{ fontSize: wide?23:19, fontWeight:800, color:T.ink }}>{tx.title}</h3>
+    <div style={{ display:'grid' }}>
+      <div style={{ gridArea:'1 / 1', zIndex:1 }}>
+        <ThemeStrip target={t.target} placeholders={t.placeholders} wide={wide} speed={speed} />
+      </div>
+      <div style={{ gridArea:'1 / 1', zIndex:2, display:'flex', alignItems:'center', pointerEvents:'none',
+        background:'linear-gradient(to right, rgba(16,14,10,.82) 0%, rgba(16,14,10,.4) 20%, transparent 38%)' }}>
+        <div style={{ padding: wide?'0 0 0 44px':'0 0 0 20px', maxWidth: wide?440:260 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:7 }}>
+            <span style={{ fontSize: wide?28:21 }}>{t.icon}</span>
+            <h3 className="serif" style={{ fontSize: wide?28:20, fontWeight:800, color:'#F2EEE2', lineHeight:1.1 }}>{tx.title}</h3>
           </div>
-          <p style={{ fontSize: wide?13.5:12.5, color:T.soft, lineHeight:1.6 }}>{tx.text}</p>
-        </div>
-        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-          {edit && (
-            <button onClick={onEditText} style={{ display:'flex', alignItems:'center', gap:6,
-              padding:'7px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
-              color:T.soft, fontSize:11.5, fontWeight:600 }}>
-              <i className="ti ti-pencil" style={{ fontSize:14 }} aria-hidden="true" />
-              {TXT[lang].text}
-            </button>
-          )}
-          {canEditImages && (
-            <button onClick={onEditPhoto} style={{ display:'flex', alignItems:'center', gap:6,
-              padding:'7px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
-              color:T.clay, fontSize:11.5, fontWeight:600 }}>
-              <i className="ti ti-camera-plus" style={{ fontSize:14 }} aria-hidden="true" />
-              {TXT[lang].photos}
-            </button>
-          )}
+          <p style={{ fontSize: wide?14:11.5, color:'rgba(242,238,226,.88)', lineHeight:1.55 }}>{tx.text}</p>
         </div>
       </div>
-      <ThemeStrip target={t.target} placeholders={t.placeholders} wide={wide} />
+      <div style={{ gridArea:'1 / 1', justifySelf:'end', alignSelf:'start', margin:14,
+        display:'flex', gap:6, zIndex:3 }}>
+        {edit && (
+          <button onClick={onEditText} style={{ display:'flex', alignItems:'center', gap:5,
+            padding:'6px 10px', borderRadius:12, background:'rgba(0,0,0,.5)', color:'#fff', fontSize:11, fontWeight:600 }}>
+            <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+            {TXT[lang].text}
+          </button>
+        )}
+        {canEditImages && (
+          <button onClick={onEditPhoto} style={{ display:'flex', alignItems:'center', gap:5,
+            padding:'6px 10px', borderRadius:12, background:'rgba(0,0,0,.5)', color:'#fff', fontSize:11, fontWeight:600 }}>
+            <i className="ti ti-camera-plus" style={{ fontSize:13 }} aria-hidden="true" />
+            {TXT[lang].photos}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -383,9 +399,9 @@ export default function Farm({ wide, onBack, onGoHost }) {
       </div>
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
-        background:T.bg, paddingTop: wide?18:12 }}>
-        {THEMES.map(t => (
-          <ThemeSection key={t.key} t={t} lang={lang} wide={wide} edit={edit} canEditImages={canEditImages}
+        background:T.bg, overflow:'hidden' }}>
+        {THEMES.map((t, i) => (
+          <ThemeSection key={t.key} t={t} i={i} lang={lang} wide={wide} edit={edit} canEditImages={canEditImages}
             onEditPhoto={()=>setPhotoTarget({ target:t.target, label:textFor(t.key,lang,t[lang]).title })}
             onEditText={()=>setTextEditor({ id:t.key,
               fields:[
