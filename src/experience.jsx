@@ -39,7 +39,7 @@ const TXT = {
     storyText:'Le cidre se presse encore comme au temps de notre grand-père, un lynx passe parfois devant nos pièges photo, et la nuit ici n’a pas la moindre lumière parasite. Plus qu’une liste d’activités, c’est un lieu vivant — où la forêt, la ferme et le silence se partagent.',
     seasonAll:'Toute l’année', seasons:{ spring:'Printemps', summer:'Été', autumn:'Automne', winter:'Hiver' },
     comfortLine:'Un intérieur chaleureux, entre bois brut et lumière du matin.',
-    mapTitle:'Localisation', mapSub:'Voir sur Google Maps',
+    mapTitle:'Localisation', mapSub:'Voir sur Google Maps', findUsTitle:'Nous trouver',
   },
   ru: {
     tag:'Гостевой дом', heroTitle:'Ночь в лесу',
@@ -55,7 +55,7 @@ const TXT = {
     storyText:'Сидр здесь до сих пор давят так же, как во времена нашего деда, рысь порой проходит перед нашими фотоловушками, а ночью здесь нет ни единого постороннего огня. Это не список развлечений — это живое место, где лес, ферма и тишина делятся с гостями.',
     seasonAll:'Круглый год', seasons:{ spring:'Весна', summer:'Лето', autumn:'Осень', winter:'Зима' },
     comfortLine:'Тёплый интерьер — необработанное дерево и утренний свет.',
-    mapTitle:'Расположение', mapSub:'Посмотреть на Google Maps',
+    mapTitle:'Расположение', mapSub:'Посмотреть на Google Maps', findUsTitle:'Как нас найти',
   },
   en: {
     tag:'Guest house', heroTitle:'A night in the forest',
@@ -71,7 +71,7 @@ const TXT = {
     storyText:'Cider is still pressed here the way our grandfather did it, a lynx sometimes walks past our camera traps, and at night there isn’t a single stray light. More than a list of activities, this is a living place — where the forest, the farm and the silence are shared.',
     seasonAll:'Year-round', seasons:{ spring:'Spring', summer:'Summer', autumn:'Autumn', winter:'Winter' },
     comfortLine:'A warm interior, raw wood and morning light.',
-    mapTitle:'Location', mapSub:'View on Google Maps',
+    mapTitle:'Location', mapSub:'View on Google Maps', findUsTitle:'Find us',
   },
 }
 
@@ -695,12 +695,12 @@ export default function Experience({ wide, onBack, onGoFarm }) {
 
           <div style={{ position:'relative', marginTop: -(wide?90:70), borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
             backdropFilter:'blur(28px)', WebkitBackdropFilter:'blur(28px)', background:'rgba(237,231,216,.78)' }}>
-            <div style={{ padding: wide?'28px 32px 0':'20px 16px 0', textAlign:'center' }}>
+            <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.cocoonTitle}</h2>
             </div>
             <ComfortStrip lang={lang} wide={wide} canEditImages={canEditImages}
               onEditPhoto={()=>setPhotoTarget({ target:'exp:comfort', label:l.comfortLine })} />
-            <div style={{ padding: wide?'28px 32px 0':'20px 16px 0', textAlign:'center' }}>
+            <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
               <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.activitiesTitle}</h2>
             </div>
 
@@ -713,7 +713,11 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             </div>
           </div>
 
-          <div style={{ position:'relative', height: wide?280:200, margin: wide?'26px 40px 0':'20px 16px 0',
+          <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+            <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.findUsTitle}</h2>
+          </div>
+
+          <div style={{ position:'relative', height: wide?280:200, margin: wide?'0 40px 0':'0 16px 0',
             borderRadius:18, overflow:'hidden' }}>
             <a href="https://maps.app.goo.gl/59rg3q9UWsyECMyX7" target="_blank" rel="noopener noreferrer"
               style={{ display:'block', position:'absolute', inset:0 }}>
@@ -734,12 +738,14 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:map', label:l.mapTitle })} />}
           </div>
 
-          <div style={{ padding: wide?'64px 40px 20px':'46px 16px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+          <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:16, maxWidth:440, margin:'0 auto' }}>
               <div style={{ flex:1, height:1, background:T.line }} />
               <h2 className="serif" style={{ fontSize: wide?32:23, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
               <div style={{ flex:1, height:1, background:T.line }} />
             </div>
+          </div>
+          <div style={{ padding: wide?'0 40px 20px':'0 16px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
             <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
           </div>
           <div style={{ position:'relative', height: wide?280:170, margin: wide?'26px 40px 60px':'20px 16px 44px',

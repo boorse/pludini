@@ -403,7 +403,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         background:T.bg, overflow:'hidden' }}>
-        <div style={{ position:'relative', padding: wide?'32px 40px 18px':'22px 20px 12px' }}>
+        <div style={{ position:'relative', padding: wide?'32px 40px 16px':'22px 16px 10px' }}>
           {edit && (
             <button onClick={()=>setTextEditor({ id:'productions',
               fields:[{ key:'productionsTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' }],
@@ -430,23 +430,25 @@ export default function Farm({ wide, onBack, onGoHost }) {
         ))}
       </div>
 
-      <div style={{ position:'relative', padding: wide?'46px 40px 16px':'34px 20px 12px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
+      <div style={{ position:'relative', padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
         {edit && (
           <button onClick={()=>setTextEditor({ id:'story',
             fields:[
               { key:'storyTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
               { key:'storyText', label:lang==='ru'?'Текст':lang==='en'?'Text':'Texte', type:'textarea' },
             ], current:storyText })}
-            style={{ position:'absolute', top: wide?46:34, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
+            style={{ position:'absolute', top: wide?32:22, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
               padding:'6px 10px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.soft, fontSize:11 }}>
             <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
           </button>
         )}
-        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, maxWidth:440, margin:'0 auto' }}>
           <div style={{ flex:1, height:1, background:T.line }} />
           <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{storyText.storyTitle}</h2>
           <div style={{ flex:1, height:1, background:T.line }} />
         </div>
+      </div>
+      <div style={{ padding: wide?'0 40px 16px':'0 20px 12px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
         <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{storyText.storyText}</p>
       </div>
 
