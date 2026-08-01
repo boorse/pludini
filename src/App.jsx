@@ -148,8 +148,6 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
     { k:'calendar',  tag:t.plan,    title:t.calendar,  sub: lang==='ru'?'Работы и наблюдения по месяцам':'Travaux et observations mois par mois' },
     { k:'gallery',   tag:t.browse,  title:t.gallery,   sub: lang==='ru'?'Все снимки особей':'Tous les clichés d\'individus' },
     { k:'quiz',      tag:t.play,    title:t.quiz,      sub: lang==='ru'?'Карточки-угадайки из ваших наблюдений':'Des cartes à deviner, tirées de vos observations' },
-    { k:'farm',      tag: lang==='ru'?'Открыть':'Découvrir', title:'Pludini Farm',
-      sub: lang==='ru'?'Сидр, мёд, козий сыр и овощи с фермы':'Cidre, miel, fromage de chèvre et légumes de la ferme' },
   ]
   const heroH = wide ? 66 : 54
   const bleed = wide ? 80 : 60
@@ -187,9 +185,6 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           <div style={{ display:'flex', flexDirection:'column', gap:3, marginTop:6, alignItems:'flex-start' }}>
             <button onClick={()=>go('experience')} style={{ display:'flex', alignItems:'center', gap:6, color:'#F2EEE2', fontSize: wide?14:13 }}>
               <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Host
-            </button>
-            <button onClick={()=>go('farm')} style={{ display:'flex', alignItems:'center', gap:6, color:'rgba(242,238,226,.75)', fontSize: wide?14:13 }}>
-              <i className="ti ti-arrow-left" aria-hidden="true" />Pludini Farm
             </button>
           </div>
         </div>
