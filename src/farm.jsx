@@ -298,7 +298,7 @@ function ThemeStrip({ target, placeholders, wide, speed = 0.5 }) {
 
 // une vitesse de dérive légèrement différente par thème, pour que les
 // bandeaux empilés ne se déplacent jamais exactement au même rythme
-const THEME_SPEEDS = [0.42, 0.58, 0.46, 0.62, 0.44, 0.6]
+const THEME_SPEEDS = [0.14, 0.26, 0.18, 0.32, 0.12, 0.22]
 
 // le texte (titre + description) est superposé directement sur les photos,
 // à gauche, sur un voile sombre qui s'estompe vers la droite — les boutons
