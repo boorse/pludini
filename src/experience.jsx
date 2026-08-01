@@ -15,6 +15,15 @@ const T = {
   line:'#D3C7AE', clay:'#B5602F',
 }
 
+// certaines activités renvoient vers la page Pludini associée (Doc pour
+// l'observation de la nature, Farm pour la ferme) — lien bien visible en
+// bas du texte, pas juste discret
+const CROSS_LINK_LABELS = {
+  fr:{ doc:'Découvrir Pludini Doc', farm:'Découvrir Pludini Farm' },
+  ru:{ doc:'Открыть Pludini Doc', farm:'Открыть Pludini Farm' },
+  en:{ doc:'Discover Pludini Doc', farm:'Discover Pludini Farm' },
+}
+
 const TXT = {
   fr: {
     tag:'Chambre d’hôtes', heroTitle:'Une nuit dans la forêt',
@@ -421,7 +430,7 @@ function ActivityTile({ a, lang, edit, wide, onOpen, onEditPhoto }) {
 }
 
 // ── Page détail d'une activité : grande photo (carrousel si plusieurs images) + texte ──
-function ActivityDetail({ a, lang, setLang, wide, editImages, editText, onBack, onEditPhoto, onEditText }) {
+function ActivityDetail({ a, lang, setLang, wide, editImages, editText, onBack, onEditPhoto, onEditText, crossLink }) {
   const at = a[lang]
   const l = TXT[lang]
   return (
@@ -445,6 +454,15 @@ function ActivityDetail({ a, lang, setLang, wide, editImages, editText, onBack, 
       </div>
       <div style={{ padding: wide?'36px 60px 60px':'26px 20px 44px', maxWidth:720, margin:'0 auto' }}>
         <p style={{ fontSize: wide?16:14, lineHeight:1.85, color:T.ink }}>{at.text}</p>
+        {crossLink && (
+          <button onClick={crossLink.onClick} className="serif" style={{ marginTop:24, display:'inline-flex', alignItems:'center', gap:10,
+            background:T.clay, color:'#fff', padding: wide?'13px 22px':'11px 18px', borderRadius:18,
+            fontSize: wide?14.5:13, fontWeight:700, boxShadow:'0 10px 24px rgba(0,0,0,.18)' }}>
+            <img src="/icons/bobber-mark.png" width={20} height={20} alt="" aria-hidden="true" />
+            {crossLink.label}
+            <i className="ti ti-arrow-up-right" style={{ fontSize:15 }} aria-hidden="true" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -640,12 +658,17 @@ export default function Experience({ wide, onBack, onGoFarm }) {
   if (view === 'booking') return <Booking lang={lang} onBack={()=>goView('home')} />
 
   const activity = activities.find(a => a.id === activeId)
+  const crossLink = activity && (
+    activity.id === 'nature_faune' ? { label: CROSS_LINK_LABELS[lang].doc, onClick: onBack } :
+    activity.id === 'ferme_fromage' && onGoFarm ? { label: CROSS_LINK_LABELS[lang].farm, onClick: onGoFarm } :
+    null
+  )
 
   return (
     <div style={{ minHeight:'100vh', background:T.bg }}>
       {view === 'activity' && activity ? (
         <ActivityDetail a={activity} lang={lang} setLang={setLang} wide={wide} editImages={canEditImages} editText={edit}
-          onBack={()=>goView('home')} onEditPhoto={openPhoto} onEditText={setTextEditor} />
+          onBack={()=>goView('home')} onEditPhoto={openPhoto} onEditText={setTextEditor} crossLink={crossLink} />
       ) : (
         <>
           <div style={{ position:'relative', height:`calc(${wide?92:70}dvh + ${wide?90:70}px)`, minHeight:440, overflow:'hidden' }}>
