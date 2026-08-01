@@ -220,13 +220,9 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
       </div>
 
       <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:14, maxWidth:440, margin:'0 auto' }}>
-          <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
-          <h2 className="serif" style={{ fontSize: wide?18:15, fontWeight:600, color:'#9A9081', whiteSpace:'nowrap' }}>
-            {lang==='ru'?'Наша история':'Notre histoire'}
-          </h2>
-          <div style={{ flex:1, height:1, background:'#D3C7AE' }} />
-        </div>
+        <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:'#2B2620' }}>
+          {lang==='ru'?'Наша история':'Notre histoire'}
+        </h2>
       </div>
       <div style={{ padding: wide?'0 40px 10px':'0 16px 8px', textAlign:'center', maxWidth:720, margin:'0 auto' }}>
         {(lang==='ru' ? [

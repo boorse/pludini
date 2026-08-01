@@ -739,11 +739,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
           </div>
 
           <div style={{ padding: wide?'32px 40px 16px':'22px 16px 10px', textAlign:'center' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:16, maxWidth:440, margin:'0 auto' }}>
-              <div style={{ flex:1, height:1, background:T.line }} />
-              <h2 className="serif" style={{ fontSize: wide?32:23, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
-              <div style={{ flex:1, height:1, background:T.line }} />
-            </div>
+            <h2 className="serif" style={{ fontSize: wide?26:20, fontWeight:700, color:T.ink }}>{l.storyTitle}</h2>
           </div>
           <div style={{ padding: wide?'0 40px 20px':'0 16px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
             <p style={{ fontSize: wide?14:13, lineHeight:1.8, color:T.soft }}>{l.storyText}</p>
