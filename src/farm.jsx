@@ -67,22 +67,22 @@ const TXT = {
     productionsTitle:'Nos productions maison',
     storyTitle:'Notre histoire et nos valeurs',
     storyText:'Tout ici pousse, mûrit et se transforme au même endroit, sans hâte : le verger donne ses pommes, les chèvres leur lait, les ruches leur miel. Nous cultivons peu, mais bien, en petites quantités et sans intrants chimiques, avec le souci de préserver la terre qui nous les donne. Chaque produit porte l’empreinte d’une saison et d’un geste transmis dans la famille.',
-    contactTitle:'Envie d’en savoir plus ?', contactSub:'Pour goûter nos produits ou vous fournir chez nous, écrivez-nous directement.',
-    contactBtn:'Nous contacter', back:'Pludini Doc', photos:'Photos', text:'Texte', edit:'Édition' },
+    contactTitle:'Envie d’en savoir plus ?', contactSub:'Pour goûter nos produits ou vous fournir chez nous, contactez-nous directement.',
+    back:'Pludini Doc', photos:'Photos', text:'Texte', edit:'Édition' },
   ru:{ tag:'Семейная ферма', heroTitle:'Продукция нашей фермы',
     heroSub:'Сидр, облепиха, мёд, козий сыр и овощи с огорода — небольшое семейное хозяйство, живущее в ритме сезонов Видземе.',
     productionsTitle:'Наша домашняя продукция',
     storyTitle:'Наша история и наши ценности',
     storyText:'Здесь всё растёт, зреет и перерабатывается на одном месте, без спешки: сад даёт яблоки, козы — молоко, улья — мёд. Мы выращиваем немного, но качественно, небольшими партиями и без химических добавок, заботясь о земле, которая нам всё это даёт. Каждый продукт несёт отпечаток сезона и семейного мастерства.',
-    contactTitle:'Хотите узнать больше?', contactSub:'Чтобы попробовать нашу продукцию или стать поставщиком, напишите нам напрямую.',
-    contactBtn:'Связаться с нами', back:'Pludini Doc', photos:'Фото', text:'Текст', edit:'Правка' },
+    contactTitle:'Хотите узнать больше?', contactSub:'Чтобы попробовать нашу продукцию или стать поставщиком, свяжитесь с нами напрямую.',
+    back:'Pludini Doc', photos:'Фото', text:'Текст', edit:'Правка' },
   en:{ tag:'Family farm', heroTitle:'Products from our farm',
     heroSub:'Cider, sea buckthorn, honey, goat cheese and garden vegetables — a small family production, shaped by the seasons of Vidzeme.',
     productionsTitle:'Our homemade productions',
     storyTitle:'Our story and our values',
     storyText:'Everything here grows, ripens and is transformed in the same place, without haste: the orchard gives its apples, the goats their milk, the hives their honey. We grow little, but well, in small batches and without chemical inputs, mindful of preserving the land that gives us all this. Every product carries the mark of a season and a gesture passed down in the family.',
-    contactTitle:'Want to know more?', contactSub:'To taste our products or become a supplier, write to us directly.',
-    contactBtn:'Contact us', back:'Pludini Doc', photos:'Photos', text:'Text', edit:'Edit' },
+    contactTitle:'Want to know more?', contactSub:'To taste our products or become a supplier, get in touch with us directly.',
+    back:'Pludini Doc', photos:'Photos', text:'Text', edit:'Edit' },
 }
 
 // re-rendu forcé quand le magasin change — les textes édités n'ont pas de snapshot figé possible
@@ -311,6 +311,7 @@ function ThemeSection({ t, i, lang, wide, edit, canEditImages, onEditPhoto, onEd
   const tx = textFor(t.key, lang, t[lang])
   const speed = THEME_SPEEDS[i % THEME_SPEEDS.length]
   return (
+    <div style={{ padding: wide?'0 40px':'0 16px', overflow:'hidden' }}>
     <div style={{ display:'grid' }}>
       <div style={{ gridArea:'1 / 1', zIndex:1, minWidth:0, overflow:'hidden' }}>
         <ThemeStrip target={t.target} placeholders={t.placeholders} wide={wide} speed={speed} />
@@ -340,6 +341,7 @@ function ThemeSection({ t, i, lang, wide, edit, canEditImages, onEditPhoto, onEd
         )}
       </div>
     </div>
+    </div>
   )
 }
 
@@ -368,7 +370,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
   const heroText = textFor('hero', lang, { tag:l.tag, heroTitle:l.heroTitle, heroSub:l.heroSub })
   const productionsText = textFor('productions', lang, { productionsTitle:l.productionsTitle })
   const storyText = textFor('story', lang, { storyTitle:l.storyTitle, storyText:l.storyText })
-  const contactText = textFor('contact', lang, { contactTitle:l.contactTitle, contactSub:l.contactSub, contactBtn:l.contactBtn })
+  const contactText = textFor('contact', lang, { contactTitle:l.contactTitle, contactSub:l.contactSub })
 
   return (
     <div style={{ minHeight:'100vh', background:T.bg }}>
@@ -453,7 +455,6 @@ export default function Farm({ wide, onBack, onGoHost }) {
             fields:[
               { key:'contactTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' },
               { key:'contactSub', label:lang==='ru'?'Подзаголовок':lang==='en'?'Subtitle':'Sous-titre', type:'textarea' },
-              { key:'contactBtn', label:lang==='ru'?'Текст кнопки':lang==='en'?'Button label':'Texte du bouton' },
             ], current:contactText })}
             style={{ position:'absolute', top: wide?20:14, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
               padding:'6px 10px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.soft, fontSize:11 }}>
@@ -461,15 +462,9 @@ export default function Farm({ wide, onBack, onGoHost }) {
           </button>
         )}
         <div className="serif" style={{ fontSize: wide?19:16, fontWeight:700, color:T.ink, marginBottom:6 }}>{contactText.contactTitle}</div>
-        <p style={{ fontSize:12.5, color:T.soft, marginBottom:18, maxWidth:420, marginLeft:'auto', marginRight:'auto', lineHeight:1.6 }}>
+        <p style={{ fontSize:12.5, color:T.soft, maxWidth:420, marginLeft:'auto', marginRight:'auto', lineHeight:1.6 }}>
           {contactText.contactSub}
         </p>
-        <a href="mailto:contact@pludini.lv" className="serif" style={{ display:'inline-flex', alignItems:'center', gap:8,
-          background:T.clay, color:'#fff', padding: wide?'14px 30px':'12px 24px', borderRadius:18,
-          fontSize: wide?15:13.5, fontWeight:700, boxShadow:'0 10px 28px rgba(0,0,0,.18)' }}>
-          <i className="ti ti-mail" style={{ fontSize:16 }} aria-hidden="true" />
-          {contactText.contactBtn}
-        </a>
       </div>
 
       {edit ? (

@@ -382,10 +382,9 @@ function ComfortStrip({ lang, wide, canEditImages, onEditPhoto }) {
       <div style={{ textAlign:'center', padding: wide?'0 40px 18px':'0 20px 12px' }}>
         <span style={{ fontSize: wide?14:12.5, color:T.soft, lineHeight:1.5 }}>{l.comfortLine}</span>
       </div>
-      <div style={{ position:'relative' }}>
+      <div style={{ position:'relative', padding: wide?'0 40px':'0 16px', overflow:'hidden' }}>
         <div ref={trackRef} className="no-scrollbar" style={{ display:'flex', overflowX:'auto',
-          WebkitOverflowScrolling:'touch', height: wide?'52dvh':'40dvh',
-          padding: wide?'0 40px':'0 20px' }}>
+          WebkitOverflowScrolling:'touch', height: wide?'52dvh':'40dvh' }}>
           {items.map((p,i)=>(
             <div key={p ? `${p.id}-${i}` : i} style={{ position:'relative', flex:'0 0 auto', height:'100%', aspectRatio:'4/3',
               overflow:'hidden',
@@ -706,7 +705,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:`repeat(${activityCols}, 1fr)`, gap:4,
-              padding: wide?'20px 32px 10px':'14px 6px 4px' }}>
+              padding: wide?'20px 40px 10px':'14px 16px 4px' }}>
               {activities.map(a => (
                 <ActivityTile key={a.id} a={a} lang={lang} edit={canEditImages} wide={wide}
                   onOpen={()=>{ setActiveId(a.id); goView('activity') }} onEditPhoto={openPhoto} />
@@ -735,7 +734,7 @@ export default function Experience({ wide, onBack, onGoFarm }) {
             {canEditImages && <EditBtn onClick={()=>setPhotoTarget({ target:'exp:map', label:l.mapTitle })} />}
           </div>
 
-          <div style={{ padding: wide?'64px 40px 20px':'46px 22px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
+          <div style={{ padding: wide?'64px 40px 20px':'46px 16px 14px', textAlign:'center', maxWidth:680, margin:'0 auto' }}>
             <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
               <div style={{ flex:1, height:1, background:T.line }} />
               <h2 className="serif" style={{ fontSize: wide?32:23, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{l.storyTitle}</h2>
