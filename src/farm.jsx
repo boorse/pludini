@@ -64,18 +64,21 @@ const THEMES = [
 const TXT = {
   fr:{ tag:'Ferme familiale', heroTitle:'Les produits de notre ferme',
     heroSub:'Cidre, argousier, miel, fromage de chèvre et légumes du potager — une petite production familiale, façonnée au rythme des saisons du Vidzeme.',
+    productionsTitle:'Nos productions maison',
     storyTitle:'Notre histoire et nos valeurs',
     storyText:'Tout ici pousse, mûrit et se transforme au même endroit, sans hâte : le verger donne ses pommes, les chèvres leur lait, les ruches leur miel. Nous cultivons peu, mais bien, en petites quantités et sans intrants chimiques, avec le souci de préserver la terre qui nous les donne. Chaque produit porte l’empreinte d’une saison et d’un geste transmis dans la famille.',
     contactTitle:'Envie d’en savoir plus ?', contactSub:'Pour goûter nos produits ou vous fournir chez nous, écrivez-nous directement.',
     contactBtn:'Nous contacter', back:'Pludini Doc', photos:'Photos', text:'Texte', edit:'Édition' },
   ru:{ tag:'Семейная ферма', heroTitle:'Продукция нашей фермы',
     heroSub:'Сидр, облепиха, мёд, козий сыр и овощи с огорода — небольшое семейное хозяйство, живущее в ритме сезонов Видземе.',
+    productionsTitle:'Наша домашняя продукция',
     storyTitle:'Наша история и наши ценности',
     storyText:'Здесь всё растёт, зреет и перерабатывается на одном месте, без спешки: сад даёт яблоки, козы — молоко, улья — мёд. Мы выращиваем немного, но качественно, небольшими партиями и без химических добавок, заботясь о земле, которая нам всё это даёт. Каждый продукт несёт отпечаток сезона и семейного мастерства.',
     contactTitle:'Хотите узнать больше?', contactSub:'Чтобы попробовать нашу продукцию или стать поставщиком, напишите нам напрямую.',
     contactBtn:'Связаться с нами', back:'Pludini Doc', photos:'Фото', text:'Текст', edit:'Правка' },
   en:{ tag:'Family farm', heroTitle:'Products from our farm',
     heroSub:'Cider, sea buckthorn, honey, goat cheese and garden vegetables — a small family production, shaped by the seasons of Vidzeme.',
+    productionsTitle:'Our homemade productions',
     storyTitle:'Our story and our values',
     storyText:'Everything here grows, ripens and is transformed in the same place, without haste: the orchard gives its apples, the goats their milk, the hives their honey. We grow little, but well, in small batches and without chemical inputs, mindful of preserving the land that gives us all this. Every product carries the mark of a season and a gesture passed down in the family.',
     contactTitle:'Want to know more?', contactSub:'To taste our products or become a supplier, write to us directly.',
@@ -366,6 +369,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
   }
 
   const heroText = textFor('hero', lang, { tag:l.tag, heroTitle:l.heroTitle, heroSub:l.heroSub })
+  const productionsText = textFor('productions', lang, { productionsTitle:l.productionsTitle })
   const storyText = textFor('story', lang, { storyTitle:l.storyTitle, storyText:l.storyText })
   const contactText = textFor('contact', lang, { contactTitle:l.contactTitle, contactSub:l.contactSub, contactBtn:l.contactBtn })
 
@@ -400,6 +404,21 @@ export default function Farm({ wide, onBack, onGoHost }) {
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         background:T.bg, overflow:'hidden' }}>
+        <div style={{ position:'relative', display:'flex', alignItems:'center', gap:16,
+          padding: wide?'32px 40px 18px':'22px 20px 12px' }}>
+          {edit && (
+            <button onClick={()=>setTextEditor({ id:'productions',
+              fields:[{ key:'productionsTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' }],
+              current:productionsText })}
+              style={{ position:'absolute', top: wide?32:22, right: wide?40:20, display:'flex', alignItems:'center', gap:6,
+                padding:'6px 10px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.soft, fontSize:11 }}>
+              <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
+            </button>
+          )}
+          <div style={{ flex:1, height:1, background:T.line }} />
+          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{productionsText.productionsTitle}</h2>
+          <div style={{ flex:1, height:1, background:T.line }} />
+        </div>
         {THEMES.map((t, i) => (
           <ThemeSection key={t.key} t={t} i={i} lang={lang} wide={wide} edit={edit} canEditImages={canEditImages}
             onEditPhoto={()=>setPhotoTarget({ target:t.target, label:textFor(t.key,lang,t[lang]).title })}
