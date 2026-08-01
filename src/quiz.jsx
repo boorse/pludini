@@ -28,15 +28,24 @@ function shuffle(arr) {
   return a
 }
 
+// les questions de base sont bilingues ({fr,ru}) ; une question ajoutée
+// depuis l'éditeur reste une simple chaîne (formulaire mono-langue) — on
+// résout vers la langue courante dans les deux cas
+function localize(val, lang) {
+  return (val && typeof val === 'object' && !Array.isArray(val)) ? (val[lang] || val.fr) : val
+}
+
 // une partie = un tirage de questions (ordre mélangé, sous-ensemble) + pour
 // chacune, un ordre de réponses mélangé et son nouvel index correct associé —
 // calculé une seule fois au démarrage, jamais recalculé au fil des rendus
-function buildRounds(themeId) {
+function buildRounds(themeId, lang) {
   const all = allQuizQuestions(themeId)
   const picked = shuffle(all).slice(0, Math.min(QUESTIONS_PER_GAME, all.length))
   return picked.map(q => {
+    const answers = localize(q.answers, lang)
     const order = shuffle([0, 1, 2, 3])
-    return { ...q, answers: order.map(i => q.answers[i]), correctIndex: order.indexOf(q.correct) }
+    return { ...q, q: localize(q.q, lang), explain: localize(q.explain, lang),
+      answers: order.map(i => answers[i]), correctIndex: order.indexOf(q.correct) }
   })
 }
 
@@ -110,7 +119,7 @@ export default function Quiz({ wide, lang, onBack, edit }) {
   const start = (themeId) => {
     if (!getMe()) { setPendingTheme(themeId); setIdPicker(true); return }
     setTheme(themeId)
-    setRounds(buildRounds(themeId)); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
+    setRounds(buildRounds(themeId, lang)); setIdx(0); setSelected(null); setScore(0); setPhase('playing')
   }
 
   if (managingTheme) {
@@ -390,7 +399,7 @@ function QuestionManager({ lang, themeId, onClose, onEdit, onAdd }) {
                 <div style={{ flex:1, minWidth:0 }}>
                   {sp && <div style={{ fontSize:10.5, color:T.mute, fontWeight:600 }}>{nameOf(sp,lang).main}</div>}
                   <div style={{ fontSize:12.5, color:T.ink, lineHeight:1.35, overflow:'hidden', textOverflow:'ellipsis',
-                    display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{q.q}</div>
+                    display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>{localize(q.q, lang)}</div>
                   {q.by && <div style={{ fontSize:10, color:T.mute, marginTop:2 }}>
                     {lang==='ru'?`Добавил(а): ${q.by}`:`Ajoutée par ${q.by}`}
                   </div>}
