@@ -298,7 +298,7 @@ function ThemeStrip({ target, placeholders, wide, speed = 0.5 }) {
 
 // une vitesse de dérive légèrement différente par thème, pour que les
 // bandeaux empilés ne se déplacent jamais exactement au même rythme
-const THEME_SPEEDS = [0.14, 0.26, 0.18, 0.32, 0.12, 0.22]
+const THEME_SPEEDS = [0.28, 0.5, 0.32, 0.55, 0.24, 0.38]
 
 // le texte (titre + description) est superposé directement sur les photos,
 // à gauche, sur un voile sombre qui s'estompe vers la droite — les boutons
@@ -403,8 +403,7 @@ export default function Farm({ wide, onBack, onGoHost }) {
 
       <div style={{ position:'relative', marginTop: wide?-30:-18, borderRadius: wide?'32px 32px 0 0':'22px 22px 0 0',
         background:T.bg, overflow:'hidden' }}>
-        <div style={{ position:'relative', display:'flex', alignItems:'center', gap:16,
-          padding: wide?'32px 40px 18px':'22px 20px 12px' }}>
+        <div style={{ position:'relative', padding: wide?'32px 40px 18px':'22px 20px 12px' }}>
           {edit && (
             <button onClick={()=>setTextEditor({ id:'productions',
               fields:[{ key:'productionsTitle', label:lang==='ru'?'Заголовок':lang==='en'?'Title':'Titre' }],
@@ -414,9 +413,11 @@ export default function Farm({ wide, onBack, onGoHost }) {
               <i className="ti ti-pencil" style={{ fontSize:13 }} aria-hidden="true" />
             </button>
           )}
-          <div style={{ flex:1, height:1, background:T.line }} />
-          <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{productionsText.productionsTitle}</h2>
-          <div style={{ flex:1, height:1, background:T.line }} />
+          <div style={{ display:'flex', alignItems:'center', gap:16, maxWidth: wide?440:280, margin:'0 auto' }}>
+            <div style={{ flex:1, height:1, background:T.line }} />
+            <h2 className="serif" style={{ fontSize: wide?30:22, fontWeight:600, color:T.ink, whiteSpace:'nowrap' }}>{productionsText.productionsTitle}</h2>
+            <div style={{ flex:1, height:1, background:T.line }} />
+          </div>
         </div>
         {THEMES.map((t, i) => (
           <ThemeSection key={t.key} t={t} i={i} lang={lang} wide={wide} edit={edit} canEditImages={canEditImages}
