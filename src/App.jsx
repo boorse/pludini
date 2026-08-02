@@ -973,8 +973,18 @@ export default function App() {
                   <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
                 </div>
               ))}
+              {(sp.dng || sp.anecdote) && (
+                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4, marginBottom:8 }}>
+                  <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
+                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />{lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?'}
+                  </div>
+                  {sp.dng && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.dng}</div>}
+                  {sp.dng && sp.anecdote && <div style={{ height:1, background:'#DCC79E', margin:'9px 0' }} />}
+                  {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
+                </div>
+              )}
               {(sp.wiki || sp.youtube) && (
-                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:10 }}>
                   {sp.wiki && (
                     <a href={sp.wiki} target="_blank" rel="noopener noreferrer" style={{ display:'flex', alignItems:'center', gap:6,
                       padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600 }}>
@@ -987,16 +997,6 @@ export default function App() {
                       <i className="ti ti-brand-youtube" style={{ fontSize:15 }} aria-hidden="true" />{lang==='ru'?'Видео':'Vidéo'}
                     </a>
                   )}
-                </div>
-              )}
-              {(sp.dng || sp.anecdote) && (
-                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4, marginBottom:8 }}>
-                  <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
-                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />{lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?'}
-                  </div>
-                  {sp.dng && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.dng}</div>}
-                  {sp.dng && sp.anecdote && <div style={{ height:1, background:'#DCC79E', margin:'9px 0' }} />}
-                  {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
                 </div>
               )}
               {sp.audio && (/\.(mp3|ogg|wav|m4a|opus|aac)(\?.*)?$/i.test(sp.audio) ? (
