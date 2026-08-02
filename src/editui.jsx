@@ -5,7 +5,7 @@ import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies,
          allSpecies, calcPtsLive } from './store.js'
 import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
-import { LUT, uploadPhotoFile, usePhotos, FocalPicker } from './photoui.jsx'
+import { LUT, uploadPhotoFile, uploadAudioFile, usePhotos, FocalPicker } from './photoui.jsx'
 import SatMap from './satmap.jsx'
 import { CENTER } from './territory.js'
 
@@ -167,6 +167,8 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [wiki, setWiki] = useState(initial?.wiki || '')
   const [youtube, setYoutube] = useState(initial?.youtube || '')
   const [audio, setAudio] = useState(initial?.audio || '')
+  const [audioBusy, setAudioBusy] = useState(false)
+  const [audioErr, setAudioErr] = useState(null)
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const catObj = cats.find(c=>c.id===cat) || cats[0]
@@ -174,6 +176,19 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [cover, setCoverLocal] = useState(initial?.cover || null)
   const pickCover = (c) => { setCoverLocal({ ind:c.ind, photoId:c.photo.id }); setCover(initial.id, c.ind, c.photo.id) }
   const resetCover = () => { setCoverLocal(null); clearCover(initial.id) }
+
+  // importer un fichier remplace le lien collé à la main par l'URL hébergée
+  const pickAudioFile = async (file) => {
+    if (!file) return
+    setAudioBusy(true); setAudioErr(null)
+    try {
+      const url = await uploadAudioFile(file)
+      setAudio(url)
+    } catch (e) {
+      setAudioErr(e?.message || (lang==='ru'?'Не удалось загрузить файл.':'Échec de l’import du fichier.'))
+    }
+    setAudioBusy(false)
+  }
 
   const save = async () => {
     if (!n.trim()) return
@@ -299,6 +314,18 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
         <input value={youtube} onChange={ev=>setYoutube(ev.target.value)} style={input} placeholder="https://youtube.com/watch?v=…" />
         <label style={label}>{lang==='ru'?'Аудио (крик/пение)':'Lien audio (cri / chant)'}</label>
         <input value={audio} onChange={ev=>setAudio(ev.target.value)} style={input} placeholder="https://xeno-canto.org/… ou Wikimedia Commons" />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
+          <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'…или':'…ou'}</span>
+          <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:11.5, fontWeight:600, color:T.clay,
+            padding:'6px 11px', borderRadius:10, border:`1px dashed ${T.line}`, cursor:'pointer' }}>
+            <i className="ti ti-file-music" style={{ fontSize:14 }} aria-hidden="true" />
+            {audioBusy ? (lang==='ru'?'Импорт…':'Import…') : (lang==='ru'?'Импортировать файл':'Importer un fichier')}
+            <input type="file" accept="audio/*" style={visuallyHiddenFileInput} disabled={audioBusy}
+              onChange={e=>{ const f=e.target.files[0]; if(f) pickAudioFile(f); e.target.value='' }} />
+          </label>
+          {audio && <span style={{ fontSize:11, color:T.mute }}>✓ {lang==='ru'?'указано':'renseigné'}</span>}
+        </div>
+        {audioErr && <div style={{ fontSize:11.5, color:'#B91C1C', marginTop:4 }}>{audioErr}</div>}
 
         {isEdit && (
           <button onClick={()=>setConfirmDel(true)} disabled={busy} style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,

@@ -999,13 +999,19 @@ export default function App() {
                   {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
                 </div>
               )}
-              {sp.audio && (
+              {sp.audio && (/\.(mp3|ogg|wav|m4a|opus|aac)(\?.*)?$/i.test(sp.audio) ? (
+                <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:9, padding:'9px 13px',
+                  borderRadius:12, background:T.card, border:`1px solid ${T.line}` }}>
+                  <i className="ti ti-volume" style={{ fontSize:15, color:T.clay, flexShrink:0 }} aria-hidden="true" />
+                  <audio controls src={sp.audio} style={{ height:32, flex:1, minWidth:0 }} />
+                </div>
+              ) : (
                 <a href={sp.audio} target="_blank" rel="noopener noreferrer" style={{ marginTop:10, display:'flex', alignItems:'center', gap:7,
                   padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600, width:'fit-content' }}>
                   <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
                   {lang==='ru'?'Крик / пение':'Cri / chant de l’espèce'}
                 </a>
-              )}
+              ))}
             </>}
 
             {!isPerson && detTab==='saisons' && seasons && (

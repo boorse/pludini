@@ -75,6 +75,17 @@ export async function uploadPhotoFile(target, file, caption = '', by = '') {
   return addPhotoRec({ target, path, caption, by })
 }
 
+// import d'un fichier audio (cri/chant importé plutôt qu'un simple lien) —
+// pas de compression/miniature ici, juste un dépôt brut dans le même bucket ;
+// renvoie l'URL publique directement utilisable comme sp.audio
+export async function uploadAudioFile(file) {
+  const ext = (file.name.split('.').pop() || 'mp3').toLowerCase().replace(/[^a-z0-9]/g,'') || 'mp3'
+  const path = `audio/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`
+  const up = await sb.storage.from('photos').upload(path, file, { contentType: file.type || 'audio/mpeg' })
+  if (up.error) throw new Error(up.error.message)
+  return sb.storage.from('photos').getPublicUrl(path).data.publicUrl
+}
+
 // re-rendu forcé quand le magasin change — utilisé par les vignettes dérivées (pas de snapshot figé possible)
 function useStoreTick() {
   const [, tick] = useState(0)
