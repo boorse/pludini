@@ -586,12 +586,12 @@ export default function App() {
                   {lang==='ru'?'Вид':'Espèce'}
                 </button>}
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, tableLayout:'fixed' }}>
                 <thead><tr>
-                  <th style={{ textAlign:'left', padding:'7px 8px', color:T.mute, fontWeight:500, fontSize:10.5, borderBottom:`1.5px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
+                  <th style={{ width:200, textAlign:'left', padding:'7px 8px', color:T.mute, fontWeight:500, fontSize:10.5, borderBottom:`1.5px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
                   {cols.map(p=>(
                     <th key={p.id} style={{ padding:'7px 8px', textAlign:'center', borderBottom:`1.5px solid ${T.line}`,
-                      borderLeft:`1px solid ${T.lineSoft}`, minWidth:110, background:p.demo?'rgba(211,199,174,.18)':'transparent' }}>
+                      borderLeft:`1px solid ${T.lineSoft}`, width:110, background:p.demo?'rgba(211,199,174,.18)':'transparent' }}>
                       <div className="serif" style={{ fontSize:13, fontWeight:700, color:T.ink }}>{p.name}</div>
                     </th>
                   ))}
@@ -628,8 +628,8 @@ export default function App() {
                                         <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named}
                                           label={`${ind.displayName} — ${METHODS[best].l}`} />
                                         <span style={{ fontSize:7.5, color: ind.named?'#A07C28':T.mute,
-                                          fontWeight: ind.named?700:400, maxWidth:44, overflow:'hidden',
-                                          textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{ind.displayName}</span>
+                                          fontWeight: ind.named?700:400, maxWidth:44, whiteSpace:'normal',
+                                          wordBreak:'break-word', textAlign:'center', lineHeight:1.25 }}>{ind.displayName}</span>
                                       </span>
                                     ))}
                                   </span>
@@ -682,9 +682,9 @@ export default function App() {
               <span>{cat.e}</span>{cn.main}
               <span style={{ fontSize:10.5, color:T.mute, fontWeight:400 }}>· {list.filter(isObserved).length}/{list.length}</span>
             </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11 }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11, tableLayout:'fixed' }}>
               <thead><tr>
-                <th style={{ textAlign:'left', padding:'5px 6px', color:T.mute, fontWeight:500, fontSize:10, borderBottom:`1px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
+                <th style={{ width:120, textAlign:'left', padding:'5px 6px', color:T.mute, fontWeight:500, fontSize:10, borderBottom:`1px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
                 <th style={{ padding:'5px 3px', textAlign:'center', color:T.mute, fontWeight:500, fontSize:10, borderBottom:`1px solid ${T.line}`, width:30 }} title="Individus identifiés">👤</th>
                 {ALL_PLAYERS.map(p=><th key={p.id} title={p.name} style={{ padding:'5px 3px', textAlign:'center', color:T.soft, fontWeight:600, fontSize:10, borderBottom:`1px solid ${T.line}`, width:38 }}>{p.id}</th>)}
               </tr></thead>
