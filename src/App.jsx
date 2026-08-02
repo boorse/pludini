@@ -999,10 +999,18 @@ export default function App() {
                   {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
                 </div>
               )}
-              <div style={{ marginTop:10, padding:'9px 11px', border:`1px dashed ${T.line}`, borderRadius:10, fontSize:11.5, color:T.mute, display:'flex', alignItems:'center', gap:7 }}>
-                <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
-                Cri / chant de l'espèce — à venir
-              </div>
+              {sp.audio ? (
+                <a href={sp.audio} target="_blank" rel="noopener noreferrer" style={{ marginTop:10, display:'flex', alignItems:'center', gap:7,
+                  padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600, width:'fit-content' }}>
+                  <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
+                  {lang==='ru'?'Крик / пение':'Cri / chant de l’espèce'}
+                </a>
+              ) : (
+                <div style={{ marginTop:10, padding:'9px 11px', border:`1px dashed ${T.line}`, borderRadius:10, fontSize:11.5, color:T.mute, display:'flex', alignItems:'center', gap:7 }}>
+                  <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
+                  {lang==='ru'?'Крик / пение вида — скоро':'Cri / chant de l’espèce — à venir'}
+                </div>
+              )}
             </>}
 
             {!isPerson && detTab==='saisons' && seasons && (

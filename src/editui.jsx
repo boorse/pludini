@@ -166,6 +166,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [dng, setDng] = useState(initial?.dng || '')
   const [wiki, setWiki] = useState(initial?.wiki || '')
   const [youtube, setYoutube] = useState(initial?.youtube || '')
+  const [audio, setAudio] = useState(initial?.audio || '')
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const catObj = cats.find(c=>c.id===cat) || cats[0]
@@ -178,7 +179,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
     if (!n.trim()) return
     setBusy(true)
     const fields = { n:n.trim(), lat:lat.trim(), e, cat, sub:(newSub.trim()||sub), r, sz,
-      alim:alim.trim(), hab:hab.trim(), dng:dng.trim(), wiki:wiki.trim(), youtube:youtube.trim() }
+      alim:alim.trim(), hab:hab.trim(), dng:dng.trim(), wiki:wiki.trim(), youtube:youtube.trim(), audio:audio.trim() }
     if (isEdit) await editSpecies(initial.id, fields)
     else await addSpecies(fields)
     setBusy(false); onSaved?.(); onClose()
@@ -296,6 +297,8 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
         <input value={wiki} onChange={ev=>setWiki(ev.target.value)} style={input} placeholder="https://fr.wikipedia.org/wiki/…" />
         <label style={label}>{lang==='ru'?'Видео YouTube':'Vidéo YouTube'}</label>
         <input value={youtube} onChange={ev=>setYoutube(ev.target.value)} style={input} placeholder="https://youtube.com/watch?v=…" />
+        <label style={label}>{lang==='ru'?'Аудио (крик/пение)':'Lien audio (cri / chant)'}</label>
+        <input value={audio} onChange={ev=>setAudio(ev.target.value)} style={input} placeholder="https://xeno-canto.org/… ou Wikimedia Commons" />
 
         {isEdit && (
           <button onClick={()=>setConfirmDel(true)} disabled={busy} style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,
