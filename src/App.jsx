@@ -967,7 +967,7 @@ export default function App() {
               {[
                 ...(isVegetal(sp) ? [] : [[lang==='ru'?'Питание':'Alimentation', sp.alim]]),
                 [lang==='ru'?'Среда обитания':'Habitat & territoire', sp.hab],
-              ].map(([t,v])=>(
+              ].filter(([,v])=>v).map(([t,v])=>(
                 <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
                   <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
@@ -999,17 +999,12 @@ export default function App() {
                   {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
                 </div>
               )}
-              {sp.audio ? (
+              {sp.audio && (
                 <a href={sp.audio} target="_blank" rel="noopener noreferrer" style={{ marginTop:10, display:'flex', alignItems:'center', gap:7,
                   padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600, width:'fit-content' }}>
                   <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
                   {lang==='ru'?'Крик / пение':'Cri / chant de l’espèce'}
                 </a>
-              ) : (
-                <div style={{ marginTop:10, padding:'9px 11px', border:`1px dashed ${T.line}`, borderRadius:10, fontSize:11.5, color:T.mute, display:'flex', alignItems:'center', gap:7 }}>
-                  <i className="ti ti-volume" style={{ fontSize:15 }} aria-hidden="true" />
-                  {lang==='ru'?'Крик / пение вида — скоро':'Cri / chant de l’espèce — à venir'}
-                </div>
               )}
             </>}
 
