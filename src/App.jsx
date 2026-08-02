@@ -967,7 +967,6 @@ export default function App() {
               {[
                 ...(isVegetal(sp) ? [] : [[lang==='ru'?'Питание':'Alimentation', sp.alim]]),
                 [lang==='ru'?'Среда обитания':'Habitat & territoire', sp.hab],
-                [lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?', sp.dng],
               ].map(([t,v])=>(
                 <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
@@ -990,12 +989,14 @@ export default function App() {
                   )}
                 </div>
               )}
-              {sp.anecdote && (
-                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4 }}>
+              {(sp.dng || sp.anecdote) && (
+                <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
-                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />Le saviez-vous
+                    <i className="ti ti-sparkles" style={{ fontSize:13 }} aria-hidden="true" />{lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?'}
                   </div>
-                  <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>
+                  {sp.dng && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.dng}</div>}
+                  {sp.dng && sp.anecdote && <div style={{ height:1, background:'#DCC79E', margin:'9px 0' }} />}
+                  {sp.anecdote && <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.65 }}>{sp.anecdote}</div>}
                 </div>
               )}
               <div style={{ marginTop:10, padding:'9px 11px', border:`1px dashed ${T.line}`, borderRadius:10, fontSize:11.5, color:T.mute, display:'flex', alignItems:'center', gap:7 }}>
