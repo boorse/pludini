@@ -9,7 +9,7 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry, speciesType, isFish, photosFor } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -964,12 +964,32 @@ export default function App() {
             </>}
 
             {detTab==='infos' && <>
-              {[['Alimentation',sp.alim],['Habitat & territoire',sp.hab],['Danger',sp.dng]].map(([t,v])=>(
+              {[
+                ...(isVegetal(sp) ? [] : [[lang==='ru'?'Питание':'Alimentation', sp.alim]]),
+                [lang==='ru'?'Среда обитания':'Habitat & territoire', sp.hab],
+                [lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?', sp.dng],
+              ].map(([t,v])=>(
                 <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
                   <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
                 </div>
               ))}
+              {(sp.wiki || sp.youtube) && (
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
+                  {sp.wiki && (
+                    <a href={sp.wiki} target="_blank" rel="noopener noreferrer" style={{ display:'flex', alignItems:'center', gap:6,
+                      padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600 }}>
+                      <i className="ti ti-brand-wikipedia" style={{ fontSize:15 }} aria-hidden="true" />Wikipédia
+                    </a>
+                  )}
+                  {sp.youtube && (
+                    <a href={sp.youtube} target="_blank" rel="noopener noreferrer" style={{ display:'flex', alignItems:'center', gap:6,
+                      padding:'8px 13px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`, color:T.clay, fontSize:12, fontWeight:600 }}>
+                      <i className="ti ti-brand-youtube" style={{ fontSize:15 }} aria-hidden="true" />{lang==='ru'?'Видео':'Vidéo'}
+                    </a>
+                  )}
+                </div>
+              )}
               {sp.anecdote && (
                 <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4 }}>
                   <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>

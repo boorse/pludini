@@ -5,7 +5,7 @@
 // formulaire de saisie lui-même est identique à celui du Type 2).
 import { useState } from 'react'
 import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish,
-         allSpecies, calcPtsLive } from './store.js'
+         isVegetal, allSpecies, calcPtsLive } from './store.js'
 import { METHODS } from './data'
 import { uploadPhotoFile } from './photoui.jsx'
 import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker, FishSizePicker } from './editui.jsx'
@@ -296,7 +296,8 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
     try {
       const before = calcPtsLive(sp, me)
       const now = new Date()
-      const dlabel = `${fish?'Pêche':'Passage'} du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}`
+      const dateShort = now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})
+      const dlabel = isVegetal(sp) ? dateShort : `${fish?'Pêche':'Passage'} du ${dateShort}`
       const ind = { n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
         time:'', by: me, method:'eye', weather:'', story:'', desc:'', b:[], traits:'',
         ...(fish ? { size: fishSize } : {}) }

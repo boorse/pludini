@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies, setObservation, addSighting, editSighting,
-         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType,
+         removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType, isVegetal,
          individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover,
          allSpecies, calcPtsLive } from './store.js'
 import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
@@ -164,6 +164,8 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [alim, setAlim] = useState(initial?.alim || '')
   const [hab, setHab] = useState(initial?.hab || '')
   const [dng, setDng] = useState(initial?.dng || '')
+  const [wiki, setWiki] = useState(initial?.wiki || '')
+  const [youtube, setYoutube] = useState(initial?.youtube || '')
   const [busy, setBusy] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
   const catObj = cats.find(c=>c.id===cat) || cats[0]
@@ -176,7 +178,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
     if (!n.trim()) return
     setBusy(true)
     const fields = { n:n.trim(), lat:lat.trim(), e, cat, sub:(newSub.trim()||sub), r, sz,
-      alim:alim.trim(), hab:hab.trim(), dng:dng.trim() }
+      alim:alim.trim(), hab:hab.trim(), dng:dng.trim(), wiki:wiki.trim(), youtube:youtube.trim() }
     if (isEdit) await editSpecies(initial.id, fields)
     else await addSpecies(fields)
     setBusy(false); onSaved?.(); onClose()
@@ -281,12 +283,19 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
           </div>
         </>}
 
-        <label style={label}>{lang==='ru'?'Питание':'Alimentation'}</label>
-        <textarea value={alim} onChange={ev=>setAlim(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
+        {!isVegetal({ cat }) && <>
+          <label style={label}>{lang==='ru'?'Питание':'Alimentation'}</label>
+          <textarea value={alim} onChange={ev=>setAlim(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
+        </>}
         <label style={label}>{lang==='ru'?'Среда обитания':'Habitat & territoire'}</label>
         <textarea value={hab} onChange={ev=>setHab(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
-        <label style={label}>{lang==='ru'?'Опасность':'Danger'}</label>
+        <label style={label}>{lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?'}</label>
         <textarea value={dng} onChange={ev=>setDng(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
+
+        <label style={label}>{lang==='ru'?'Ссылка на Википедию':'Lien Wikipédia'}</label>
+        <input value={wiki} onChange={ev=>setWiki(ev.target.value)} style={input} placeholder="https://fr.wikipedia.org/wiki/…" />
+        <label style={label}>{lang==='ru'?'Видео YouTube':'Vidéo YouTube'}</label>
+        <input value={youtube} onChange={ev=>setYoutube(ev.target.value)} style={input} placeholder="https://youtube.com/watch?v=…" />
 
         {isEdit && (
           <button onClick={()=>setConfirmDel(true)} disabled={busy} style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,

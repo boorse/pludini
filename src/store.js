@@ -352,6 +352,12 @@ export function speciesType(sp) {
   return 2
 }
 
+// arbres/arbustes/champignons/lichens : le végétal (au sens large) ne "passe"
+// pas devant un appareil comme un animal — ni la notion de passage daté, ni
+// celle d'alimentation n'ont de sens ici (contrairement aux insectes/poissons,
+// eux aussi de type 2, qui gardent les deux)
+export function isVegetal(sp) { return ['arbres','arbustes','champignons','lichens'].includes(sp.cat) }
+
 // ══════ POISSONS : "pêché" remplace "observation", taille remplace qualité de photo ══════
 export function isFish(sp) { return sp.cat === 'poissons' }
 
