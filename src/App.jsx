@@ -95,7 +95,7 @@ function NavCard({ c, wide, edit, onOpen, onEditPhoto }) {
       style={{ textAlign:'left', borderRadius:14, overflow:'hidden', border:'none', padding:0,
         position:'relative', minHeight: wide?148:104 }}>
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(145deg,#39432E 0%,#5C6B48 100%)' }} />
-      <div style={{ position:'absolute', inset:0, opacity: hover?1:0, transition:'opacity .3s' }}>
+      <div style={{ position:'absolute', inset:0, transform: hover?'scale(1.35)':'scale(1)', transition:'transform .35s ease' }}>
         <PhotoBg target={`site:card:${c.k}`} thumb={false} fallback="transparent" />
       </div>
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.72), transparent 60%)' }} />
