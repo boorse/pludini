@@ -29,6 +29,24 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     })
   }, [])
 
+  // déplie un ordre en ne révélant que les familles contenant au moins une observation
+  const toggleObserved = useCallback((n) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(n.id)) {
+        next.delete(n.id)
+        for (const k of [...next]) if (k.startsWith(n.id + ':')) next.delete(k)
+      } else {
+        next.add(n.id)
+        for (const c of n.children || []) {
+          if ((c.members || []).some(isObserved)) next.add(c.id)
+          else next.delete(c.id)
+        }
+      }
+      return next
+    })
+  }, [])
+
   const SPECIES = allSpecies()
   const CATS = allCats()
 
@@ -267,6 +285,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
                 <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
                   view={view}
                   expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+                  onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
                   onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
                   onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
               </div>
@@ -286,6 +305,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
             <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
               view={view}
               expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+              onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
               onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
               onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
           </div>
@@ -295,7 +315,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   )
 }
 
-const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onSp, onAdd, view }) {
+const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onSp, onAdd, view }) {
   // culling : on ne dessine que ce qui est visible, avec une marge généreuse
   const vis = view
     ? nodes.filter(n => n.x > view.x0 && n.x < view.x1 && n.y > view.y0 && n.y < view.y1)
@@ -316,6 +336,7 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
       {vis.map(n => (
         <Card key={n.id} n={n} lang={lang} expanded={expanded}
           toggle={()=>onToggle(n.id)}
+          toggleObserved={()=>onToggleObserved(n)}
           onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)} />
       ))}
       <div style={{ width, height }} />
@@ -325,7 +346,7 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
 
 const btn = { fontSize:10.5, padding:'5px 9px', borderRadius:12, background:'#EDE7D8', color:'#6B6357', border:'1px solid #D3C7AE' }
 
-function Card({ n, lang, expanded, toggle, onSp }) {
+function Card({ n, lang, expanded, toggle, toggleObserved, onSp }) {
   const open = expanded.has(n.id)
   const hasKids = n.children?.length > 0
   const base = {
@@ -348,14 +369,24 @@ function Card({ n, lang, expanded, toggle, onSp }) {
     const all = allSpecies().filter(s=>s.cat===n.cat.id)
     const obs = all.filter(isObserved).length
     return (
-      <button onClick={toggle} style={{ ...base, background:gradientForCat(n.cat.id) }}>
+      <div role="button" tabIndex={0} onClick={toggle}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+        style={{ ...base, background:gradientForCat(n.cat.id) }}>
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.62), transparent 58%)' }} />
         <span style={{ position:'absolute', top:6, left:8, fontSize:17 }}>{n.e}</span>
-        {hasKids && <Chev open={open} />}
+        {hasKids && (
+          <button onClick={e=>{ e.stopPropagation(); toggleObserved() }}
+            title="N'afficher que les branches observées"
+            style={{ position:'absolute', top:6, right:7, width:15, height:15, borderRadius:5,
+              background:'rgba(255,255,255,.22)', border:'none', padding:0, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <span style={{ fontSize:9, color:'#F2EEE2', transform:open?'rotate(180deg)':'none', transition:'transform .18s', lineHeight:1 }}>▾</span>
+          </button>
+        )}
         <span style={{ position:'relative', fontSize:10.5, fontWeight:700, color:'#F2EEE2', lineHeight:1.15 }}>{catNameOf(n.cat, lang).main}</span>
         {catNameOf(n.cat, lang).sub && <span style={{ position:'relative', fontSize:7.5, color:'rgba(242,238,226,.5)', lineHeight:1.1 }}>{catNameOf(n.cat, lang).sub}</span>}
         <span style={{ position:'relative', fontSize:8.5, color:'rgba(242,238,226,.75)' }}>{obs}/{all.length}</span>
-      </button>
+      </div>
     )
   }
 
