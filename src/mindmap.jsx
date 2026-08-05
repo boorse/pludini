@@ -310,21 +310,6 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           </div>
         </div>
       )}
-
-      <div style={{ display:'flex', gap:12, flexWrap:'wrap', padding:'8px 14px', borderTop:'1px solid #D3C7AE', fontSize:10.5, color:'#6B6357', background:'#E3DAC5', alignItems:'center' }}>
-        {Object.entries(RARITY).map(([k,r])=>(
-          <span key={k} style={{ display:'flex', alignItems:'center', gap:4 }}>
-            <span style={{ width:9, height:9, borderRadius:2, background:r.c }} />{r.l}
-          </span>
-        ))}
-        <span style={{ display:'flex', alignItems:'center', gap:4, opacity:.65 }}>
-          <span style={{ width:9, height:9, borderRadius:2, background:'#CFC3A8' }} />Non observée
-        </span>
-        {!isTouch && <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>}
-        <span style={{ width: isTouch ? undefined : '100%', marginLeft: isTouch ? 'auto' : undefined, color:'#9A9081' }}>
-          {lang==='ru'?'Двумя пальцами — перемещение и масштабирование':'Deux doigts pour déplacer et zoomer'}
-        </span>
-      </div>
     </div>
   )
 }
