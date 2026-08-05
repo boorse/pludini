@@ -27,8 +27,13 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       else n.add(id)
       return n
     })
-    // un dépli manuel quitte le mode "observées uniquement" de cette branche
-    setObsOnly(prev => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n })
+    // un dépli manuel quitte le mode "observées uniquement" de cette branche (et de ses enfants)
+    setObsOnly(prev => {
+      if (!prev.has(id) && ![...prev].some(k => k.startsWith(id + ':'))) return prev
+      const next = new Set(prev)
+      for (const k of [...next]) if (k === id || k.startsWith(id + ':')) next.delete(k)
+      return next
+    })
   }, [])
 
   // déplie un ordre en ne révélant que les familles (et espèces) observées
@@ -52,6 +57,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
       const willOpen = !expanded.has(n.id)
       if (willOpen) {
+        next.add(n.id)
         for (const c of n.children || []) {
           if ((c.members || []).some(isObserved)) next.add(c.id)
         }
@@ -66,23 +72,30 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   const { nodes, links, width, height } = useMemo(() => {
     const root = {
       id: 'root', kind: 'root', label: 'Pokédex', e: '🌿',
-      children: CATS.map((cat, ci) => ({
-        id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
-        children: cat.subs.map(sv => {
-          const famId = cat.id + ':' + sv.id
-          const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
-          const onlyObs = obsOnly.has(famId)
-          const shown = onlyObs ? members.filter(isObserved) : members
-          return {
-            id: famId, kind: 'fam', label: sv.id, sub: sv.lat,
-            members,
-            children: [
-              ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
-              ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
-            ]
-          }
+      children: CATS.map((cat, ci) => {
+        const catOnlyObs = obsOnly.has(cat.id)
+        const subs = cat.subs.filter(sv => {
+          if (!catOnlyObs) return true
+          return SPECIES.some(sp => sp.cat === cat.id && sp.sub === sv.id && isObserved(sp))
         })
-      }))
+        return {
+          id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
+          children: subs.map(sv => {
+            const famId = cat.id + ':' + sv.id
+            const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
+            const onlyObs = obsOnly.has(famId)
+            const shown = onlyObs ? members.filter(isObserved) : members
+            return {
+              id: famId, kind: 'fam', label: sv.id, sub: sv.lat,
+              members,
+              children: [
+                ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
+                ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
+              ]
+            }
+          })
+        }
+      })
     }
     // largeur en unités : les espèces d'une famille sont réparties en colonnes
     const COLS = (n) => n <= 2 ? n : n <= 6 ? 2 : n <= 12 ? 3 : 4
