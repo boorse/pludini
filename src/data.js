@@ -461,7 +461,7 @@ export const ACHIEVEMENTS = [
   { e:'🌿', n:'Naturaliste',       d:'25 espèces observées',                w:'—', on:false, pts:150, tier:2 },
   { e:'🌳', n:'Connaisseur',       d:'50 espèces observées',                w:'—', on:false, pts:300, tier:3 },
   { e:'🏞️', n:'Encyclopédiste',    d:'80 espèces observées',                w:'—', on:false, pts:500, tier:4 },
-  { e:'👑', n:'Maître du vivant',  d:'Toutes les espèces du Pokédex',       w:'—', on:false, pts:900, tier:5 },
+  { e:'👑', n:'Maître du vivant',  d:'Toutes les espèces du Conservatoire', w:'—', on:false, pts:900, tier:5 },
 
   // ── Grands prédateurs & espèces difficiles ──
   { e:'🐆', n:'Le fantôme',        d:'Voir le lynx de ses propres yeux',    w:'—', on:false, pts:400 },

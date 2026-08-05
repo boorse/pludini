@@ -229,13 +229,13 @@ function Landing({ lang, setLang, go, onQuiz, edit, editMode, onToggleEdit, onEd
           'Всё началось с фотоловушки, закреплённой на дереве в глубине леса. Я просто хотел увидеть, кто проходит здесь по ночам.',
           'Через несколько недель — сотни фотографий. Лиса на рассвете, косуля, щиплющая траву, и однажды — пятнистый силуэт, бесшумно пересекающий кадр: рысь.',
           'Понять что-либо в этой дикой жизни, разбросанной по тысячам файлов, было невозможно. Всё это нужно было классифицировать, дать имена, даты, места. Знать, кто здесь живёт, кто проходит мимо, кто возвращается.',
-          'Желание навести порядок во всём, что меня окружает, было слишком сильным — но никакой унылой таблицы. Мне хотелось игру, коллекцию, Покедекс живой природы, где каждый замеченный вид — маленькая победа. Не только животные: деревья, грибы, цветы — всё, что населяет эти леса, озёра и эту реку.',
+          'Желание навести порядок во всём, что меня окружает, было слишком сильным — но никакой унылой таблицы. Мне хотелось игру, коллекцию, Заповедник живой природы, где каждый замеченный вид — маленькая победа. Не только животные: деревья, грибы, цветы — всё, что населяет эти леса, озёра и эту реку.',
           'Ничего этого не было бы без Елены, придумавшей это чудесное — сотворить такой райский сад. Спасибо, что подарила нам такое место — исследовать и любить.',
         ] : [
           'Tout a commencé avec une caméra piège, accrochée à un arbre au fond de la forêt. Je voulais juste voir qui passait par là, la nuit.',
           'Quelques semaines plus tard : des centaines de photos. Un renard au petit matin, un chevreuil qui broute, et un jour une silhouette tachetée qui traverse le cadre sans un bruit — un lynx.',
           'Impossible de comprendre quoi que ce soit à une vie sauvage éparpillée dans des milliers de fichiers. Il fallait classer tout ça, mettre des noms, des dates, des lieux. Savoir qui vit ici, qui passe, qui revient.',
-          'L’envie d’ordonner tout ce qui m’entoure était trop forte — mais pas question d’un tableur triste. Je voulais un jeu, une collection, un Pokédex du vivant où chaque espèce observée est une petite victoire. Pas seulement les animaux : les arbres, les champignons, les fleurs, tout ce qui peuple ces forêts, ces lacs et cette rivière.',
+          'L’envie d’ordonner tout ce qui m’entoure était trop forte — mais pas question d’un tableur triste. Je voulais un jeu, une collection, un Conservatoire du vivant où chaque espèce observée est une petite victoire. Pas seulement les animaux : les arbres, les champignons, les fleurs, tout ce qui peuple ces forêts, ces lacs et cette rivière.',
           'Rien de tout cela n’existerait sans Elena, qui a eu la merveilleuse idée de façonner ce jardin d’Éden. Merci de nous avoir offert un endroit pareil à explorer et à aimer.',
         ]).map((p,i)=>(
           <p key={i} style={{ fontSize: wide?12:11, lineHeight:1.55, color:'#9A9081', textAlign:'left', marginTop: i===0?0:7 }}>{p}</p>
@@ -341,7 +341,7 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
           {lang==='ru'?'Режим правки':'Mode édition'}
         </div>
         <div style={{ fontSize:12.5, color:T.soft, marginBottom:14 }}>
-          {lang==='ru'?'Введите пароль.':'Entre le mot de passe pour modifier le Pokédex.'}
+          {lang==='ru'?'Введите пароль.':'Entre le mot de passe pour modifier le Conservatoire.'}
         </div>
         <input type="password" value={pw} onChange={e=>setPw(e.target.value)}
           onKeyDown={e=>e.key==='Enter'&&onSubmit()} placeholder={lang==='ru'?'Пароль':'Mot de passe'} autoFocus
@@ -363,15 +363,16 @@ function PwModal({ lang, pw, setPw, onSubmit, onClose }) {
 }
 
 // URLs partagées directement vers un écran précis — / est Pludini Host (page
-// publique du domaine), Pludini Doc (l'inventaire) vit sur /doc ; /host reste
-// une redirection d'écran pour ne pas casser d'anciens liens déjà partagés
-const PATH_SCREENS = { '/': 'experience', '/host': 'experience', '/doc': 'landing', '/pokedex': 'app', '/farm': 'farm' }
-const SCREEN_PATHS = { landing: '/doc', experience: '/', app: '/pokedex', farm: '/farm' }
+// publique du domaine), Pludini Doc (l'inventaire) vit sur /doc ; /host et
+// /pokedex restent en redirection d'écran pour ne pas casser d'anciens liens
+// déjà partagés (le Pokédex s'appelle désormais "Le Conservatoire")
+const PATH_SCREENS = { '/': 'experience', '/host': 'experience', '/doc': 'landing', '/conservatoire': 'app', '/pokedex': 'app', '/farm': 'farm' }
+const SCREEN_PATHS = { landing: '/doc', experience: '/', app: '/conservatoire', farm: '/farm' }
 
 // ══════════════════ APP ══════════════════
 export default function App() {
   const wide = useWide()
-  // /host et /pokedex sont de vraies URLs partageables (aperçu de lien dédié
+  // /host et /conservatoire sont de vraies URLs partageables (aperçu de lien dédié
   // pour /host via middleware.js) : elles doivent toujours ouvrir le bon écran,
   // même si le dernier écran mémorisé était différent — sinon un lien partagé
   // n'amènerait pas au bon endroit
@@ -443,7 +444,7 @@ export default function App() {
   // panneau est démonté/remonté et perd son scroll natif — restauré manuellement
   const matrixScrollTop = useRef(0)
   // seuls landing ("Pludini Doc"), experience ("Pludini Host") et app ("Le
-  // Pokédex") ont une URL dédiée (/doc, /, /pokedex) — ce sont les seules
+  // Conservatoire") ont une URL dédiée (/doc, /, /conservatoire) — ce sont les seules
   // pages qu'on partage avec un lien direct (aperçu de lien propre pour
   // chacune) ; les autres écrans restent de simples états internes
   const goScreen = (s) => {
@@ -1438,7 +1439,7 @@ export default function App() {
           <span style={{ textAlign:'left' }}>
             <span className="serif" style={{ display:'block', fontSize:10.5, fontWeight:600, color:T.soft, letterSpacing:'.3px' }}>Pludini Doc</span>
             <span className="serif" style={{ display:'block', fontSize:20, fontWeight:900, color:T.ink, letterSpacing:'-0.4px', lineHeight:1.05 }}>
-              {lang==='ru'?'Покедекс':'Pokédex'}
+              {lang==='ru'?'Заповедник':'Conservatoire'}
             </span>
           </span>
         </button>

@@ -50,7 +50,7 @@ export const SUB_RU = {
 
 export const UI = {
   fr:{
-    pokedex:'Le Pokédex', quiz:'Le Quiz', gallery:'La Galerie',
+    pokedex:'Le Conservatoire', quiz:'Le Quiz', gallery:'La Galerie',
     calendar:'Le Calendrier', territory:'Le Territoire',
     explore:'Explorer', scores:'Scores', badges:'Badges',
     consult:'Consulter', play:'Jouer', browse:'Parcourir', plan:'Planifier', locate:'Situer',
@@ -60,7 +60,7 @@ export const UI = {
     mapTitle:'La map du vivant', matrixTitle:'Matrice des observations',
     obs:'Observations', infos:'Infos', seasons:'Saisons', individuals:'Individus observés',
     whoObserved:'Qui a observé', notObserved:'Pas encore observée', toObserve:'À observer',
-    quizSoon:"Oups — le Quiz n'est pas encore prêt. Il arrivera quand le Pokédex sera bien rempli !",
+    quizSoon:"Oups — le Quiz n'est pas encore prêt. Il arrivera quand le Conservatoire sera bien rempli !",
     gallerySoon:"La galerie se remplira dès que les premières photos seront importées.",
     byPerson:'Par observateur', all:'Tout', home:'Accueil', back:'Retour',
     edit:'Mode édition', quit:'Quitter', addSpecies:'Ajouter une espèce',
@@ -77,7 +77,7 @@ export const UI = {
     added:'a ajouté', nothingAdded:"n'a encore rien ajouté.",
   },
   ru:{
-    pokedex:'Покедекс', quiz:'Викторина', gallery:'Галерея',
+    pokedex:'Заповедник', quiz:'Викторина', gallery:'Галерея',
     calendar:'Календарь', territory:'Территория',
     explore:'Обзор', scores:'Очки', badges:'Значки',
     consult:'Смотреть', play:'Играть', browse:'Листать', plan:'Планировать', locate:'Карта',
@@ -87,7 +87,7 @@ export const UI = {
     mapTitle:'Карта живого', matrixTitle:'Матрица наблюдений',
     obs:'Наблюдения', infos:'Сведения', seasons:'Сезоны', individuals:'Замеченные особи',
     whoObserved:'Кто наблюдал', notObserved:'Ещё не замечен', toObserve:'Найти',
-    quizSoon:'Ой — викторина ещё не готова. Она появится, когда Покедекс наполнится!',
+    quizSoon:'Ой — викторина ещё не готова. Она появится, когда Заповедник наполнится!',
     gallerySoon:'Галерея заполнится, как только появятся первые фотографии.',
     byPerson:'По наблюдателям', all:'Всё', home:'Главная', back:'Назад',
     edit:'Режим правки', quit:'Выйти', addSpecies:'Добавить вид',

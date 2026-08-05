@@ -71,7 +71,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
 
   const { nodes, links, width, height } = useMemo(() => {
     const root = {
-      id: 'root', kind: 'root', label: 'Pokédex', e: '🌿',
+      id: 'root', kind: 'root', label: lang==='ru' ? 'Заповедник' : 'Conservatoire', e: '🌿',
       children: CATS.map((cat, ci) => {
         const catOnlyObs = obsOnly.has(cat.id)
         const subs = cat.subs.filter(sv => {
@@ -155,7 +155,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const width = root.units * (CARD_W + GAP_X) + 80
     const height = Math.max(...nodes.map(n => n.y)) + CARD_H + 70
     return { nodes, links, width, height }
-  }, [expanded, obsOnly, edit, SPECIES.length, CATS.length])
+  }, [expanded, obsOnly, edit, lang, SPECIES.length, CATS.length])
 
   const stageRef = useRef(null)
   const liveRef = useRef({ ...tf })

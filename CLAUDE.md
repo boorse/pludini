@@ -63,4 +63,4 @@ côté registrar (enregistrements DNS fournis par Vercel).
 Le site a accumulé des régressions sur les dernières itérations. Priorité :
 relancer `npm run dev`, ouvrir la console, corriger les erreurs d'exécution une
 par une jusqu'à ce que la page s'affiche, puis vérifier chaque écran
-(Pokédex, Territoire, Calendrier, Galerie, Scores).
+(Le Conservatoire, Territoire, Calendrier, Galerie, Scores).
