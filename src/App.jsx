@@ -437,6 +437,10 @@ export default function App() {
   // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
   // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
   const scrollPos = useRef({})
+  // idem pour le panneau Matrice : ouvrir une fiche espèce redéfinit le composant
+  // Explore/MatrixPane (déclarés en interne à App) à chaque re-rendu, donc le
+  // panneau est démonté/remonté et perd son scroll natif — restauré manuellement
+  const matrixScrollTop = useRef(0)
   // seuls landing ("Pludini Doc"), experience ("Pludini Host") et app ("Le
   // Pokédex") ont une URL dédiée (/doc, /, /pokedex) — ce sont les seules
   // pages qu'on partage avec un lien direct (aperçu de lien propre pour
@@ -1360,6 +1364,12 @@ export default function App() {
     // la vraie place restante sous l'en-tête, quelle que soit la taille de
     // l'écran ou celle de l'en-tête — sinon la légende du bas était rognée
     const mapWrapRef = useRef(null)
+    const matrixDivRef = useRef(null)
+    const trackMatrixScroll = e => { matrixScrollTop.current = e.currentTarget.scrollTop }
+    useEffect(() => {
+      const el = wide ? matrixDivRef.current : (mobileTab==='matrix' ? mapWrapRef.current : null)
+      if (el) el.scrollTop = matrixScrollTop.current
+    }, [])
     const [mapH, setMapH] = useState(420)
     useEffect(() => {
       if (wide) return
@@ -1381,7 +1391,8 @@ export default function App() {
               </button>
             ))}
           </div>
-          <div ref={mapWrapRef} style={{ background:T.surface, borderRadius:16, border:`1px solid ${T.line}`,
+          <div ref={mapWrapRef} onScroll={mobileTab==='matrix' ? trackMatrixScroll : undefined}
+            style={{ background:T.surface, borderRadius:16, border:`1px solid ${T.line}`,
             ...(mobileTab==='map'
               ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
@@ -1409,7 +1420,7 @@ export default function App() {
             overflow:'hidden', display:'flex', flexDirection:'column',
             transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
           <PaneHeader title={t.matrixTitle} icon="ti-layout-grid" />
-          <div style={{ flex:1, overflowY:'auto' }}>
+          <div ref={matrixDivRef} onScroll={trackMatrixScroll} style={{ flex:1, overflowY:'auto' }}>
             <MatrixPane compact={focus!=='matrix'} />
           </div>
         </div>
