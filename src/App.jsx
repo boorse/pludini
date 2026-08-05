@@ -420,6 +420,7 @@ export default function App() {
   const [refresh, setRefresh] = useState(0)
   const [mapExpanded, setMapExpanded] = useState(() => new Set())
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
+  const [mapObsOnly, setMapObsOnly] = useState(() => new Set())
 
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
   const [sighting, setSighting] = useState(null)
@@ -1396,7 +1397,7 @@ export default function App() {
             ...(mobileTab==='map'
               ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
-            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
+            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
           </div>
         </div>
       )
@@ -1412,7 +1413,7 @@ export default function App() {
             transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
           <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" />
           <div style={{ flex:1, overflow:'hidden' }}>
-            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
+            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
           </div>
         </div>
         <div onMouseEnter={()=>setFocus('matrix')} onClick={()=>setFocus('matrix')}

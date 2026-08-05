@@ -13,7 +13,7 @@ const STAGGER = [0, 46, 16, 62, 30, 74]
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
 const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
-export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, edit, onAddSpecies }) {
+export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
   // pour un geste fiable (pan/pincement/double-tap) — souris/trackpad (PC) :
@@ -27,9 +27,11 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       else n.add(id)
       return n
     })
+    // un dépli manuel quitte le mode "observées uniquement" de cette branche
+    setObsOnly(prev => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n })
   }, [])
 
-  // déplie un ordre en ne révélant que les familles contenant au moins une observation
+  // déplie un ordre en ne révélant que les familles (et espèces) observées
   const toggleObserved = useCallback((n) => {
     setExpanded(prev => {
       const next = new Set(prev)
@@ -45,7 +47,18 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       }
       return next
     })
-  }, [])
+    setObsOnly(prev => {
+      const next = new Set(prev)
+      for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
+      const willOpen = !expanded.has(n.id)
+      if (willOpen) {
+        for (const c of n.children || []) {
+          if ((c.members || []).some(isObserved)) next.add(c.id)
+        }
+      }
+      return next
+    })
+  }, [expanded])
 
   const SPECIES = allSpecies()
   const CATS = allCats()
@@ -55,15 +68,20 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       id: 'root', kind: 'root', label: 'Pokédex', e: '🌿',
       children: CATS.map((cat, ci) => ({
         id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
-        children: cat.subs.map(sv => ({
-          id: cat.id + ':' + sv.id, kind: 'fam', label: sv.id, sub: sv.lat,
-          members: SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id),
-          children: [
-            ...SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
-              .map(sp => ({ id: cat.id + ':' + sv.id + ':' + sp.id, kind: 'sp', sp, children: [] })),
-            ...(edit ? [{ id: cat.id + ':' + sv.id + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
-          ]
-        }))
+        children: cat.subs.map(sv => {
+          const famId = cat.id + ':' + sv.id
+          const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
+          const onlyObs = obsOnly.has(famId)
+          const shown = onlyObs ? members.filter(isObserved) : members
+          return {
+            id: famId, kind: 'fam', label: sv.id, sub: sv.lat,
+            members,
+            children: [
+              ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
+              ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
+            ]
+          }
+        })
       }))
     }
     // largeur en unités : les espèces d'une famille sont réparties en colonnes
@@ -124,7 +142,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const width = root.units * (CARD_W + GAP_X) + 80
     const height = Math.max(...nodes.map(n => n.y)) + CARD_H + 70
     return { nodes, links, width, height }
-  }, [expanded, edit, SPECIES.length, CATS.length])
+  }, [expanded, obsOnly, edit, SPECIES.length, CATS.length])
 
   const stageRef = useRef(null)
   const liveRef = useRef({ ...tf })
