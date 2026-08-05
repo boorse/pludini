@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { RARITY, isObserved } from './data'
 import { allSpecies, allCats } from './store.js'
 import { gradientFor, gradientForCat } from './gradients.js'
@@ -14,6 +15,10 @@ const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
+  // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
+  // pour un geste fiable (pan/pincement/double-tap) — souris/trackpad (PC) :
+  // comportement Pointer Events fait maison, inchangé
+  const [isTouch] = useState(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
 
   const toggle = useCallback((id) => {
     setExpanded(prev => {
@@ -106,6 +111,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   const stageRef = useRef(null)
   const liveRef = useRef({ ...tf })
   const [view, setView] = useState(null)
+  const touchApiRef = useRef(null)   // API impérative de react-zoom-pan-pinch (tactile uniquement)
 
   const computeView = useCallback(() => {
     const el = wrapRef.current; if (!el) return
@@ -128,15 +134,18 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const vw = el.clientWidth, vh = el.clientHeight
     const k = Math.max(0.3, Math.min(1, Math.min((vw - 40) / width, (vh - 40) / height)))
     const next = { x: (vw - width * k) / 2, y: 14, k }
-    liveRef.current = next; applyLive(); setTf(next)
-  }, [width, height, setTf])
+    liveRef.current = next
+    if (isTouch && touchApiRef.current) touchApiRef.current.setTransform(next.x, next.y, next.k, 0)
+    else applyLive()
+    setTf(next)
+  }, [width, height, setTf, isTouch])
 
   useEffect(() => {
     if (tf.k === 1 && tf.x === 0 && tf.y === 0) fit()
     else computeView()
   }, [fit, width, height])
 
-  // ── Pointer Events : un seul chemin pour souris, stylet et doigts ──
+  // ── Pointer Events (PC/souris) : un seul chemin pour souris et stylet — inchangé ──
   const ptrs = useRef(new Map())
   const gest = useRef(null)
 
@@ -210,21 +219,47 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   }, [setTf])
 
   useEffect(() => {
+    if (isTouch) return   // pas de molette sur tactile ; le pincement est géré par la bibliothèque
     const el = wrapRef.current; if (!el) return
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [onWheel])
+  }, [onWheel, isTouch])
+
+  // ── Tactile (téléphone) : react-zoom-pan-pinch gère pan + pincement + double-tap ──
+  const onTouchTransform = useCallback((_ref, state) => {
+    const prev = liveRef.current
+    // même garde-fou que côté PC (G.moved) : seul un déplacement réel bloque le
+    // tap suivant — onPanningStart seul se déclenche aussi sur un simple tap
+    if (Math.abs(state.positionX - prev.x) > 3 || Math.abs(state.positionY - prev.y) > 3 || state.scale !== prev.k) {
+      G.moved = true
+    }
+    liveRef.current = { x: state.positionX, y: state.positionY, k: state.scale }
+    computeView()
+    clearTimeout(onTouchTransform._t)
+    onTouchTransform._t = setTimeout(() => setTf({ ...liveRef.current }), 140)
+  }, [computeView, setTf])
+  const touchGestureStop = useCallback(() => { setTimeout(() => { G.moved = false }, 0) }, [])
 
   const zoomBy = (f) => {
     const el = wrapRef.current; if (!el) return
     const cx2 = el.clientWidth/2, cy2 = el.clientHeight/2
     const cur = liveRef.current
     const k2 = Math.min(2.6, Math.max(0.22, cur.k * f)), r = k2/cur.k
-    liveRef.current = { k:k2, x: cx2-(cx2-cur.x)*r, y: cy2-(cy2-cur.y)*r }
-    applyLive(); setTf({ ...liveRef.current })
+    const next = { k:k2, x: cx2-(cx2-cur.x)*r, y: cy2-(cy2-cur.y)*r }
+    liveRef.current = next
+    if (isTouch && touchApiRef.current) touchApiRef.current.setTransform(next.x, next.y, next.k, 180)
+    else applyLive()
+    setTf(next)
   }
 
   const gridStep = 34
+  const gridBg = {
+    backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
+    backgroundSize:`${gridStep*tf.k}px ${gridStep*tf.k}px`,
+    backgroundPosition:`${tf.x}px ${tf.y}px`,
+    backgroundColor:'#E3DAC5',
+  }
+
   return (
     <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
       <div style={{ position:'absolute', top:9, right:10, zIndex:5, display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
@@ -238,25 +273,43 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         ))}
       </div>
 
-      <div ref={wrapRef}
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
-        onPointerCancel={onUp} onPointerLeave={onUp} onLostPointerCapture={onUp}
-        onDragStart={e=>e.preventDefault()}
-        style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative',
-          cursor:'grab', touchAction:'none', userSelect:'none', WebkitUserSelect:'none',
-          backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
-          backgroundSize:`${gridStep*tf.k}px ${gridStep*tf.k}px`,
-          backgroundPosition:`${tf.x}px ${tf.y}px`,
-          backgroundColor:'#E3DAC5' }}>
-        <div ref={stageRef} style={{ position:'absolute', transformOrigin:'0 0',
-          transform:`translate3d(${tf.x}px,${tf.y}px,0) scale(${tf.k})`, willChange:'transform' }}>
-          <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
-            view={view}
-            expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
-            onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
-            onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+      {isTouch ? (
+        <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
+          <TransformWrapper ref={touchApiRef}
+            initialScale={tf.k} initialPositionX={tf.x} initialPositionY={tf.y}
+            minScale={0.22} maxScale={2.6} limitToBounds={false} centerOnInit={false}
+            doubleClick={{ step: 0.7 }}
+            onTransform={onTouchTransform}
+            onPanningStop={touchGestureStop} onPinchStop={touchGestureStop}>
+            <TransformComponent wrapperStyle={{ width:'100%', height:'100%', cursor:'grab', ...gridBg }}>
+              <div style={{ width, height, position:'relative' }}>
+                <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
+                  view={view}
+                  expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+                  onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
+                  onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+              </div>
+            </TransformComponent>
+          </TransformWrapper>
         </div>
-      </div>
+      ) : (
+        <div ref={wrapRef}
+          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+          onPointerCancel={onUp} onPointerLeave={onUp} onLostPointerCapture={onUp}
+          onDragStart={e=>e.preventDefault()}
+          style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative',
+            cursor:'grab', touchAction:'none', userSelect:'none', WebkitUserSelect:'none',
+            ...gridBg }}>
+          <div ref={stageRef} style={{ position:'absolute', transformOrigin:'0 0',
+            transform:`translate3d(${tf.x}px,${tf.y}px,0) scale(${tf.k})`, willChange:'transform' }}>
+            <Stage nodes={nodes} links={links} width={width} height={height} lang={lang}
+              view={view}
+              expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
+              onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
+              onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+          </div>
+        </div>
+      )}
 
       <div style={{ display:'flex', gap:12, flexWrap:'wrap', padding:'8px 14px', borderTop:'1px solid #D3C7AE', fontSize:10.5, color:'#6B6357', background:'#E3DAC5', alignItems:'center' }}>
         {Object.entries(RARITY).map(([k,r])=>(
@@ -267,9 +320,9 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         <span style={{ display:'flex', alignItems:'center', gap:4, opacity:.65 }}>
           <span style={{ width:9, height:9, borderRadius:2, background:'#CFC3A8' }} />Non observée
         </span>
-        <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>
-        <span style={{ width:'100%', color:'#9A9081' }}>
-          {lang==='ru'?'Двумя пальцами — перемещение и масштабирование':'Utilisez deux doigts pour vous déplacer et zoomer'}
+        {!isTouch && <span style={{ marginLeft:'auto', color:'#9A9081' }}>Clique pour déployer · molette pour zoomer</span>}
+        <span style={{ width: isTouch ? undefined : '100%', marginLeft: isTouch ? 'auto' : undefined, color:'#9A9081' }}>
+          {lang==='ru'?'Двумя пальцами — перемещение и масштабирование':'Deux doigts pour déplacer et zoomer'}
         </span>
       </div>
     </div>
