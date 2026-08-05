@@ -240,18 +240,6 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   }, [computeView, setTf])
   const touchGestureStop = useCallback(() => { setTimeout(() => { G.moved = false }, 0) }, [])
 
-  const zoomBy = (f) => {
-    const el = wrapRef.current; if (!el) return
-    const cx2 = el.clientWidth/2, cy2 = el.clientHeight/2
-    const cur = liveRef.current
-    const k2 = Math.min(2.6, Math.max(0.22, cur.k * f)), r = k2/cur.k
-    const next = { k:k2, x: cx2-(cx2-cur.x)*r, y: cy2-(cy2-cur.y)*r }
-    liveRef.current = next
-    if (isTouch && touchApiRef.current) touchApiRef.current.setTransform(next.x, next.y, next.k, 180)
-    else applyLive()
-    setTf(next)
-  }
-
   const gridStep = 34
   const gridBg = {
     backgroundImage:`linear-gradient(rgba(190,178,152,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(190,178,152,.3) 1px, transparent 1px)`,
@@ -266,13 +254,6 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
         <button onClick={fit} style={btn}>Recentrer</button>
       </div>
-      <div style={{ position:'absolute', bottom:52, right:10, zIndex:5, display:'flex', flexDirection:'column', gap:5 }}>
-        {[['+',1.28],['−',0.78]].map(([l,f])=>(
-          <button key={l} onClick={()=>zoomBy(f)} style={{ ...btn, width:34, height:34, padding:0,
-            fontSize:18, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center' }}>{l}</button>
-        ))}
-      </div>
-
       {isTouch ? (
         <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
           <TransformWrapper ref={touchApiRef}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
@@ -1371,7 +1371,7 @@ export default function App() {
       if (el) el.scrollTop = matrixScrollTop.current
     }, [])
     const [mapH, setMapH] = useState(420)
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (wide) return
       const el = mapWrapRef.current
       if (!el) return
