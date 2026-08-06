@@ -942,7 +942,7 @@ export default function App() {
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
                               <div style={{ position:'relative', height:'100%', minHeight:92, display:'flex',
                                 flexDirection:'column', justifyContent:'flex-end', padding:9 }}>
-                                <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#F2EEE2', lineHeight:1.1 }}>{ind.displayName}</div>
+                                {isNamed && <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#F2EEE2', lineHeight:1.1 }}>{ind.displayName}</div>}
                                 <div style={{ fontSize:9.5, color:'rgba(242,238,226,.72)', marginTop:2 }}>{ind.d}</div>
                               </div>
                             </button>
