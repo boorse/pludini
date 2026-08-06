@@ -629,7 +629,7 @@ export default function App() {
                               {best ? (
                                 mine.length>0 ? (
                                   <span style={{ display:'flex', gap:3, flexWrap:'wrap', justifyContent:'center' }}>
-                                    {mine.map((ind,i)=>(
+                                    {mine.slice(0,2).map((ind,i)=>(
                                       <span key={i} style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                                         <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named}
                                           label={`${ind.displayName} — ${METHODS[best].l}`} />
@@ -638,6 +638,14 @@ export default function App() {
                                           wordBreak:'break-word', textAlign:'center', lineHeight:1.25 }}>{ind.displayName}</span>
                                       </span>
                                     ))}
+                                    {mine.length>2 && (
+                                      <span title={`+${mine.length-2} ${lang==='ru'?'ещё':'de plus'}`}
+                                        style={{ display:'inline-flex', alignItems:'center', justifyContent:'center',
+                                        width:38, height:30, borderRadius:6, border:`1px solid ${T.line}`,
+                                        background:T.card, fontSize:11, fontWeight:700, color:T.soft, flexShrink:0 }}>
+                                        +{mine.length-2}
+                                      </span>
+                                    )}
                                   </span>
                                 ) : <SpeciesCell spId={s.id} method={best} label={`${pl.name} — ${METHODS[best].l}`} />
                               ) : <span style={{ color:T.line, fontSize:13 }}>·</span>}
