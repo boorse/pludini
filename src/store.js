@@ -122,6 +122,16 @@ export async function removePhotosFor(target) {
   const list = S.photos[target] || []
   await Promise.all(list.map(p => removePhoto(target, p.id, p.path)))
 }
+// déplace toutes les photos d'une cible vers une autre — utilisé pour fusionner
+// plusieurs passages caméra en un seul individu reconnu, sans perdre les photos
+export async function movePhotos(oldTarget, newTarget) {
+  const list = S.photos[oldTarget] || []
+  if (!list.length) return
+  await Promise.all(list.map(p => sb.from('photos').update({ target: newTarget }).eq('id', p.id)))
+  S.photos[newTarget] = [...(S.photos[newTarget] || []), ...list]
+  delete S.photos[oldTarget]
+  notify()
+}
 // écrit l'aperçu tout de suite (réactif), mais différe l'envoi réseau : sans
 // ça, cliquer plusieurs fois de suite pour affiner le point envoie une
 // requête par clic, et rien ne garantit que la dernière arrivée au serveur
@@ -171,6 +181,28 @@ export async function demote(spId, obsName) {
   const key = `${spId}::${obsName}`
   delete S.named[key]; notify()
   await sb.from('overrides').delete().eq('key', key)
+}
+function parseFrDateTime(d, time) {
+  const [dd, mm, yyyy] = (d || '').split('/').map(Number)
+  const [hh, mi] = (time || '00:00').split(':').map(Number)
+  return new Date(yyyy || 0, (mm || 1) - 1, dd || 1, hh || 0, mi || 0).getTime()
+}
+// regroupe plusieurs passages (même espèce) en un seul individu reconnu : toutes
+// les photos rejoignent le passage le plus ancien (conservé comme clé), les
+// autres passages sont supprimés, et le nombre fusionné est mémorisé pour
+// l'affichage ("×N") sans multiplier les vignettes
+export async function mergeAsIndividual(spId, indNames, name, traits = '') {
+  const sp = allSpecies().find(s => s.id === spId)
+  if (!sp) return
+  const inds = indNames.map(n => (sp.inds || []).find(i => i.n === n)).filter(Boolean)
+  if (!inds.length) return
+  const sorted = [...inds].sort((a, b) => parseFrDateTime(a.d, a.time) - parseFrDateTime(b.d, b.time))
+  const keep = sorted[0]
+  const rest = sorted.slice(1)
+  for (const r of rest) await movePhotos(`ind:${spId}:${r.n}`, `ind:${spId}:${keep.n}`)
+  if (sorted.length > 1) await editSighting(spId, keep.n, { mergedCount: sorted.length, mergedDates: sorted.map(i => i.d) })
+  for (const r of rest) await removeSighting(spId, r.n)
+  await promote(spId, keep.n, name, traits)
 }
 export function splitInds(sp) {
   const all = (sp.inds || []).map(ind => {

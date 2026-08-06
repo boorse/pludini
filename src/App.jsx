@@ -7,7 +7,7 @@ import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
 import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
-import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote,
+import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
          removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
@@ -416,6 +416,8 @@ export default function App() {
   const [scoreCat, setScoreCat] = useState('all')  // filtre règne dans la fiche score
   const [photoTarget, setPhotoTarget] = useState(null) // {target,label}
   const [promoting, setPromoting] = useState(null)   // {sp, ind}
+  const [merging, setMerging] = useState(null)        // {spId, selected:Set<string>} — mode multi-sélection des passages
+  const [mergeSheet, setMergeSheet] = useState(null)  // {sp, indNames} — fenêtre de nommage après sélection
   const [confirmDelSighting, setConfirmDelSighting] = useState(null) // {sp, ind}
   const [confirmClearObs, setConfirmClearObs] = useState(null) // {sp, player}
   const [refresh, setRefresh] = useState(0)
@@ -923,6 +925,13 @@ export default function App() {
                 )
               })() : sp.inds.length>0 && (() => {
                 const { named, sightings } = splitInds(sp)
+                const selectMode = merging?.spId === sp.id
+                const selected = merging?.selected || new Set()
+                const toggleSelect = (n) => setMerging(m => {
+                  const next = new Set(m.selected)
+                  next.has(n) ? next.delete(n) : next.add(n)
+                  return { ...m, selected: next }
+                })
                 const Col = ({ title, icon, list, isNamed }) => (
                   <div>
                     <div style={{ fontSize:10.5, fontWeight:700, color: isNamed?'#A07C28':T.mute, textTransform:'uppercase',
@@ -930,6 +939,15 @@ export default function App() {
                       paddingBottom:5, borderBottom: isNamed?'1.5px solid #C9A046':`1px solid ${T.line}` }}>
                       <i className={`ti ${icon}`} style={{ fontSize:13 }} aria-hidden="true" />
                       {title} ({list.length})
+                      {edit && !isNamed && list.length>1 && (
+                        <button onClick={()=>setMerging(selectMode ? null : { spId:sp.id, selected:new Set() })}
+                          style={{ marginLeft:'auto', fontSize:9.5, fontWeight:600, padding:'3px 8px', borderRadius:10,
+                            border:`1px solid ${selectMode?'#B5602F':T.line}`, background:selectMode?'#B5602F':'transparent',
+                            color:selectMode?'#fff':T.mute, textTransform:'none', letterSpacing:0 }}>
+                          {selectMode ? (lang==='ru'?'Отмена':'Annuler')
+                            : (lang==='ru'?'Выбрать':'Sélectionner')}
+                        </button>
+                      )}
                     </div>
                     {list.length===0
                       ? <div style={{ fontSize:11.5, color:T.mute, padding:'8px 0', fontStyle:'italic' }}>
@@ -937,32 +955,64 @@ export default function App() {
                                    : (lang==='ru'?'Нет наблюдений':'Aucune observation')}
                         </div>
                       : <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?118:104}px,1fr))`, gap:8 }}>
-                          {list.map((ind,i)=>(
-                            <button key={i} onClick={()=>setCurInd(ind)} style={{ textAlign:'left', borderRadius:12,
+                          {list.map((ind,i)=>{
+                            const isSel = !isNamed && selectMode && selected.has(ind.n)
+                            return (
+                            <button key={i} onClick={()=> (!isNamed && selectMode) ? toggleSelect(ind.n) : setCurInd(ind)}
+                              style={{ textAlign:'left', borderRadius:12,
                               overflow:'hidden', padding:0, position:'relative', minHeight: isNamed?100:92,
-                              border: isNamed?'2px solid #C9A046':`1px solid ${T.line}`,
-                              boxShadow: isNamed?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)':'none' }}>
+                              border: isSel?'2px solid #B5602F':isNamed?'2px solid #C9A046':`1px solid ${T.line}`,
+                              boxShadow: isSel?'0 0 0 1px rgba(181,96,47,.3), 0 3px 12px rgba(181,96,47,.25)'
+                                :isNamed?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)':'none' }}>
                               <PhotoBg target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
                               <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
                               {isNamed && <span style={{ position:'absolute', top:6, left:6, background:'#C9A046',
                                 color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
                                 letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
+                              {isNamed && ind.mergedCount>1 && <span style={{ position:'absolute', top:6, right:6,
+                                background:'rgba(20,18,14,.72)', color:'#fff', borderRadius:8, padding:'2px 7px',
+                                fontSize:8.5, fontWeight:800, zIndex:2 }}>×{ind.mergedCount}</span>}
+                              {!isNamed && selectMode && <span style={{ position:'absolute', top:6, right:6, width:18, height:18,
+                                borderRadius:'50%', border:'1.5px solid #fff', background:isSel?'#B5602F':'rgba(20,18,14,.4)',
+                                display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}>
+                                {isSel && <i className="ti ti-check" style={{ fontSize:11, color:'#fff' }} aria-hidden="true" />}
+                              </span>}
                               <div style={{ position:'relative', height:'100%', minHeight:92, display:'flex',
                                 flexDirection:'column', justifyContent:'flex-end', padding:9 }}>
                                 {isNamed && <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#F2EEE2', lineHeight:1.1 }}>{ind.displayName}</div>}
                                 <div style={{ fontSize:9.5, color:'rgba(242,238,226,.72)', marginTop:2 }}>{ind.d}</div>
                               </div>
                             </button>
-                          ))}
+                          )})}
                         </div>}
                   </div>
                 )
                 const showFamiliers = speciesType(sp)!==3
                 return (
-                  <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16 }}>
-                    <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
-                    {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
+                  <div>
+                    <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16 }}>
+                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
+                      {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
+                    </div>
+                    {selectMode && (
+                      <div style={{ position:'sticky', bottom:0, marginTop:12, padding:'10px 12px', borderRadius:12,
+                        background:'#2B2620', display:'flex', alignItems:'center', gap:10, boxShadow:'0 4px 16px rgba(0,0,0,.25)' }}>
+                        <span style={{ fontSize:12, color:'#EDE7D8', fontWeight:600 }}>
+                          {selected.size} {lang==='ru'?'выбрано':'sélectionné'}{selected.size>1 && lang!=='ru' ?'s':''}
+                        </span>
+                        <button onClick={()=>setMerging(null)} style={{ marginLeft:'auto', fontSize:12, padding:'7px 12px',
+                          borderRadius:9, color:'#C3B9A6' }}>{lang==='ru'?'Отмена':'Annuler'}</button>
+                        <button disabled={selected.size===0}
+                          onClick={()=>setMergeSheet({ sp, indNames:[...selected] })}
+                          className="serif" style={{ fontSize:12.5, fontWeight:700, padding:'8px 14px', borderRadius:9,
+                            background: selected.size===0?'#5A5245':'#B5602F', color:'#fff',
+                            opacity: selected.size===0?.6:1 }}>
+                          <i className="ti ti-star" style={{ fontSize:13, marginRight:5 }} aria-hidden="true" />
+                          {lang==='ru'?'Опознать как один':(selected.size>1?'Regrouper en individu':'Reconnaître')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })()}
@@ -1112,6 +1162,16 @@ export default function App() {
                   {lang==='ru'?'Приметы':'Signes distinctifs'}
                 </div>
                 <div style={{ fontSize:12.5, color:'#6B5330', lineHeight:1.6 }}>{ind.traits}</div>
+              </div>
+            )}
+            {ind.mergedCount>1 && (
+              <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:12, marginBottom:9 }}>
+                <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
+                  letterSpacing:'.5px', marginBottom:5, display:'flex', alignItems:'center', gap:5 }}>
+                  <i className="ti ti-copy" style={{ fontSize:12 }} aria-hidden="true" />
+                  {lang==='ru'?`${ind.mergedCount} прохода объединены`:`${ind.mergedCount} passages regroupés`}
+                </div>
+                <div style={{ fontSize:11.5, color:T.soft, lineHeight:1.6 }}>{(ind.mergedDates||[]).join(' · ')}</div>
               </div>
             )}
             {edit && !ind.named && speciesType(sp)!==3 && (
@@ -1513,6 +1573,9 @@ export default function App() {
       {curPlayer && <ScoreSheet />}
       {promoting && <PromoteSheet sp={promoting.sp} ind={promoting.ind} lang={lang} wide={wide}
         onClose={()=>setPromoting(null)} onDone={()=>{ setPromoting(null); setRefresh(r=>r+1) }} />}
+      {mergeSheet && <MergeSheet sp={mergeSheet.sp} indNames={mergeSheet.indNames} lang={lang} wide={wide}
+        onClose={()=>setMergeSheet(null)}
+        onDone={()=>{ setMergeSheet(null); setMerging(null); setRefresh(r=>r+1) }} />}
       {confirmDelSighting && <ConfirmDialog lang={lang}
         title={lang==='ru'?'Удалить это наблюдение?':'Supprimer cette observation ?'}
         message={lang==='ru'?'Это действие необратимо.':'Cette action est irréversible.'}
@@ -1682,6 +1745,68 @@ function PromoteSheet({ sp, ind, lang, wide, onClose, onDone }) {
             className="serif" style={{ flex:1.4, padding:'10px', borderRadius:10, background:'#B5602F',
               color:'#fff', fontSize:13.5, fontWeight:700 }}>
             {lang==='ru'?'Опознать':'Reconnaître'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// fusionne plusieurs passages sélectionnés en un seul individu reconnu —
+// toutes leurs photos rejoignent le passage conservé (le plus ancien)
+function MergeSheet({ sp, indNames, lang, wide, onClose, onDone }) {
+  const [name, setName] = useState('')
+  const [traits, setTraits] = useState('')
+  const [busy, setBusy] = useState(false)
+  const n = indNames.length
+  return (
+    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.62)', zIndex:130,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:'#EDE7D8', borderRadius:18, padding:22,
+        width:'100%', maxWidth:400, border:'1px solid #D3C7AE' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+          <span style={{ fontSize:20 }}>⭐</span>
+          <div className="serif" style={{ fontSize:18, fontWeight:900, color:'#2B2620' }}>
+            {lang==='ru'?'Опознать особь':(n>1?'Regrouper en individu':'Reconnaître un individu')}
+          </div>
+        </div>
+        <div style={{ fontSize:12, color:'#6B6357', lineHeight:1.55, marginBottom:14 }}>
+          {n>1
+            ? (lang==='ru'
+              ? `Ces ${n} наблюдения объединятся en un seul individu récurrent — toutes leurs photos seront rassemblées.`
+              : `Ces ${n} passages deviendront un seul individu récurrent — toutes leurs photos seront rassemblées sous cette fiche.`)
+            : (lang==='ru'
+              ? 'Если вы узнаёте это животное по приметам — дайте ему имя.'
+              : "Si tu reconnais cet animal à des signes distinctifs, donne-lui un nom.")}
+        </div>
+        <label style={{ fontSize:11, color:'#9A9081', display:'block', marginBottom:4 }}>
+          {lang==='ru'?'Имя':'Nom'}
+        </label>
+        <input value={name} onChange={e=>setName(e.target.value)} autoFocus
+          placeholder={lang==='ru'?'ex. Барсук со шрамом':'ex. Le blaireau à l\'oreille fendue'}
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #D3C7AE',
+            background:'#E6DDC8', fontSize:14, color:'#2B2620', marginBottom:11 }} />
+        <label style={{ fontSize:11, color:'#9A9081', display:'block', marginBottom:4 }}>
+          {lang==='ru'?'Приметы':'Signes distinctifs'}
+        </label>
+        <textarea value={traits} onChange={e=>setTraits(e.target.value)} rows={3}
+          placeholder={lang==='ru'?'Шрам, окрас, размер…':'Cicatrice, tache, taille des bois…'}
+          style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid #D3C7AE',
+            background:'#E6DDC8', fontSize:12.5, color:'#2B2620', marginBottom:14, resize:'vertical' }} />
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={onClose} style={{ flex:1, padding:'10px', borderRadius:10,
+            border:'1px solid #D3C7AE', color:'#6B6357', fontSize:13 }}>
+            {lang==='ru'?'Отмена':'Annuler'}
+          </button>
+          <button disabled={busy} onClick={async()=>{
+              if (!name.trim()) return
+              setBusy(true)
+              await mergeAsIndividual(sp.id, indNames, name.trim(), traits.trim())
+              onDone()
+            }}
+            className="serif" style={{ flex:1.4, padding:'10px', borderRadius:10, background:'#B5602F',
+              color:'#fff', fontSize:13.5, fontWeight:700, opacity:busy?.6:1 }}>
+            {busy ? (lang==='ru'?'…':'…') : (lang==='ru'?'Опознать':'Reconnaître')}
           </button>
         </div>
       </div>
