@@ -43,6 +43,7 @@ export const CATS = [
       { id:'Tétraonidés', lat:'Tetraonidae' }, { id:'Paridés', lat:'Paridae' },
       { id:'Muscicapidés', lat:'Muscicapidae' }, { id:'Alcédinidés', lat:'Alcedinidae' },
       { id:'Anatidés', lat:'Anatidae' }, { id:'Fringillidés', lat:'Fringillidae' },
+      { id:'Columbidés', lat:'Columbidae' },
   ]},
   { id:'arbres', e:'🌳', n:'Arbres', lat:'Arbores', subs:[
       { id:'Fagacées', lat:'Fagaceae' }, { id:'Bétulacées', lat:'Betulaceae' },
@@ -226,6 +227,10 @@ export const SPECIES = [
     obs:{}, bonus:{}, inds:[],
     alim:'Graines, insectes en période de nidification.',
     hab:'Forêts, lisières, jardins. Chant vif et répétitif.', dng:'Aucun.' },
+  { id:'pigeon_ramier', n:'Pigeon ramier', lat:'Columba palumbus', e:'🐦', cat:'oiseaux', sub:'Columbidés', r:'commun', sz:'s',
+    obs:{}, bonus:{}, inds:[],
+    alim:'Graines, bourgeons, feuilles, glands.',
+    hab:'Forêts, lisières, sol dégagé. Vol bruyant au décollage.', dng:'Aucun.' },
 
   { id:'chene', n:'Chêne pédonculé', lat:'Quercus robur', e:'🌳', cat:'arbres', sub:'Fagacées', r:'commun', sz:'xl',
     obs:{}, bonus:{}, inds:[],
