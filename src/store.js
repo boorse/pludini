@@ -294,20 +294,36 @@ export function individualCovers(sp) {
     return photos.length ? { ind: ind.n, displayName: ov ? ov.name : ind.n, photo: photos[0] } : null
   }).filter(Boolean)
 }
-// toutes les photos de l'espèce (tous individus confondus) — sert au carrousel de la fiche espèce
+// toutes les photos de l'espèce (tous individus confondus) — sert au carrousel de la fiche espèce ;
+// la vignette choisie (sp.cover) passe en tête, comme photosFor() le fait déjà pour la vignette
+// choisie au sein d'un même individu — sinon elle n'apparaissait qu'au hasard de l'ordre des passages
 export function speciesPhotos(sp) {
-  return (sp.inds || []).flatMap(ind => {
+  const all = (sp.inds || []).flatMap(ind => {
     const ov = S.named[`${sp.id}::${ind.n}`]
     return photosFor(`ind:${sp.id}:${ind.n}`).map(photo => ({ ind: ind.n, displayName: ov ? ov.name : ind.n, photo }))
   })
+  // on ne recale que sur l'individu choisi, jamais sur un photoId précis : sinon
+  // choisir une autre photo préférée pour cet individu (étoile dans la fiche
+  // observation) invalidait silencieusement le choix fait ici, et l'espèce
+  // retombait sur le premier individu de la liste sans prévenir
+  const chosen = sp.cover
+  if (chosen) {
+    const idx = all.findIndex(s => s.ind === chosen.ind)
+    if (idx > 0) {
+      const [pick] = all.splice(idx, 1)
+      all.unshift(pick)
+    }
+  }
+  return all
 }
-// la vignette choisie manuellement (réglages), sinon la première photo d'individu disponible
+// la vignette choisie manuellement (réglages), sinon la première photo d'individu disponible —
+// ne recale que sur l'individu choisi (voir speciesPhotos ci-dessus pour le pourquoi)
 export function coverPhoto(sp) {
   const covers = individualCovers(sp)
   if (!covers.length) return null
   const chosen = sp.cover
   if (chosen) {
-    const found = covers.find(c => c.ind === chosen.ind && c.photo.id === chosen.photoId)
+    const found = covers.find(c => c.ind === chosen.ind)
     if (found) return found.photo
   }
   return covers[0].photo

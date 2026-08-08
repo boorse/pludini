@@ -15,9 +15,10 @@ const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
 // chemin de la miniature déduit du chemin principal
 export const thumbOf = (path) => path ? path.replace(/\.jpg$/, '_t.jpg') : path
 
-// zoom de vignette : un scale() centré sur le même point focal que object-position,
-// donc se compose avec object-fit:cover sans le casser — à n'utiliser que sur les
-// affichages en vignette (jamais sur les bannières / le plein écran)
+// cadrage choisi pour une photo : un scale() centré sur le même point focal que
+// object-position, donc se compose avec object-fit:cover sans le casser — utilisé
+// sur les vignettes ET les bannières (jamais sur le Lightbox plein écran, qui
+// montre volontairement la photo d'origine non recadrée)
 export function thumbZoomStyle(photo) {
   const zoom = photo?.zoom || 1
   if (zoom <= 1.001) return {}
@@ -179,7 +180,8 @@ export function PhotoHero({ target, fallback }) {
         background: cover ? '#1E2418' : fallback, cursor: cover ? 'zoom-in' : 'default' }}>
         {cover && (
           <img src={cover.url} alt="" loading="lazy" decoding="async" draggable={false}
-            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block' }} />
+            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block',
+              ...thumbZoomStyle(cover) }} />
         )}
       </div>
       {many && <>
@@ -208,7 +210,8 @@ export function PhotoHeroSpecies({ sp, fallback }) {
         background: current ? '#1E2418' : fallback, cursor: current ? 'zoom-in' : 'default' }}>
         {current && (
           <img src={current.photo.url} alt="" loading="lazy" decoding="async" draggable={false}
-            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:current.photo.pos||'50% 50%', filter:LUT, display:'block' }} />
+            style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:current.photo.pos||'50% 50%', filter:LUT, display:'block',
+              ...thumbZoomStyle(current.photo) }} />
         )}
       </div>
       {current && (
@@ -526,52 +529,52 @@ export function PhotoCropPicker({ target, photo, lang, onClose }) {
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.7)', zIndex:150,
       display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:16, padding:16,
-        maxWidth:420, width:'100%', border:`1px solid ${T.line}` }}>
-        <div className="serif" style={{ fontSize:15, fontWeight:700, color:T.ink, marginBottom:5 }}>
-          {lang==='ru'?'Кадрирование миниатюры':'Cadrage de la vignette'}
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:22,
+        maxWidth:860, width:'100%', maxHeight:'92vh', overflowY:'auto', border:`1px solid ${T.line}` }}>
+        <div className="serif" style={{ fontSize:19, fontWeight:700, color:T.ink, marginBottom:6 }}>
+          {lang==='ru'?'Кадрирование фото':'Cadrage de la photo'}
         </div>
-        <div style={{ fontSize:12, color:T.soft, marginBottom:10, lineHeight:1.5 }}>
+        <div style={{ fontSize:13, color:T.soft, marginBottom:14, lineHeight:1.5, maxWidth:560 }}>
           {lang==='ru'
-            ? 'Нажмите на животное, затем настройте масштаб рамки. Миниатюры будут обрезаны по ней — фото в полном размере не меняется.'
-            : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : les vignettes seront recadrées dessus. La photo en pleine résolution ne change jamais.'}
+            ? 'Нажмите на животное, затем настройте масштаб рамки. Применяется к миниатюрам и к баннеру в шапке страницы — оригинал фото (при полном просмотре) не меняется.'
+            : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : ce cadrage s’applique aux vignettes et à la bannière en haut de la fiche. La photo d’origine (en plein écran) ne change jamais.'}
         </div>
-        <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'4/3',
-          borderRadius:10, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
+        <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'16/10',
+          maxHeight:'56vh', margin:'0 auto', borderRadius:12, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
           <img src={photo.url} alt="" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'contain', filter:LUT, display:'block' }} />
           <div style={{ position:'absolute', left:`${px}%`, top:`${py}%`, transform:'translate(-50%,-50%)',
-            width:`${frameSize}%`, height:`${frameSize}%`, border:'2px solid #fff', borderRadius:4,
+            width:`${frameSize}%`, height:`${frameSize}%`, border:'2.5px solid #fff', borderRadius:4,
             boxShadow:'0 0 0 1.5px rgba(0,0,0,.45), 0 0 0 2000px rgba(14,16,10,.55)',
             pointerEvents:'none', transition:'width .12s, height .12s' }} />
         </div>
-        <label style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
-          <i className="ti ti-zoom-in" style={{ fontSize:16, color:T.mute, flexShrink:0 }} aria-hidden="true" />
-          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={onZoom} style={{ flex:1 }} />
-          <span style={{ fontSize:11.5, color:T.soft, width:34, textAlign:'right', flexShrink:0 }}>×{zoom.toFixed(1)}</span>
+        <label style={{ display:'flex', alignItems:'center', gap:12, marginTop:18, maxWidth:520 }}>
+          <i className="ti ti-zoom-in" style={{ fontSize:19, color:T.mute, flexShrink:0 }} aria-hidden="true" />
+          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={onZoom} style={{ flex:1, height:22 }} />
+          <span style={{ fontSize:13, color:T.soft, width:38, textAlign:'right', flexShrink:0, fontWeight:600 }}>×{zoom.toFixed(1)}</span>
         </label>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12 }}>
-          <div style={{ width:54, height:54, borderRadius:10, overflow:'hidden', border:`1px solid ${T.line}`, flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14, marginTop:16 }}>
+          <div style={{ width:88, height:88, borderRadius:12, overflow:'hidden', border:`1px solid ${T.line}`, flexShrink:0 }}>
             <img src={photo.thumbUrl||photo.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
               objectPosition:pos, transform: zoom>1.001?`scale(${zoom})`:undefined, transformOrigin:pos, display:'block' }} />
           </div>
-          <div style={{ fontSize:11, color:T.mute, lineHeight:1.4 }}>
+          <div style={{ fontSize:12.5, color:T.mute, lineHeight:1.4 }}>
             {lang==='ru'?'Так будет выглядеть миниатюра':'Aperçu de la vignette'}
           </div>
         </div>
-        {err && <div style={{ fontSize:11.5, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
-          borderRadius:9, padding:'7px 10px', marginTop:10 }}>{err}</div>}
-        <div style={{ display:'flex', gap:8, marginTop:14 }}>
-          <label style={{ flex:1, textAlign:'center', padding:'9px', borderRadius:10, border:`1px dashed ${T.line}`,
-            color:T.soft, fontSize:12.5, fontWeight:600, cursor: busy?'default':'pointer', opacity:busy?.6:1,
-            display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
-            <i className="ti ti-replace" style={{ fontSize:14 }} aria-hidden="true" />
+        {err && <div style={{ fontSize:12.5, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
+          borderRadius:10, padding:'8px 12px', marginTop:12 }}>{err}</div>}
+        <div style={{ display:'flex', gap:10, marginTop:18, maxWidth:420 }}>
+          <label style={{ flex:1, textAlign:'center', padding:'11px', borderRadius:11, border:`1px dashed ${T.line}`,
+            color:T.soft, fontSize:13, fontWeight:600, cursor: busy?'default':'pointer', opacity:busy?.6:1,
+            display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            <i className="ti ti-replace" style={{ fontSize:15 }} aria-hidden="true" />
             {busy ? (lang==='ru'?'Замена…':'Remplacement…') : (lang==='ru'?'Заменить фото':'Remplacer la photo')}
             <input type="file" accept="image/*" hidden disabled={busy}
               onChange={e=>{ const f=e.target.files[0]; if(f) replace(f); e.target.value='' }} />
           </label>
-          <button onClick={onClose} className="serif" style={{ flex:1, padding:'9px',
-            borderRadius:10, background:T.clay, color:'#fff', fontWeight:600, fontSize:13 }}>
+          <button onClick={onClose} className="serif" style={{ flex:1, padding:'11px',
+            borderRadius:11, background:T.clay, color:'#fff', fontWeight:600, fontSize:14 }}>
             {lang==='ru'?'Готово':'Terminé'}
           </button>
         </div>
