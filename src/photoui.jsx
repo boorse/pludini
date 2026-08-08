@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import { sb } from './supabase.js'
-import { photosFor, addPhotoRec, removePhoto, setPhotoPos, flushPhotoPos, subscribe, allPlayers, getMe, coverPhoto, speciesPhotos,
-         coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
+import { photosFor, addPhotoRec, removePhoto, setPhotoPos, flushPhotoPos, setPhotoZoom, flushPhotoZoom, replacePhotoImage,
+         subscribe, allPlayers, getMe, coverPhoto, speciesPhotos, coverIdFor, setPhotoCover, clearPhotoCover } from './store.js'
 
 // pas de sepia/hue-rotate : ça écrasait le bleu du ciel et virait tout au
 // brun (l'effet "vieux filtre Instagram" signalé) — juste un peu de
@@ -14,6 +14,15 @@ const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
 
 // chemin de la miniature déduit du chemin principal
 export const thumbOf = (path) => path ? path.replace(/\.jpg$/, '_t.jpg') : path
+
+// zoom de vignette : un scale() centré sur le même point focal que object-position,
+// donc se compose avec object-fit:cover sans le casser — à n'utiliser que sur les
+// affichages en vignette (jamais sur les bannières / le plein écran)
+export function thumbZoomStyle(photo) {
+  const zoom = photo?.zoom || 1
+  if (zoom <= 1.001) return {}
+  return { transform:`scale(${zoom})`, transformOrigin: photo?.pos || '50% 50%' }
+}
 
 export function compress(file, maxSide = 1600, quality = 0.82) {
   return new Promise((res, rej) => {
@@ -54,7 +63,8 @@ export function PhotoBg({ target, fallback, rounded = 0, thumb = true }) {
       background: cover ? '#1E2418' : fallback }}>
       {src && (
         <img src={src} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block' }} />
+          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block',
+            ...(thumb ? thumbZoomStyle(cover) : {}) }} />
       )}
     </div>
   )
@@ -73,6 +83,23 @@ export async function uploadPhotoFile(target, file, caption = '', by = '') {
   if (up.error) throw new Error(up.error.message)
   await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
   return addPhotoRec({ target, path, caption, by })
+}
+
+// remplace le fichier d'une photo existante (même id, même position, mêmes
+// réglages de cadrage) — supprime l'ancien fichier de stockage après coup
+export async function replacePhotoFile(target, photo, file) {
+  const isHero = String(target) === 'site:hero'
+  const [blob, thumb] = await Promise.all([
+    compress(file, isHero ? 2560 : 1600, isHero ? 0.9 : 0.82),
+    compress(file, 260, 0.72),
+  ])
+  const base = `${String(target).replace(/[^a-zA-Z0-9_-]/g,'_')}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`
+  const path = base + '.jpg'
+  const up = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' })
+  if (up.error) throw new Error(up.error.message)
+  await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  await replacePhotoImage(target, photo.id, path)
+  if (photo.path) await sb.storage.from('photos').remove([photo.path, thumbOf(photo.path)]).catch(()=>{})
 }
 
 // import d'un fichier audio (cri/chant importé plutôt qu'un simple lien) —
@@ -104,7 +131,8 @@ export function CoverBg({ sp, fallback, rounded = 0, thumb = true, plain = false
       background: cover ? '#1E2418' : fallback }}>
       {src && (
         <img src={src} alt="" loading="lazy" decoding="async" draggable={false}
-          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:plain?'none':LUT, display:'block', WebkitTouchCallout:'none' }} />
+          style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:plain?'none':LUT, display:'block', WebkitTouchCallout:'none',
+            ...(thumb ? thumbZoomStyle(cover) : {}) }} />
       )}
     </div>
   )
@@ -344,7 +372,7 @@ export function PhotoManager({ target, label, lang, onClose }) {
   const [err, setErr] = useState(null)
   const [caption, setCaption] = useState('')
   const [by, setBy] = useState(getMe() || allPlayers()[0]?.name || '')
-  const [focalPhoto, setFocalPhoto] = useState(null)
+  const [cropPhoto, setCropPhoto] = useState(null)
   const inputRef = useRef(null)
 
   const handle = async (files) => {
@@ -412,13 +440,13 @@ export function PhotoManager({ target, label, lang, onClose }) {
                   return (
                   <div key={p.id} style={{ position:'relative', borderRadius:11, overflow:'hidden',
                     border:`1px solid ${isCover?T.clay:T.line}`, aspectRatio:'4/5' }}>
-                    <img src={p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
-                      objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />
-                    <button onClick={()=>setFocalPhoto(p)}
+                    <img src={p.thumbUrl||p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
+                      objectPosition:p.pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(p) }} />
+                    <button onClick={()=>setCropPhoto(p)}
                       style={{ position:'absolute', top:6, left:6, width:24, height:24, borderRadius:'50%',
                         background:'rgba(0,0,0,.55)', color:'#fff', fontSize:12, display:'flex',
-                        alignItems:'center', justifyContent:'center' }} title={lang==='ru'?'Точка фокуса':'Point focal'}>
-                      <i className="ti ti-focus-2" style={{ fontSize:13 }} aria-hidden="true" />
+                        alignItems:'center', justifyContent:'center' }} title={lang==='ru'?'Кадрирование':'Cadrage'}>
+                      <i className="ti ti-crop" style={{ fontSize:13 }} aria-hidden="true" />
                     </button>
                     <button onClick={()=>removePhoto(target, p.id, p.path)}
                       style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%',
@@ -444,18 +472,24 @@ export function PhotoManager({ target, label, lang, onClose }) {
               </div>}
         </div>
       </div>
-      {focalPhoto && <FocalPicker target={target} photo={focalPhoto} lang={lang} onClose={()=>setFocalPhoto(null)} />}
+      {cropPhoto && <PhotoCropPicker target={target} photo={cropPhoto} lang={lang} onClose={()=>setCropPhoto(null)} />}
     </div>
   )
 }
 
-// ── Point focal : le sujet reste visible quel que soit le cadrage ──
-export function FocalPicker({ target, photo, lang, onClose }) {
+// ── Cadrage vignette : point focal + zoom, avec remplacement de la photo ──
+// le point focal (comme avant) garde le sujet visible quel que soit le cadrage ;
+// le zoom ne recadre QUE les vignettes (Conservatoire, matrice, galerie) — la
+// bannière et le plein écran affichent toujours la photo entière, inchangée
+export function PhotoCropPicker({ target, photo, lang, onClose }) {
   const [pos, setPos] = useState(photo.pos || '50% 50%')
+  const [zoom, setZoom] = useState(photo.zoom || 1)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
   const boxRef = useRef(null)
   const [px, py] = pos.replace(/%/g,'').split(' ').map(Number)
 
-  useEffect(() => () => { flushPhotoPos(photo.id) }, [photo.id])
+  useEffect(() => () => { flushPhotoPos(photo.id); flushPhotoZoom(photo.id) }, [photo.id])
 
   const pick = (e) => {
     const box = boxRef.current, img = box?.querySelector('img')
@@ -472,31 +506,75 @@ export function FocalPicker({ target, photo, lang, onClose }) {
     setPhotoPos(target, photo.id, next)
   }
 
+  const onZoom = (e) => {
+    const z = parseFloat(e.target.value)
+    setZoom(z)
+    setPhotoZoom(target, photo.id, z)
+  }
+
+  const replace = async (file) => {
+    if (!file) return
+    setBusy(true); setErr(null)
+    try { await replacePhotoFile(target, photo, file) }
+    catch (e) { setErr(e?.message || (lang==='ru'?'Не удалось заменить фото.':'Échec du remplacement de la photo.')) }
+    setBusy(false)
+  }
+
+  // taille du cadre affiché = inverse du zoom (zoom 1× = cadre plein cadre)
+  const frameSize = 100 / zoom
+
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.7)', zIndex:150,
       display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:16, padding:16,
         maxWidth:420, width:'100%', border:`1px solid ${T.line}` }}>
         <div className="serif" style={{ fontSize:15, fontWeight:700, color:T.ink, marginBottom:5 }}>
-          {lang==='ru'?'Точка фокуса':'Point focal'}
+          {lang==='ru'?'Кадрирование миниатюры':'Cadrage de la vignette'}
         </div>
         <div style={{ fontSize:12, color:T.soft, marginBottom:10, lineHeight:1.5 }}>
           {lang==='ru'
-            ? 'Нажмите на важную часть фото — она останется видимой при любой обрезке.'
-            : 'Touche l’endroit important de la photo (le sujet) : il restera toujours visible, quel que soit le cadrage utilisé dans l’appli.'}
+            ? 'Нажмите на животное, затем настройте масштаб рамки. Миниатюры будут обрезаны по ней — фото в полном размере не меняется.'
+            : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : les vignettes seront recadrées dessus. La photo en pleine résolution ne change jamais.'}
         </div>
         <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'4/3',
           borderRadius:10, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
           <img src={photo.url} alt="" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'contain', filter:LUT, display:'block' }} />
-          <span style={{ position:'absolute', left:`${px}%`, top:`${py}%`, transform:'translate(-50%,-50%)',
-            width:22, height:22, borderRadius:'50%', border:'2.5px solid #fff',
-            boxShadow:'0 0 0 1.5px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.4)', pointerEvents:'none' }} />
+          <div style={{ position:'absolute', left:`${px}%`, top:`${py}%`, transform:'translate(-50%,-50%)',
+            width:`${frameSize}%`, height:`${frameSize}%`, border:'2px solid #fff', borderRadius:4,
+            boxShadow:'0 0 0 1.5px rgba(0,0,0,.45), 0 0 0 2000px rgba(14,16,10,.55)',
+            pointerEvents:'none', transition:'width .12s, height .12s' }} />
         </div>
-        <button onClick={onClose} className="serif" style={{ marginTop:12, width:'100%', padding:'9px',
-          borderRadius:10, background:T.clay, color:'#fff', fontWeight:600, fontSize:13 }}>
-          {lang==='ru'?'Готово':'Terminé'}
-        </button>
+        <label style={{ display:'flex', alignItems:'center', gap:10, marginTop:14 }}>
+          <i className="ti ti-zoom-in" style={{ fontSize:16, color:T.mute, flexShrink:0 }} aria-hidden="true" />
+          <input type="range" min="1" max="3" step="0.05" value={zoom} onChange={onZoom} style={{ flex:1 }} />
+          <span style={{ fontSize:11.5, color:T.soft, width:34, textAlign:'right', flexShrink:0 }}>×{zoom.toFixed(1)}</span>
+        </label>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12 }}>
+          <div style={{ width:54, height:54, borderRadius:10, overflow:'hidden', border:`1px solid ${T.line}`, flexShrink:0 }}>
+            <img src={photo.thumbUrl||photo.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
+              objectPosition:pos, transform: zoom>1.001?`scale(${zoom})`:undefined, transformOrigin:pos, display:'block' }} />
+          </div>
+          <div style={{ fontSize:11, color:T.mute, lineHeight:1.4 }}>
+            {lang==='ru'?'Так будет выглядеть миниатюра':'Aperçu de la vignette'}
+          </div>
+        </div>
+        {err && <div style={{ fontSize:11.5, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
+          borderRadius:9, padding:'7px 10px', marginTop:10 }}>{err}</div>}
+        <div style={{ display:'flex', gap:8, marginTop:14 }}>
+          <label style={{ flex:1, textAlign:'center', padding:'9px', borderRadius:10, border:`1px dashed ${T.line}`,
+            color:T.soft, fontSize:12.5, fontWeight:600, cursor: busy?'default':'pointer', opacity:busy?.6:1,
+            display:'flex', alignItems:'center', justifyContent:'center', gap:5 }}>
+            <i className="ti ti-replace" style={{ fontSize:14 }} aria-hidden="true" />
+            {busy ? (lang==='ru'?'Замена…':'Remplacement…') : (lang==='ru'?'Заменить фото':'Remplacer la photo')}
+            <input type="file" accept="image/*" hidden disabled={busy}
+              onChange={e=>{ const f=e.target.files[0]; if(f) replace(f); e.target.value='' }} />
+          </label>
+          <button onClick={onClose} className="serif" style={{ flex:1, padding:'9px',
+            borderRadius:10, background:T.clay, color:'#fff', fontWeight:600, fontSize:13 }}>
+            {lang==='ru'?'Готово':'Terminé'}
+          </button>
+        </div>
       </div>
     </div>
   )

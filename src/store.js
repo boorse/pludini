@@ -39,9 +39,11 @@ export async function loadAll() {
   ])
   S.photos = {}
   ;(ph.data || []).forEach(p => {
+    // pos/zoom : pas de colonnes dédiées sur "photos" — patchées juste après
+    // depuis "overrides" (kind photopos/photozoom), sinon la valeur par défaut
     const rec = { id: p.id, path: p.path, url: publicUrl(p.path),
       thumbUrl: publicUrl(p.path.replace(/\.jpg$/, '_t.jpg')),
-      caption: p.caption, by: p.author, pos: p.pos || '50% 50%' }
+      caption: p.caption, by: p.author, pos: '50% 50%', zoom: 1 }
     ;(S.photos[p.target] ||= []).push(rec)
   })
   S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
@@ -58,6 +60,21 @@ export async function loadAll() {
     if (r.kind === 'sighting') (S.sightings[r.value.spId] ||= []).push({ ...r.value, key: r.key })
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
     if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
+    // zoom de vignette : stocké à part (pas de colonne dédiée sur "photos") — on
+    // patche le tableau déjà construit ci-dessus plutôt que de garder une carte
+    // séparée, pour que photosFor() invalide son cache normalement au changement
+    if (r.kind === 'photozoom') {
+      const arr = S.photos[r.value.target]
+      const idx = arr?.findIndex(p => p.id === r.value.photoId)
+      if (arr && idx >= 0) arr[idx] = { ...arr[idx], zoom: r.value.zoom }
+    }
+    // point focal : même mécanisme que le zoom ci-dessus — la colonne "pos" sur
+    // "photos" n'existe pas réellement, seul ce chemin par "overrides" persiste
+    if (r.kind === 'photopos') {
+      const arr = S.photos[r.value.target]
+      const idx = arr?.findIndex(p => p.id === r.value.photoId)
+      if (arr && idx >= 0) arr[idx] = { ...arr[idx], pos: r.value.pos }
+    }
     if (r.kind === 'activityedit') S.activityEdits[r.value.id] = r.value
     if (r.kind === 'farmtextedit') S.farmTextEdits[r.value.id] = r.value
     if (r.kind === 'quizq')     S.quizQuestions.push({ ...r.value, key: r.key })
@@ -135,13 +152,15 @@ export async function movePhotos(oldTarget, newTarget) {
 // écrit l'aperçu tout de suite (réactif), mais différe l'envoi réseau : sans
 // ça, cliquer plusieurs fois de suite pour affiner le point envoie une
 // requête par clic, et rien ne garantit que la dernière arrivée au serveur
-// soit la dernière envoyée — le point choisi ne "tenait" pas au rechargement
+// soit la dernière envoyée. Pas de colonne "pos" sur "photos" (elle n'a jamais
+// existé — le point ne "tenait" donc jamais au rechargement) : stocké dans
+// "overrides", comme le zoom de vignette juste en dessous
 const posTimers = {}
 const posPending = {}
 export async function setPhotoPos(target, id, pos) {
   S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, pos } : p)
   notify()
-  posPending[id] = pos
+  posPending[id] = { target, pos }
   clearTimeout(posTimers[id])
   posTimers[id] = setTimeout(() => flushPhotoPos(id), 500)
 }
@@ -152,9 +171,42 @@ export async function flushPhotoPos(id) {
   if (!(id in posPending)) return
   clearTimeout(posTimers[id])
   delete posTimers[id]
-  const pos = posPending[id]
+  const { target, pos } = posPending[id]
   delete posPending[id]
-  await sb.from('photos').update({ pos }).eq('id', id)
+  const key = 'photopos_' + id
+  await sb.from('overrides').upsert({ kind:'photopos', key, value:{ target, photoId:id, pos }, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+
+// zoom appliqué uniquement à l'affichage en vignette (jamais en pleine résolution)
+// — pas de colonne dédiée sur "photos", donc stocké dans "overrides" comme la
+// vignette choisie ; même écriture différée que setPhotoPos/flushPhotoPos
+const zoomTimers = {}
+const zoomPending = {}
+export async function setPhotoZoom(target, id, zoom) {
+  S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, zoom } : p)
+  notify()
+  zoomPending[id] = { target, zoom }
+  clearTimeout(zoomTimers[id])
+  zoomTimers[id] = setTimeout(() => flushPhotoZoom(id), 500)
+}
+export async function flushPhotoZoom(id) {
+  if (!(id in zoomPending)) return
+  clearTimeout(zoomTimers[id])
+  delete zoomTimers[id]
+  const { target, zoom } = zoomPending[id]
+  delete zoomPending[id]
+  const key = 'photozoom_' + id
+  await sb.from('overrides').upsert({ kind:'photozoom', key, value:{ target, photoId:id, zoom }, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+
+// remplace le fichier image d'une photo existante (même id, même position dans
+// la liste, mêmes pos/zoom/statut de vignette) — utilisé pour recadrer une
+// mauvaise prise sans perdre les réglages déjà faits dessus
+export async function replacePhotoImage(target, id, path) {
+  const url = publicUrl(path), thumbUrl = publicUrl(path.replace(/\.jpg$/, '_t.jpg'))
+  S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, path, url, thumbUrl } : p)
+  notify()
+  await sb.from('photos').update({ path }).eq('id', id)
 }
 
 // ══════ VIGNETTE CHOISIE (par cible, pour tout type de photo) ══════

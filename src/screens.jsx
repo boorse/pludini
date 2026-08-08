@@ -4,7 +4,7 @@ import SatMap from './satmap.jsx'
 import { isObserved } from './data'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf } from './i18n.js'
-import { LUT } from './photoui.jsx'
+import { LUT, thumbZoomStyle } from './photoui.jsx'
 import { allPhotos, allSpecies, allPlayers, subscribe, namedOf, parseFrDateTime } from './store.js'
 import { getTodos, saveTodo, deleteTodo, getPins, savePin, deletePin,
          getZones, saveZone, deleteZone, getPinTypes, savePinType,
@@ -637,7 +637,7 @@ export function Gallery({ wide, lang, onBack }) {
         // effacée elle aussi, mais on ne l'affiche jamais dans le doute
         if (kind === 'ind' && !ind) return
         const nm = ind ? namedOf(sp.id, ind.n) : null
-        items.push({ sp, ind, url: p.url, caption: p.caption, by: p.by || ind?.by,
+        items.push({ sp, ind, url: p.url, thumbUrl: p.thumbUrl, pos: p.pos, zoom: p.zoom, caption: p.caption, by: p.by || ind?.by,
           named: !!nm, displayName: nm?.name || null })
       })
       SPECIES.filter(isObserved).forEach(sp => (sp.inds || []).forEach(ind => {
@@ -673,7 +673,8 @@ export function Gallery({ wide, lang, onBack }) {
             boxShadow: unc?'0 0 0 1px rgba(214,140,52,.3), 0 3px 12px rgba(214,140,52,.22)'
               :sh.named?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)':'none' }}>
             {sh.url
-              ? <img src={sh.url} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', filter:LUT }} />
+              ? <img src={sh.thumbUrl||sh.url} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover',
+                  objectPosition:sh.pos||'50% 50%', filter:LUT, ...thumbZoomStyle(sh) }} />
               : <div style={{ position:'absolute', inset:0, background:gradientFor(sh.sp.id+(sh.ind?.n||'')) }} />}
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.78), transparent 55%)' }} />
             {unc && <span style={{ position:'absolute', top:8, left:8, background:'#D68C34',

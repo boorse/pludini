@@ -6,7 +6,7 @@ import { gradientFor, gradientForCat } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
 import Experience from './experience.jsx'
-import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
+import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT, thumbZoomStyle } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
          removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain } from './store.js'
@@ -928,7 +928,8 @@ export default function App() {
                           border: ind.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}`,
                           boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':'none', background:T.card }}>
                           {photos[0] ? (
-                            <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
+                            <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
+                              objectPosition:photos[0].pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(photos[0]) }} />
                           ) : (
                             <div style={{ width:'100%', height:'100%', display:'flex', flexDirection:'column',
                               alignItems:'center', justifyContent:'center', padding:6, textAlign:'center' }}>
@@ -2018,7 +2019,7 @@ function ObsCell({ spId, indName, method, label, named, uncertain }) {
       boxShadow: uncertain?'0 0 0 1px rgba(214,140,52,.3)':named?'0 0 0 1px rgba(201,160,70,.25)':'none',
       background: ph?'#1E2418':'#DDD3BE' }}>
       {ph && <img src={ph.thumbUrl || ph.url} alt="" loading="lazy"
-        style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />}
+        style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:ph.pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(ph) }} />}
       <span style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(14,16,10,.72)',
         color:'#F2EEE2', fontSize:7, lineHeight:'10px', textAlign:'center' }}>{ico}</span>
       {uncertain && <span style={{ position:'absolute', top:-1, right:-1, width:11, height:11, borderRadius:'50%',
@@ -2036,7 +2037,7 @@ function SpeciesCell({ spId, method, label }) {
     <span title={label} style={{ position:'relative', width:38, height:30, borderRadius:6, overflow:'hidden',
       display:'inline-block', flexShrink:0, border:'1px solid #D3C7AE', background: ph?'#1E2418':'#DDD3BE' }}>
       {ph && <img src={ph.thumbUrl || ph.url} alt="" loading="lazy"
-        style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />}
+        style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:ph.pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(ph) }} />}
       <span style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(14,16,10,.72)',
         color:'#F2EEE2', fontSize:7, lineHeight:'10px', textAlign:'center' }}>{ico}</span>
     </span>

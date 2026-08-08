@@ -5,7 +5,7 @@ import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies,
          allSpecies, calcPtsLive } from './store.js'
 import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
 import { subNameOf } from './i18n.js'
-import { LUT, uploadPhotoFile, uploadAudioFile, usePhotos, FocalPicker } from './photoui.jsx'
+import { LUT, uploadPhotoFile, uploadAudioFile, usePhotos, PhotoCropPicker, thumbZoomStyle } from './photoui.jsx'
 import SatMap from './satmap.jsx'
 import { CENTER } from './territory.js'
 
@@ -601,12 +601,12 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
                 <div key={p.id} style={{ position:'relative', width:72, height:72, borderRadius:9, overflow:'hidden',
                   border:`1px solid ${isCover?T.clay:T.line}` }}>
                   <img src={p.thumbUrl||p.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
-                    objectPosition:p.pos||'50% 50%', filter:LUT, display:'block' }} />
-                  <button onClick={()=>setFocalPhoto(p)} title={lang==='ru'?'Точка фокуса':'Point focal'}
+                    objectPosition:p.pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(p) }} />
+                  <button onClick={()=>setFocalPhoto(p)} title={lang==='ru'?'Кадрирование':'Cadrage'}
                     style={{ position:'absolute', top:3, left:3, width:18, height:18, borderRadius:'50%',
                       background:'rgba(0,0,0,.55)', color:'#fff', fontSize:10, display:'flex',
                       alignItems:'center', justifyContent:'center' }}>
-                    <i className="ti ti-focus-2" style={{ fontSize:10 }} aria-hidden="true" />
+                    <i className="ti ti-crop" style={{ fontSize:10 }} aria-hidden="true" />
                   </button>
                   <button onClick={()=>removePhoto(photoTarget, p.id, p.path)} title={lang==='ru'?'Удалить':'Supprimer'}
                     style={{ position:'absolute', top:3, right:3, width:18, height:18, borderRadius:'50%',
@@ -723,7 +723,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       {mapPick && <GpsMapPicker lat={lat} lon={lon} lang={lang}
         onCancel={()=>setMapPick(false)}
         onPick={(p)=>{ setLat(p.lat.toFixed(5)); setLon(p.lon.toFixed(5)); setMapPick(false) }} />}
-      {focalPhoto && <FocalPicker target={photoTarget} photo={focalPhoto} lang={lang} onClose={()=>setFocalPhoto(null)} />}
+      {focalPhoto && <PhotoCropPicker target={photoTarget} photo={focalPhoto} lang={lang} onClose={()=>setFocalPhoto(null)} />}
     </Modal>
   )
 }
