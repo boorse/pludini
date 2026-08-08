@@ -378,6 +378,11 @@ export async function editSighting(spId, indName, fields) {
   S.sightEdits[key] = value; notify()
   await sb.from('overrides').upsert({ kind:'sightedit', key, value, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
+// marque une observation comme identification incertaine (doute sur l'espèce) —
+// elle reste visible mais ne rapporte aucun point tant qu'elle n'est pas confirmée
+export async function setUncertain(spId, indName, val) {
+  await editSighting(spId, indName, { uncertain: val })
+}
 export async function removeSighting(spId, indName) {
   const orig = (S.sightings[spId] || []).find(x => x.ind?.n === indName)
   const seKey = `sedit_${spId}::${indName}`
@@ -427,9 +432,13 @@ export function calcPtsLive(sp, player) {
   const qualityMult = sp.quality?.[player] ? 2 : 1
   const bonusPts = (bonuses.includes('bebe') ? 20 : 0) + (bonuses.includes('terrier') ? 30 : 0)
   const rarityPts = (RARITY[sp.r]?.p || 0) * (SIZE_MULT[sp.sz] || 1)
-  const myInds = (sp.inds || []).filter(i => i.by === player)
+  const allMyInds = (sp.inds || []).filter(i => i.by === player)
+  // une identification marquée incertaine ne rapporte aucun point tant qu'elle
+  // n'est pas confirmée — mais ne doit pas non plus faire "retomber" sur le
+  // barème "méthode cochée sans passage" (sinon elle compterait quand même)
+  const myInds = allMyInds.filter(i => !i.uncertain)
   let base
-  if (myInds.length) {
+  if (allMyInds.length) {
     // chaque passage compte pour les points de sa propre méthode d'observation :
     // seul le tout premier passage ajouté rapporte 100% des points de base,
     // les suivants n'en rapportent que 10% (sinon cumuler les photos d'un

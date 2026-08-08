@@ -9,7 +9,7 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -660,8 +660,8 @@ export default function App() {
                                   <span style={{ display:'flex', gap:3, flexWrap:'wrap', justifyContent:'center' }}>
                                     {mine.slice(0,2).map((ind,i)=>(
                                       <span key={i} style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                                        <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named}
-                                          label={`${ind.displayName} — ${METHODS[best].l}`} />
+                                        <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named} uncertain={ind.uncertain}
+                                          label={`${ind.displayName} — ${METHODS[best].l}${ind.uncertain?' — à confirmer':''}`} />
                                         <span style={{ fontSize:7.5, color: ind.named?'#A07C28':T.mute,
                                           fontWeight: ind.named?700:400, maxWidth:44, whiteSpace:'normal',
                                           wordBreak:'break-word', textAlign:'center', lineHeight:1.25 }}>{ind.displayName}</span>
@@ -754,13 +754,16 @@ export default function App() {
                       {PLAYERS.map(pl=>{
                         const m = s.obs[pl.name]||[]
                         const best = m.length ? m.reduce((b,x)=>(METHODS[x]?.mult||0)>(METHODS[b]?.mult||0)?x:b, m[0]) : null
-                        const myInd = (s.inds||[]).filter(i=>i.by===pl.name).length
+                        const myInds = (s.inds||[]).filter(i=>i.by===pl.name)
+                        const myInd = myInds.length
+                        const hasUncertain = myInds.some(i=>i.uncertain)
                         return (
                           <td key={pl.id} style={{ padding:'5px 3px', borderBottom:`1px solid ${T.lineSoft}`, textAlign:'center' }}>
-                            <div title={best?`${pl.name} — ${METHODS[best].l}${myInd?` · ${myInd} individu(s)`:''}`:pl.name}
+                            <div title={`${best?`${pl.name} — ${METHODS[best].l}${myInd?` · ${myInd} individu(s)`:''}`:pl.name}${hasUncertain?' · identification à confirmer':''}`}
                               style={{ position:'relative', width:22, height:22, borderRadius:'50%', margin:'0 auto',
                                 display:'flex', alignItems:'center', justifyContent:'center', fontSize:9,
-                                background:best?METHODS[best].c:'#E0D8C6', border:`1px solid ${best?METHODS[best].c:T.line}` }}>
+                                background:best?METHODS[best].c:'#E0D8C6',
+                                border: hasUncertain?'1.5px solid #D68C34':`1px solid ${best?METHODS[best].c:T.line}` }}>
                               {best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):''}
                               {myInd>0 && <span className="serif" style={{ position:'absolute', top:-4, right:-5,
                                 minWidth:13, height:13, borderRadius:7, background:'#8F4A22', color:'#fff',
@@ -993,7 +996,7 @@ export default function App() {
                           {list.map((ind,i)=>{
                             const isSel = !isNamed && selectMode && selected.has(ind.n)
                             return (
-                            <button key={i} onClick={()=> (!isNamed && selectMode) ? toggleSelect(ind.n) : setCurInd(ind)}
+                            <button key={i} onClick={()=> (!isNamed && selectMode) ? toggleSelect(ind.n) : setCurInd(ind.n)}
                               style={{ textAlign:'left', borderRadius:12,
                               overflow:'hidden', padding:0, position:'relative', minHeight: isNamed?100:92,
                               border: isSel?'2px solid #B5602F':isNamed?'2px solid #C9A046':`1px solid ${T.line}`,
@@ -1158,7 +1161,12 @@ export default function App() {
   // ═════ INDIVIDU ═════
   const IndividuSheet = () => {
     if (!curInd || !sp) return null
-    const ind = curInd
+    // curInd est juste le nom technique (clé) de l'individu — on relit toujours
+    // sa version à jour dans sp.inds, sinon la fiche affiche une photo figée
+    // (ex: "incertain" qui ne se met pas à jour après un clic sur le bouton)
+    const { named: namedList, sightings: sightingsList } = splitInds(sp)
+    const ind = [...namedList, ...sightingsList].find(i => i.n === curInd)
+    if (!ind) return null
     const M = ind.method ? METHODS[ind.method] : null
     const [addingPassage, setAddingPassage] = useState(false)
     const [addSel, setAddSel] = useState(() => new Set())
@@ -1206,8 +1214,33 @@ export default function App() {
                 {ind.method==='eye'?'👁':ind.method==='scope'?'🔭':ind.method==='night'?'🌙':'📷'} {M.l}
               </div>
             )}
+            {ind.uncertain && (
+              <div style={{ background:'#F5E4C8', border:'1.5px solid #D68C34', borderRadius:12, padding:12, marginBottom:12,
+                display:'flex', alignItems:'flex-start', gap:8 }}>
+                <i className="ti ti-help-circle" style={{ fontSize:17, color:'#B5701A', flexShrink:0, marginTop:1 }} aria-hidden="true" />
+                <div>
+                  <div style={{ fontSize:11.5, fontWeight:700, color:'#8F5A15' }}>
+                    {lang==='ru'?'Определение под вопросом':'Identification à confirmer'}
+                  </div>
+                  <div style={{ fontSize:11, color:'#8F5A15', marginTop:2, lineHeight:1.5 }}>
+                    {lang==='ru'?'Не приносит очков, пока не подтверждено.':"Ne rapporte pas de points tant que ce n'est pas confirmé."}
+                  </div>
+                </div>
+              </div>
+            )}
+            {edit && (
+              <button onClick={()=>setUncertain(sp.id, ind.n, !ind.uncertain)}
+                style={{ width:'100%', padding:'10px', borderRadius:12, border:`1px dashed ${ind.uncertain?'#D68C34':T.line}`,
+                  background:'transparent', color: ind.uncertain?'#B5701A':T.mute, fontSize:12, fontWeight:600,
+                  marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                <i className="ti ti-help-circle" style={{ fontSize:14 }} aria-hidden="true" />
+                {ind.uncertain
+                  ? (lang==='ru'?'Определение подтверждено':'Confirmer cette identification')
+                  : (lang==='ru'?'Я не уверен в определении':'Je doute de cette identification')}
+              </button>
+            )}
             {ind.gps && <MiniMap gps={ind.gps} lang={lang} excludeKey={`${sp.id}::${ind.n}`}
-              onJump={(sp2, ind2)=>{ setCurSp(sp2); setCurInd(ind2) }} />}
+              onJump={(sp2, ind2)=>{ setCurSp(sp2.id); setCurInd(ind2.n) }} />}
             {ind.story && (
               <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13, marginBottom:9 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:7, display:'flex', alignItems:'center', gap:5 }}>
@@ -1931,20 +1964,23 @@ function MergeSheet({ sp, indNames, lang, wide, onClose, onDone }) {
   )
 }
 
-function ObsCell({ spId, indName, method, label, named }) {
+function ObsCell({ spId, indName, method, label, named, uncertain }) {
   const { photos } = usePhotos(`ind:${spId}:${indName}`)
   const ph = photos[0]
   const ico = method==='eye'?'👁':method==='scope'?'🔭':method==='night'?'🌙':'📷'
   return (
     <span title={label} style={{ position:'relative', width:38, height:30, borderRadius:6, overflow:'hidden',
       display:'inline-block', flexShrink:0,
-      border: named?'1.5px solid #C9A046':'1px solid #D3C7AE',
-      boxShadow: named?'0 0 0 1px rgba(201,160,70,.25)':'none',
+      border: uncertain?'1.5px solid #D68C34':named?'1.5px solid #C9A046':'1px solid #D3C7AE',
+      boxShadow: uncertain?'0 0 0 1px rgba(214,140,52,.3)':named?'0 0 0 1px rgba(201,160,70,.25)':'none',
       background: ph?'#1E2418':'#DDD3BE' }}>
       {ph && <img src={ph.thumbUrl || ph.url} alt="" loading="lazy"
         style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />}
       <span style={{ position:'absolute', bottom:0, left:0, right:0, background:'rgba(14,16,10,.72)',
         color:'#F2EEE2', fontSize:7, lineHeight:'10px', textAlign:'center' }}>{ico}</span>
+      {uncertain && <span style={{ position:'absolute', top:-1, right:-1, width:11, height:11, borderRadius:'50%',
+        background:'#D68C34', color:'#fff', fontSize:8, fontWeight:800, display:'flex', alignItems:'center',
+        justifyContent:'center', lineHeight:1, border:'1px solid #EDE7D8' }}>?</span>}
     </span>
   )
 }

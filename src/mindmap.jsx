@@ -445,14 +445,20 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp }) {
   )
 
   const sp = n.sp, o = isObserved(sp), r = RARITY[sp.r] || RARITY.commun
+  const uncertain = (sp.inds || []).some(i => i.uncertain)
   return (
-    <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68 }}>
+    <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68,
+      border: uncertain ? '2px solid #D68C34' : 'none',
+      boxShadow: uncertain ? '0 0 0 1px rgba(214,140,52,.3)' : base.boxShadow }}>
       {o
         ? <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
       {o && <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.66), transparent 55%)' }} />}
       <span style={{ position:'absolute', top:6, left:8, fontSize:17, filter:o?'none':'grayscale(.65)' }}>{sp.e}</span>
       <span style={{ position:'absolute', top:8, right:8, width:8, height:8, borderRadius:2, background:o?r.c:'#BFB39A' }} />
+      {uncertain && <span title="Identification à confirmer" style={{ position:'absolute', bottom:6, right:6, width:13, height:13,
+        borderRadius:'50%', background:'#D68C34', color:'#fff', fontSize:9, fontWeight:800, display:'flex',
+        alignItems:'center', justifyContent:'center', lineHeight:1, zIndex:2 }}>?</span>}
       <span style={{ position:'relative', fontSize:9.5, fontWeight:o?700:500, color:o?'#F2EEE2':'#5A5245', lineHeight:1.12 }}>{nameOf(sp, lang).main}</span>
       {nameOf(sp, lang).sub && <span style={{ position:'relative', fontSize:7.5, color:o?'rgba(242,238,226,.5)':'rgba(90,82,69,.45)', lineHeight:1.1, marginTop:1 }}>{nameOf(sp, lang).sub}</span>}
     </button>

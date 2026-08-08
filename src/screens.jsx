@@ -664,28 +664,34 @@ export function Gallery({ wide, lang, onBack }) {
         {real} {lang==='ru'?'фото':'photo'}{real!==1?'s':''} · {shots.length-real} {lang==='ru'?'без фото':'sans image'}
       </p>
       <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?170:140}px,1fr))`, gap:10 }}>
-        {shots.map((sh,i)=>(
+        {shots.map((sh,i)=>{
+          const unc = !!sh.ind?.uncertain
+          return (
           <button key={i} onClick={()=>setBox(sh)} style={{ textAlign:'left', borderRadius:14,
             overflow:'hidden', padding:0, position:'relative', aspectRatio:'4/5',
-            border: sh.named?'2px solid #C9A046':`1px solid ${T.line}`,
-            boxShadow: sh.named?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)':'none' }}>
+            border: unc?'2px solid #D68C34':sh.named?'2px solid #C9A046':`1px solid ${T.line}`,
+            boxShadow: unc?'0 0 0 1px rgba(214,140,52,.3), 0 3px 12px rgba(214,140,52,.22)'
+              :sh.named?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)':'none' }}>
             {sh.url
               ? <img src={sh.url} alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', filter:LUT }} />
               : <div style={{ position:'absolute', inset:0, background:gradientFor(sh.sp.id+(sh.ind?.n||'')) }} />}
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.78), transparent 55%)' }} />
-            {sh.named && <span style={{ position:'absolute', top:8, left:8, background:'#C9A046',
+            {unc && <span style={{ position:'absolute', top:8, left:8, background:'#D68C34',
+              color:'#fff', borderRadius:8, padding:'2px 7px', fontSize:8, fontWeight:800,
+              letterSpacing:'.4px', zIndex:2 }}>? {lang==='ru'?'ПРОВЕРИТЬ':'À CONFIRMER'}</span>}
+            {!unc && sh.named && <span style={{ position:'absolute', top:8, left:8, background:'#C9A046',
               color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8, fontWeight:800,
               letterSpacing:'.4px', zIndex:2 }}>★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
             <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:11 }}>
               <span style={{ fontSize:22 }}>{sh.sp.e}</span>
               <div>
                 <div className="serif" style={{ fontSize:13.5, fontWeight:700, lineHeight:1.1,
-                  color: sh.named?'#E3B94D':'#F2EEE2' }}>{sh.named ? sh.displayName : nameOf(sh.sp,lang).main}</div>
+                  color: unc?'#E8A855':sh.named?'#E3B94D':'#F2EEE2' }}>{sh.named ? sh.displayName : nameOf(sh.sp,lang).main}</div>
                 {sh.ind?.d && <div style={{ fontSize:9.5, color:'rgba(242,238,226,.7)', marginTop:2 }}>{sh.ind.d}</div>}
               </div>
             </div>
           </button>
-        ))}
+        )})}
       </div>
       {box && <Lightbox sh={box} lang={lang} wide={wide} onClose={()=>setBox(null)} />}
     </div>
