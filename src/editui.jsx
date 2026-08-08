@@ -394,6 +394,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const [pickCat, setPickCat] = useState(null)
   const cats = allCats()
   const [named, setNamed] = useState(editInd ? !!editInd.named : false)
+  const [unsure, setUnsure] = useState(editInd ? !!editInd.uncertain : false)
   const [name, setName] = useState(editInd?.displayName || editInd?.n || '')
   const [note, setNote] = useState(editInd?.note || '')
   const [traits, setTraits] = useState(editInd?.traits || '')
@@ -443,7 +444,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
 
       if (isEdit) {
         const fields = { note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'), time, by, method,
-          weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps }
+          weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps, uncertain: unsure }
         await editSighting(spId, editInd.n, fields)
         const wasNamed = !!namedOf(spId, editInd.n)
         if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
@@ -461,7 +462,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       const ind = {
         n: label, named, note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'),
         time, by, method, weather: weather.trim(), story: story.trim(),
-        desc: '', b: [], traits: traits.trim(),
+        desc: '', b: [], traits: traits.trim(), uncertain: unsure,
         ...(gps ? { gps } : {}),
       }
       await addSighting(spId, ind)
@@ -569,6 +570,18 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
             : (lang==='ru'?'Разовая встреча без опознания особи.'
                           :'Une rencontre ponctuelle, sans identifier l’individu.')}
         </div>
+
+        <button type="button" onClick={()=>setUnsure(v=>!v)} style={{ width:'100%', padding:'10px', borderRadius:11, marginTop:10,
+          border:`1.5px dashed ${unsure?'#D68C34':T.line}`, background:unsure?'#F5E4C8':'transparent',
+          color: unsure?'#B5701A':T.soft, fontSize:12, fontWeight:600,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <i className={`ti ${unsure?'ti-square-rounded-check':'ti-square-rounded'}`} style={{ fontSize:15 }} aria-hidden="true" />
+          {lang==='ru'?'Я не уверен(а) в определении вида':'Je ne suis pas sûr(e) de l’identification'}
+        </button>
+        {unsure && <div style={{ fontSize:11, color:T.mute, marginTop:4, lineHeight:1.45 }}>
+          {lang==='ru'?'Не будет приносить очков, пока определение не подтверждено.'
+                      :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
+        </div>}
 
         {named && <>
           <label style={label}>{lang==='ru'?'Имя':'Son nom'}</label>

@@ -924,7 +924,8 @@ export default function App() {
                     <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?110:90}px,1fr))`, gap:8 }}>
                       {entries.map(({ ind, photos }, i)=>(
                         <div key={i} style={{ position:'relative', borderRadius:10, overflow:'hidden', aspectRatio:'1',
-                          border:`1px solid ${T.line}`, background:T.card }}>
+                          border: ind.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}`,
+                          boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':'none', background:T.card }}>
                           {photos[0] ? (
                             <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover', filter:LUT, display:'block' }} />
                           ) : (
@@ -942,6 +943,23 @@ export default function App() {
                           {photos.length>1 && (
                             <span style={{ position:'absolute', bottom:4, left:4, background:'rgba(20,18,14,.6)',
                               color:'#fff', fontSize:9, padding:'2px 6px', borderRadius:8 }}>+{photos.length-1}</span>
+                          )}
+                          {ind.uncertain && (
+                            <span title={lang==='ru'?'Определение под вопросом':'Identification à confirmer'}
+                              style={{ position:'absolute', bottom:4, right: edit?26:4, width:16, height:16, borderRadius:'50%',
+                                background:'#D68C34', color:'#fff', fontSize:9, fontWeight:800, lineHeight:1,
+                                display:'flex', alignItems:'center', justifyContent:'center' }}>?</span>
+                          )}
+                          {edit && (
+                            <button onClick={()=>setUncertain(sp.id, ind.n, !ind.uncertain)}
+                              title={ind.uncertain
+                                ? (lang==='ru'?'Подтвердить определение':'Confirmer cette identification')
+                                : (lang==='ru'?'Я не уверен(а) в определении':'Je doute de cette identification')}
+                              style={{ position:'absolute', bottom:4, right:4, width:20, height:20, borderRadius:'50%',
+                                background: ind.uncertain?'#D68C34':'rgba(20,18,14,.6)', color:'#fff', fontSize:11, lineHeight:1,
+                                display:'flex', alignItems:'center', justifyContent:'center' }}>
+                              <i className="ti ti-help-circle" style={{ fontSize:12 }} aria-hidden="true" />
+                            </button>
                           )}
                           {edit && (
                             <button onClick={()=>setConfirmDelSighting({ sp, ind })}

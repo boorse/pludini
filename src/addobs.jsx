@@ -122,6 +122,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
   const [time, setTime] = useState('')
   const [note, setNote] = useState('')
   const [story, setStory] = useState('')
+  const [unsure, setUnsure] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -138,7 +139,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
       const ind = {
         n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
         time: time || now.toTimeString().slice(0,5), by: me, method, weather:'', story: story.trim(),
-        desc:'', b:[], traits:'',
+        desc:'', b:[], traits:'', uncertain: unsure,
         ...(gps ? { gps } : {}),
       }
       await addSighting(sp.id, ind)
@@ -251,6 +252,18 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
           style={{ ...input, fontSize:12.5, resize:'vertical' }}
           placeholder={lang==='ru'?'Что произошло…':'Raconte la rencontre… (facultatif)'} />
 
+        <button type="button" onClick={()=>setUnsure(v=>!v)} style={{ width:'100%', padding:'10px', borderRadius:11, marginTop:12,
+          border:`1.5px dashed ${unsure?'#D68C34':T.line}`, background:unsure?'#F5E4C8':'transparent',
+          color: unsure?'#B5701A':T.soft, fontSize:12, fontWeight:600,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <i className={`ti ${unsure?'ti-square-rounded-check':'ti-square-rounded'}`} style={{ fontSize:15 }} aria-hidden="true" />
+          {lang==='ru'?'Я не уверен(а) в определении вида':'Je ne suis pas sûr(e) de l’identification'}
+        </button>
+        {unsure && <div style={{ fontSize:11, color:T.mute, marginTop:4, lineHeight:1.45 }}>
+          {lang==='ru'?'Не будет приносить очков, пока определение не подтверждено.'
+                      :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
+        </div>}
+
         {err && <div style={{ fontSize:12, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
           borderRadius:9, padding:'8px 11px', marginTop:11 }}>{err}</div>}
       </div>
@@ -285,6 +298,7 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
   const [stagedFiles, setStagedFiles] = useState([])
   const [note, setNote] = useState('')
   const [fishSize, setFishSize] = useState('moyen')
+  const [unsure, setUnsure] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -299,7 +313,7 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
       const dateShort = now.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})
       const dlabel = isVegetal(sp) ? dateShort : `${fish?'Pêche':'Passage'} du ${dateShort}`
       const ind = { n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
-        time:'', by: me, method:'eye', weather:'', story:'', desc:'', b:[], traits:'',
+        time:'', by: me, method:'eye', weather:'', story:'', desc:'', b:[], traits:'', uncertain: unsure,
         ...(fish ? { size: fishSize } : {}) }
       await addSighting(sp.id, ind)
       for (const f of stagedFiles) await uploadPhotoFile(`ind:${sp.id}:${dlabel}`, f, '', me)
@@ -346,7 +360,19 @@ function SimpleObsForm({ lang, sp, onClose, onSaved, onBackToSpecies }) {
           <label style={label}>{lang==='ru'?'Размер':'Taille'}</label>
           <FishSizePicker lang={lang} sp={sp} value={fishSize} onChange={setFishSize} />
         </>)}
-        <label style={label}>{lang==='ru'?'Кратко':'Un petit mot (facultatif)'}</label>
+        <button type="button" onClick={()=>setUnsure(v=>!v)} style={{ width:'100%', padding:'10px', borderRadius:11, marginTop:10,
+          border:`1.5px dashed ${unsure?'#D68C34':T.line}`, background:unsure?'#F5E4C8':'transparent',
+          color: unsure?'#B5701A':T.soft, fontSize:12, fontWeight:600,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <i className={`ti ${unsure?'ti-square-rounded-check':'ti-square-rounded'}`} style={{ fontSize:15 }} aria-hidden="true" />
+          {lang==='ru'?'Я не уверен(а) в определении вида':'Je ne suis pas sûr(e) de l’identification'}
+        </button>
+        {unsure && <div style={{ fontSize:11, color:T.mute, marginTop:4, marginBottom:2, lineHeight:1.45 }}>
+          {lang==='ru'?'Не будет приносить очков, пока определение не подтверждено.'
+                      :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
+        </div>}
+
+        <label style={{ ...label, marginTop:10 }}>{lang==='ru'?'Кратко':'Un petit mot (facultatif)'}</label>
         <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3}
           style={{ ...input, fontSize:12.5, resize:'vertical' }}
           placeholder={lang==='ru'?'Что вы заметили…':'Ce que tu as remarqué…'} />
