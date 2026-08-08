@@ -821,7 +821,8 @@ export default function App() {
     const tabs = [['obs',t.obs],['infos',t.infos],...(seasons?[['saisons',t.seasons]]:[])]
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
-        <div ref={detailScrollRef} onScroll={trackDetailScroll} onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'hidden', display:'flex', flexDirection:'column', border:`1px solid ${T.line}` }}>
+          <div ref={detailScrollRef} onScroll={trackDetailScroll} style={{ overflowY:'auto', overscrollBehavior:'contain', flex:'1 1 auto', minHeight:0 }}>
           <div style={{ position:'relative', height: wide?420:260, display:'flex', alignItems:'flex-end', padding:20 }}>
             <PhotoHeroSpecies sp={sp} fallback={gradientFor(sp.id)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 65%)', pointerEvents:'none' }} />
@@ -1190,6 +1191,7 @@ export default function App() {
               </div>
             )}
           </div>
+          </div>
         </div>
       </div>
     )
@@ -1210,7 +1212,8 @@ export default function App() {
     const candidates = addingPassage ? splitInds(sp).sightings : []
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurInd(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'hidden', display:'flex', flexDirection:'column', border:`1px solid ${T.line}` }}>
+          <div style={{ overflowY:'auto', overscrollBehavior:'contain', flex:'1 1 auto', minHeight:0 }}>
           <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
@@ -1386,6 +1389,7 @@ export default function App() {
               </button>
             )}
           </div>
+          </div>
         </div>
       </div>
     )
@@ -1471,7 +1475,8 @@ export default function App() {
     const shownPts = scoreCat==='all' ? spTotal : (catBreakdown.find(c=>c.cat.id===scoreCat)?.pts || 0)
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.55)', zIndex:70, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurPlayer(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'hidden', display:'flex', flexDirection:'column', border:`1px solid ${T.line}` }}>
+          <div style={{ overflowY:'auto', overscrollBehavior:'contain', flex:'1 1 auto', minHeight:0 }}>
           <div style={{ position:'sticky', top:0, background:T.surface, borderBottom:`1px solid ${T.line}`, padding:'14px 18px', display:'flex', alignItems:'center', gap:11, zIndex:2 }}>
             <div className="serif" style={{ width:38, height:38, borderRadius:'50%', background:T.sage, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:700 }}>{curPlayer[0]}</div>
             <div style={{ flex:1 }}>
@@ -1539,6 +1544,7 @@ export default function App() {
               <span className="serif" style={{ fontSize:14, fontWeight:700, color:T.ink }}>Total</span>
               <span className="serif" style={{ fontSize:20, fontWeight:900, color:T.clay }}>{spTotal} + {bTotal} = {spTotal+bTotal} pts</span>
             </div>
+          </div>
           </div>
         </div>
       </div>
