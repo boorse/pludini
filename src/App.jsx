@@ -621,6 +621,7 @@ export default function App() {
                   {lang==='ru'?'Вид':'Espèce'}
                 </button>}
               </div>
+              {cat.niche && <div style={{ fontSize:11.5, color:T.mute, fontStyle:'italic', lineHeight:1.55, marginBottom:9, maxWidth:720 }}>{cat.niche}</div>}
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, tableLayout:'fixed' }}>
                 <thead><tr>
                   <th style={{ width:200, textAlign:'left', padding:'7px 8px', color:T.mute, fontWeight:500, fontSize:10.5, borderBottom:`1.5px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
@@ -725,6 +726,7 @@ export default function App() {
               <span>{cat.e}</span>{cn.main}
               <span style={{ fontSize:10.5, color:T.mute, fontWeight:400 }}>· {list.filter(isObserved).length}/{list.length}</span>
             </div>
+            {cat.niche && <div style={{ fontSize:10.5, color:T.mute, fontStyle:'italic', lineHeight:1.5, marginBottom:7 }}>{cat.niche}</div>}
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11, tableLayout:'fixed' }}>
               <thead><tr>
                 <th style={{ width:120, textAlign:'left', padding:'5px 6px', color:T.mute, fontWeight:500, fontSize:10, borderBottom:`1px solid ${T.line}` }}>{lang==='ru'?'Вид':'Espèce'}</th>
@@ -1098,6 +1100,14 @@ export default function App() {
                   <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
                 </div>
               ))}
+              {sp.niche && (
+                <div style={{ background:'#E6EAD9', border:'1px solid #C3CDA9', borderRadius:10, padding:12, marginBottom:8 }}>
+                  <div style={{ fontSize:10.5, fontWeight:700, color:'#4A5D32', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
+                    <i className="ti ti-plant-2" style={{ fontSize:13 }} aria-hidden="true" />{lang==='ru'?'Экологическая ниша':'Niche écologique'}
+                  </div>
+                  <div style={{ fontSize:12.5, color:'#3F4B2E', lineHeight:1.65 }}>{sp.niche}</div>
+                </div>
+              )}
               {(sp.dng || sp.anecdote) && (
                 <div style={{ background:'#F0E4CF', border:`1px solid #DCC79E`, borderRadius:10, padding:12, marginTop:4, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:700, color:'#8F6A2E', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>
