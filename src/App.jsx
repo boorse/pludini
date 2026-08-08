@@ -9,7 +9,7 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -438,6 +438,29 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem('pludini_screen', screen) } catch {} }, [screen])
   useEffect(() => { try { localStorage.setItem('pludini_edit', edit ? '1' : '0') } catch {} }, [edit])
 
+  // bloque le scroll de la page derrière une fenêtre plein écran (fiche espèce,
+  // score, etc.) : sans ça, sur mobile, un geste de défilement dans la fenêtre
+  // peut "rebondir" jusqu'au corps de page en dessous et faire bouger toute
+  // la page — elle doit rester parfaitement fixe pendant qu'une fenêtre est ouverte
+  const anyModalOpen = !!(curSp || curPlayer || promoting || mergeSheet || spEditor || sighting || idPicker || showCalendar || photoTarget)
+  useEffect(() => {
+    if (!anyModalOpen) return
+    const scrollY = window.scrollY
+    const { style } = document.body
+    const prev = { position: style.position, top: style.top, width: style.width, overflow: style.overflow }
+    style.position = 'fixed'
+    style.top = `-${scrollY}px`
+    style.width = '100%'
+    style.overflow = 'hidden'
+    return () => {
+      style.position = prev.position
+      style.top = prev.top
+      style.width = prev.width
+      style.overflow = prev.overflow
+      window.scrollTo(0, scrollY)
+    }
+  }, [anyModalOpen])
+
   // mémorise la position de défilement de chaque écran — le scroll brut du navigateur
   // ne s'applique pas à la nouvelle mise en page et donne des sauts incohérents
   const scrollPos = useRef({})
@@ -445,6 +468,10 @@ export default function App() {
   // Explore/MatrixPane (déclarés en interne à App) à chaque re-rendu, donc le
   // panneau est démonté/remonté et perd son scroll natif — restauré manuellement
   const matrixScrollTop = useRef(0)
+  // même souci pour la fiche espèce : ouvrir/fermer un individu (curInd) redéfinit
+  // Detail à chaque fois, donc son scroll interne repart à 0 — d'où l'impression de
+  // "remonter en haut" en cliquant une vignette de passage puis en la refermant
+  const detailScrollTop = useRef({})
   // seuls landing ("Pludini Doc"), experience ("Pludini Host") et app ("Le
   // Conservatoire") ont une URL dédiée (/doc, /, /conservatoire) — ce sont les seules
   // pages qu'on partage avec un lien direct (aperçu de lien propre pour
@@ -782,10 +809,14 @@ export default function App() {
     const baseP = Math.round(r.p * SIZE_MULT[sp.sz])
     const seasons = sp.saisons
     const isPerson = sp.cat === 'humains' || sp.cat === 'domestiques'
+    const detailScrollRef = useRef(null)
+    useEffect(() => { if (detailScrollRef.current) detailScrollRef.current.scrollTop = detailScrollTop.current[sp.id] || 0 }, [])
+    const trackDetailScroll = (e) => { detailScrollTop.current[sp.id] = e.currentTarget.scrollTop }
+    const [yearFilter, setYearFilter] = useState('all') // filtre par année des passages, quand il y en a beaucoup
     const tabs = [['obs',t.obs],['infos',t.infos],...(seasons?[['saisons',t.seasons]]:[])]
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.5)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>{setCurSp(null);setCurInd(null)}}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div ref={detailScrollRef} onScroll={trackDetailScroll} onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?820:640, maxHeight: wide?'90vh':'92dvh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
           <div style={{ position:'relative', height: wide?420:260, display:'flex', alignItems:'flex-end', padding:20 }}>
             <PhotoHeroSpecies sp={sp} fallback={gradientFor(sp.id)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 65%)', pointerEvents:'none' }} />
@@ -924,7 +955,11 @@ export default function App() {
                   </div>
                 )
               })() : sp.inds.length>0 && (() => {
-                const { named, sightings } = splitInds(sp)
+                const { named, sightings: allSightings } = splitInds(sp)
+                // filtre par année seulement utile s'il y a beaucoup de passages à trier
+                const years = [...new Set(allSightings.map(i=>i.d?.split('/')[2]).filter(Boolean))].sort().reverse()
+                const showYearFilter = allSightings.length > 12 && years.length > 1
+                const sightings = (showYearFilter && yearFilter!=='all') ? allSightings.filter(i=>i.d?.split('/')[2]===yearFilter) : allSightings
                 const selectMode = merging?.spId === sp.id
                 const selected = merging?.selected || new Set()
                 const toggleSelect = (n) => setMerging(m => {
@@ -991,12 +1026,35 @@ export default function App() {
                 const showFamiliers = speciesType(sp)!==3
                 return (
                   <div>
-                    <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16 }}>
-                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
+                    {showYearFilter && (
+                      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
+                        <span style={{ fontSize:10.5, color:T.mute, alignSelf:'center' }}>
+                          {lang==='ru'?'Год :':'Année :'}
+                        </span>
+                        <button onClick={()=>setYearFilter('all')} style={{ fontSize:11, padding:'4px 10px', borderRadius:12,
+                          border:`1px solid ${yearFilter==='all'?T.clay:T.line}`, background:yearFilter==='all'?T.clay:'transparent',
+                          color:yearFilter==='all'?'#fff':T.soft, fontWeight:yearFilter==='all'?600:400 }}>
+                          {lang==='ru'?'Все':'Toutes'} ({allSightings.length})
+                        </button>
+                        {years.map(y=>{
+                          const n = allSightings.filter(i=>i.d?.split('/')[2]===y).length
+                          return (
+                            <button key={y} onClick={()=>setYearFilter(y)} style={{ fontSize:11, padding:'4px 10px', borderRadius:12,
+                              border:`1px solid ${yearFilter===y?T.clay:T.line}`, background:yearFilter===y?T.clay:'transparent',
+                              color:yearFilter===y?'#fff':T.soft, fontWeight:yearFilter===y?600:400 }}>
+                              {y} ({n})
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16,
+                      paddingBottom: selectMode ? 64 : 0 }}>
                       {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
+                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
                     </div>
                     {selectMode && (
-                      <div style={{ position:'sticky', bottom:0, marginTop:12, padding:'10px 12px', borderRadius:12,
+                      <div style={{ position:'sticky', bottom:0, zIndex:5, marginTop:12, padding:'10px 12px', borderRadius:12,
                         background:'#2B2620', display:'flex', alignItems:'center', gap:10, boxShadow:'0 4px 16px rgba(0,0,0,.25)' }}>
                         <span style={{ fontSize:12, color:'#EDE7D8', fontWeight:600 }}>
                           {selected.size} {lang==='ru'?'выбрано':'sélectionné'}{selected.size>1 && lang!=='ru' ?'s':''}
@@ -1102,9 +1160,12 @@ export default function App() {
     if (!curInd || !sp) return null
     const ind = curInd
     const M = ind.method ? METHODS[ind.method] : null
+    const [addingPassage, setAddingPassage] = useState(false)
+    const [addSel, setAddSel] = useState(() => new Set())
+    const candidates = addingPassage ? splitInds(sp).sightings : []
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurInd(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
           <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
@@ -1145,7 +1206,8 @@ export default function App() {
                 {ind.method==='eye'?'👁':ind.method==='scope'?'🔭':ind.method==='night'?'🌙':'📷'} {M.l}
               </div>
             )}
-            {ind.gps && <MiniMap gps={ind.gps} />}
+            {ind.gps && <MiniMap gps={ind.gps} lang={lang} excludeKey={`${sp.id}::${ind.n}`}
+              onJump={(sp2, ind2)=>{ setCurSp(sp2); setCurInd(ind2) }} />}
             {ind.story && (
               <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13, marginBottom:9 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:7, display:'flex', alignItems:'center', gap:5 }}>
@@ -1182,6 +1244,61 @@ export default function App() {
                 <i className="ti ti-lock-open" style={{ fontSize:15 }} aria-hidden="true" />
                 {lang==='ru'?'Опознать эту особь и дать имя':'Reconnaître cet individu et lui donner un nom'}
               </button>
+            )}
+            {edit && ind.named && speciesType(sp)!==3 && (
+              <button onClick={()=>{ setAddingPassage(true); setAddSel(new Set()) }}
+                style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
+                  background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
+                  marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Добавить проход этой особи':'Ajouter un passage à cet individu'}
+              </button>
+            )}
+            {addingPassage && (
+              <div onClick={e=>e.stopPropagation()} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13, marginBottom:10 }}>
+                <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:8 }}>
+                  {lang==='ru'?'Выбрать проходы для добавления':'Choisir les passages à ajouter'}
+                </div>
+                {candidates.length === 0 ? (
+                  <div style={{ fontSize:11.5, color:T.mute, fontStyle:'italic', marginBottom:8 }}>
+                    {lang==='ru'?'Нет отдельных проходов для этого вида.':'Aucun passage isolé pour cette espèce.'}
+                  </div>
+                ) : (
+                  <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?100:88}px,1fr))`, gap:7, marginBottom:10 }}>
+                    {candidates.map((c,i)=>{
+                      const isSel = addSel.has(c.n)
+                      return (
+                        <button key={i} onClick={()=>setAddSel(prev=>{ const n=new Set(prev); n.has(c.n)?n.delete(c.n):n.add(c.n); return n })}
+                          style={{ textAlign:'left', borderRadius:10, overflow:'hidden', padding:0, position:'relative', minHeight:76,
+                            border: isSel?'2px solid #B5602F':`1px solid ${T.line}` }}>
+                          <PhotoBg target={`ind:${sp.id}:${c.n}`} fallback={gradientFor(sp.id+c.n)} />
+                          <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
+                          <span style={{ position:'absolute', top:5, right:5, width:16, height:16, borderRadius:'50%',
+                            border:'1.5px solid #fff', background:isSel?'#B5602F':'rgba(20,18,14,.4)',
+                            display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            {isSel && <i className="ti ti-check" style={{ fontSize:10, color:'#fff' }} aria-hidden="true" />}
+                          </span>
+                          <div style={{ position:'relative', padding:6, fontSize:9, color:'rgba(242,238,226,.85)' }}>{c.d}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={()=>setAddingPassage(false)} style={{ flex:1, padding:'9px', borderRadius:9,
+                    border:`1px solid ${T.line}`, color:T.soft, fontSize:12.5 }}>
+                    {lang==='ru'?'Отмена':'Annuler'}
+                  </button>
+                  <button disabled={addSel.size===0} onClick={async()=>{
+                      await mergeAsIndividual(sp.id, [ind.n, ...addSel], ind.displayName, ind.traits || '')
+                      setAddingPassage(false); setCurInd(null); setRefresh(r=>r+1)
+                    }}
+                    className="serif" style={{ flex:1.4, padding:'9px', borderRadius:9, background: addSel.size===0?'#B5A98C':'#B5602F',
+                      color:'#fff', fontSize:12.5, fontWeight:700 }}>
+                    {lang==='ru'?'Добавить':`Ajouter${addSel.size?` (${addSel.size})`:''}`}
+                  </button>
+                </div>
+              </div>
             )}
             {ind.desc && (
               <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13 }}>
@@ -1284,7 +1401,7 @@ export default function App() {
     const shownPts = scoreCat==='all' ? spTotal : (catBreakdown.find(c=>c.cat.id===scoreCat)?.pts || 0)
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.55)', zIndex:70, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurPlayer(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth:600, maxHeight: wide?'88vh':'92vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
           <div style={{ position:'sticky', top:0, background:T.surface, borderBottom:`1px solid ${T.line}`, padding:'14px 18px', display:'flex', alignItems:'center', gap:11, zIndex:2 }}>
             <div className="serif" style={{ width:38, height:38, borderRadius:'50%', background:T.sage, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:700 }}>{curPlayer[0]}</div>
             <div style={{ flex:1 }}>
@@ -1645,7 +1762,7 @@ function PassageCalendar({ sp, lang, onClose }) {
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:170,
       display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
       <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:680,
-        maxHeight:'88vh', overflow:'auto', border:`1px solid ${T.line}` }}>
+        maxHeight:'88vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
         <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
             <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink }}>
@@ -1873,18 +1990,49 @@ function Shell({ children, lang, setLang, onHome, edit, onToggleEdit, pageTitle 
   )
 }
 
-function MiniMap({ gps }) {
+function MiniMap({ gps, lang, excludeKey, onJump }) {
   const [lat, lon] = gps
+  const [spotOpen, setSpotOpen] = useState(false)
+  const spot = spotOpen ? sightingsNearGps(lat, lon).filter(r => `${r.sp.id}::${r.ind.n}` !== excludeKey) : []
   return (
     <div style={{ borderRadius:12, overflow:'hidden', border:'1px solid #D3C7AE', marginBottom:9 }}>
-      <SatMap center={{ lat, lon }} pins={[{ id:'p', lat, lon, color:'#B5602F', emoji:'📍' }]} height={170} />
+      <div style={{ position:'relative' }}>
+        <SatMap center={{ lat, lon }} pins={[{ id:'p', lat, lon, color:'#B5602F', emoji:'📍' }]} height={170}
+          onSelect={()=>setSpotOpen(v=>!v)} />
+      </div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 11px', background:'#E6DDC8', fontSize:11, color:'#6B6357' }}>
-        <span style={{ display:'flex', alignItems:'center', gap:5 }}>
+        <button onClick={()=>setSpotOpen(v=>!v)} style={{ display:'flex', alignItems:'center', gap:5, color:'#6B6357' }}>
           <i className="ti ti-map-pin" style={{ fontSize:13, color:'#B5602F' }} aria-hidden="true" />
           {lat.toFixed(4)}° N · {lon.toFixed(4)}° E
-        </span>
+        </button>
         <a href={`https://www.google.com/maps/@${lat},${lon},17z/data=!3m1!1e3`} target="_blank" rel="noreferrer" style={{ color:'#8F4A22', textDecoration:'none', fontWeight:600 }}>Ouvrir ↗</a>
       </div>
+      {spotOpen && (
+        <div style={{ background:'#E6DDC8', borderTop:'1px solid #D3C7AE', padding:'9px 11px' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#8F4A22', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:7 }}>
+            {lang==='ru'?'Здесь также замечены':'Vues au même endroit'} {spot.length ? `(${spot.length})` : ''}
+          </div>
+          {spot.length === 0 ? (
+            <div style={{ fontSize:11.5, color:'#9A9081', fontStyle:'italic' }}>
+              {lang==='ru'?'Ничего другого здесь не замечено.':'Aucune autre observation à cet endroit.'}
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+              {spot.map(({ sp:sp2, ind:ind2 }, i) => (
+                <button key={i} onClick={()=>onJump?.(sp2, ind2)} style={{ display:'flex', alignItems:'center', gap:8,
+                  padding:'6px 8px', borderRadius:9, background:'#DDD3BE', textAlign:'left' }}>
+                  <span style={{ fontSize:15 }}>{sp2.e}</span>
+                  <span style={{ flex:1, minWidth:0 }}>
+                    <span style={{ display:'block', fontSize:11.5, fontWeight:600, color:'#2B2620' }}>{sp2.n}</span>
+                    <span style={{ display:'block', fontSize:10, color:'#8A8172' }}>{ind2.named ? '⭐ ' : ''}{ind2.displayName} · {ind2.d}</span>
+                  </span>
+                  <i className="ti ti-chevron-right" style={{ fontSize:13, color:'#9A9081' }} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

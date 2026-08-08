@@ -182,7 +182,7 @@ export async function demote(spId, obsName) {
   delete S.named[key]; notify()
   await sb.from('overrides').delete().eq('key', key)
 }
-function parseFrDateTime(d, time) {
+export function parseFrDateTime(d, time) {
   const [dd, mm, yyyy] = (d || '').split('/').map(Number)
   const [hh, mi] = (time || '00:00').split(':').map(Number)
   return new Date(yyyy || 0, (mm || 1) - 1, dd || 1, hh || 0, mi || 0).getTime()
@@ -210,7 +210,27 @@ export function splitInds(sp) {
     return ov ? { ...ind, named: true, displayName: ov.name, traits: ov.traits }
               : { ...ind, displayName: ind.n, named: !!ind.named }
   })
-  return { named: all.filter(i => i.named), sightings: all.filter(i => !i.named) }
+  // du plus récent au plus ancien — sans ça les vignettes restaient dans l'ordre
+  // d'import/création, pas dans l'ordre chronologique des passages
+  const byDateDesc = (a, b) => parseFrDateTime(b.d, b.time) - parseFrDateTime(a.d, a.time)
+  return { named: all.filter(i => i.named).sort(byDateDesc), sightings: all.filter(i => !i.named).sort(byDateDesc) }
+}
+
+// trouve toutes les observations (toutes espèces) partageant à peu près les mêmes
+// coordonnées GPS — utile pour "qui d'autre a été vu à cet endroit" (ex. une caméra piège)
+export function sightingsNearGps(lat, lon, tolerance = 0.0006) {
+  const results = []
+  for (const sp of allSpecies()) {
+    for (const ind of (sp.inds || [])) {
+      if (!ind.gps) continue
+      const [la, lo] = ind.gps
+      if (Math.abs(la - lat) <= tolerance && Math.abs(lo - lon) <= tolerance) {
+        const ov = S.named[`${sp.id}::${ind.n}`]
+        results.push({ sp, ind: { ...ind, displayName: ov ? ov.name : ind.n, named: !!ov } })
+      }
+    }
+  }
+  return results.sort((a, b) => parseFrDateTime(b.ind.d, b.ind.time) - parseFrDateTime(a.ind.d, a.ind.time))
 }
 
 // ══════ COUVERTURE D'ESPÈCE (issue des photos de ses individus) ══════

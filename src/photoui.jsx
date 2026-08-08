@@ -117,6 +117,27 @@ const navBtn = (side) => ({
 })
 
 // ── Bannière photo avec carrousel (flèches, points) + clic pour agrandir ──
+// indicateur de position dans un carrousel : des points si peu nombreux, sinon
+// un compteur texte "3/35" — pour ne jamais déborder de la largeur de l'écran
+function CarouselDots({ count, idx }) {
+  if (count <= 8) {
+    return (
+      <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:2 }}>
+        {Array.from({ length:count }).map((_,i)=>(
+          <span key={i} style={{ width:i===idx?14:5, height:5, borderRadius:3,
+            background: i===idx?'#F2EEE2':'rgba(242,238,226,.45)', transition:'width .15s' }} />
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', zIndex:2,
+      background:'rgba(0,0,0,.4)', color:'#F2EEE2', fontSize:10.5, fontWeight:600, padding:'3px 9px', borderRadius:10 }}>
+      {idx+1} / {count}
+    </div>
+  )
+}
+
 export function PhotoHero({ target, fallback }) {
   const { photos } = usePhotos(target)
   const [idx, setIdx] = useState(0)
@@ -136,12 +157,7 @@ export function PhotoHero({ target, fallback }) {
       {many && <>
         <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+photos.length)%photos.length) }} style={navBtn('left')}>‹</button>
         <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%photos.length) }} style={navBtn('right')}>›</button>
-        <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:2 }}>
-          {photos.map((_,i)=>(
-            <span key={i} style={{ width:i===idx?14:5, height:5, borderRadius:3,
-              background: i===idx?'#F2EEE2':'rgba(242,238,226,.45)', transition:'width .15s' }} />
-          ))}
-        </div>
+        <CarouselDots count={photos.length} idx={idx} />
       </>}
       {open && cover && <Lightbox photos={photos} index={idx} onIndex={setIdx} onClose={()=>setOpen(false)} />}
     </>
@@ -175,12 +191,7 @@ export function PhotoHeroSpecies({ sp, fallback }) {
       {many && <>
         <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i-1+shots.length)%shots.length) }} style={navBtn('left')}>‹</button>
         <button onClick={(e)=>{ e.stopPropagation(); setIdx(i=>(i+1)%shots.length) }} style={navBtn('right')}>›</button>
-        <div style={{ position:'absolute', bottom:8, left:'50%', transform:'translateX(-50%)', display:'flex', gap:4, zIndex:2 }}>
-          {shots.map((_,i)=>(
-            <span key={i} style={{ width:i===idx?14:5, height:5, borderRadius:3,
-              background: i===idx?'#F2EEE2':'rgba(242,238,226,.45)', transition:'width .15s' }} />
-          ))}
-        </div>
+        <CarouselDots count={shots.length} idx={idx} />
       </>}
       {open && current && <Lightbox photos={photos} index={idx} onIndex={setIdx} onClose={()=>setOpen(false)} />}
     </>
@@ -194,9 +205,19 @@ const bigNavBtn = (side) => ({
 })
 
 // ── Visionneuse plein écran, résolution maximale ──
+// zoom : molette (PC), pincement (mobile), double-clic/double-tap (reset ou zoom ×2.5)
 export function Lightbox({ photos, index, onIndex, onClose }) {
   const p = photos[index]
   const many = photos.length > 1
+  const [tf, setTf] = useState({ k:1, x:0, y:0 })
+  const imgRef = useRef(null)
+  const ptrs = useRef(new Map())
+  const gest = useRef(null)
+  const movedRef = useRef(false)
+  const lastTapRef = useRef(0)
+
+  useEffect(() => { setTf({ k:1, x:0, y:0 }) }, [index])
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape') onClose()
@@ -206,14 +227,97 @@ export function Lightbox({ photos, index, onIndex, onClose }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [photos.length, many, onClose, onIndex])
+
+  const clampK = (k) => Math.min(5, Math.max(1, k))
+  const centerOf = (clientX, clientY) => {
+    const r = imgRef.current.getBoundingClientRect()
+    return { mx: clientX - r.left - r.width/2, my: clientY - r.top - r.height/2 }
+  }
+  const zoomAt = (clientX, clientY, factor) => {
+    const { mx, my } = centerOf(clientX, clientY)
+    setTf(cur => {
+      const k2 = clampK(cur.k * factor)
+      const ratio = k2 / cur.k
+      return { k:k2, x: mx - (mx - cur.x)*ratio, y: my - (my - cur.y)*ratio }
+    })
+  }
+  const toggleZoomAt = (clientX, clientY) => {
+    setTf(cur => {
+      if (cur.k > 1.05) return { k:1, x:0, y:0 }
+      const { mx, my } = centerOf(clientX, clientY)
+      const k2 = 2.5
+      return { k:k2, x: mx - mx*k2, y: my - my*k2 }
+    })
+  }
+
+  const onWheel = (e) => {
+    e.preventDefault()
+    zoomAt(e.clientX, e.clientY, 1 - e.deltaY * 0.0016)
+  }
+  const onDoubleClick = (e) => { e.stopPropagation(); toggleZoomAt(e.clientX, e.clientY) }
+
+  const onPointerDown = (e) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    ptrs.current.set(e.pointerId, { x:e.clientX, y:e.clientY })
+    movedRef.current = false
+    if (ptrs.current.size === 1) {
+      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, ox:tf.x, oy:tf.y }
+    } else if (ptrs.current.size === 2) {
+      const [a,b] = [...ptrs.current.values()]
+      const { mx, my } = centerOf((a.x+b.x)/2, (a.y+b.y)/2)
+      gest.current = { mode:'pinch', d:Math.hypot(a.x-b.x, a.y-b.y), k:tf.k, x:tf.x, y:tf.y, mx, my }
+    }
+  }
+  const onPointerMove = (e) => {
+    if (!ptrs.current.has(e.pointerId)) return
+    ptrs.current.set(e.pointerId, { x:e.clientX, y:e.clientY })
+    const g = gest.current; if (!g) return
+    if (g.mode === 'pan' && ptrs.current.size === 1) {
+      const dx = e.clientX - g.sx, dy = e.clientY - g.sy
+      if (!movedRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) movedRef.current = true
+      if (tf.k <= 1.001) return // rien à déplacer sans zoom — laisse le tap simple fermer/naviguer
+      setTf({ k:tf.k, x: g.ox + dx, y: g.oy + dy })
+    } else if (g.mode === 'pinch' && ptrs.current.size >= 2) {
+      const [a,b] = [...ptrs.current.values()]
+      const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
+      const k2 = clampK(g.k * ratio)
+      const r = k2 / g.k
+      movedRef.current = true
+      setTf({ k:k2, x: g.mx - (g.mx - g.x)*r, y: g.my - (g.my - g.y)*r })
+    }
+  }
+  const onPointerUp = (e) => {
+    ptrs.current.delete(e.pointerId)
+    if (ptrs.current.size === 0) {
+      gest.current = null
+      // double-tap tactile : deux relâchements rapprochés dans le temps
+      const now = Date.now()
+      if (!movedRef.current && now - lastTapRef.current < 300) { toggleZoomAt(e.clientX, e.clientY); lastTapRef.current = 0 }
+      else lastTapRef.current = now
+      setTimeout(() => { movedRef.current = false }, 0)
+    } else if (ptrs.current.size === 1) {
+      const [pt] = [...ptrs.current.values()]
+      gest.current = { mode:'pan', sx:pt.x, sy:pt.y, ox:tf.x, oy:tf.y }
+    }
+  }
+
   if (!p) return null
   return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(10,11,7,.92)', zIndex:200,
-      display:'flex', alignItems:'center', justifyContent:'center', padding:28 }}>
-      <img src={p.url} alt="" draggable={false} onClick={e=>e.stopPropagation()}
-        style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', filter:LUT, borderRadius:4 }} />
+    <div onClick={()=>{ if (!movedRef.current) onClose() }} style={{ position:'fixed', inset:0, background:'rgba(10,11,7,.92)', zIndex:200,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:28, overflow:'hidden' }}>
+      <img ref={imgRef} src={p.url} alt="" draggable={false}
+        onClick={e=>e.stopPropagation()} onDoubleClick={onDoubleClick}
+        onPointerDown={e=>{ e.stopPropagation(); onPointerDown(e) }}
+        onPointerMove={e=>{ e.stopPropagation(); onPointerMove(e) }}
+        onPointerUp={e=>{ e.stopPropagation(); onPointerUp(e) }}
+        onPointerCancel={e=>{ e.stopPropagation(); onPointerUp(e) }}
+        onWheel={onWheel}
+        style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain', filter:LUT, borderRadius:4,
+          touchAction:'none', cursor: tf.k>1?'grab':'zoom-in',
+          transform:`translate(${tf.x}px,${tf.y}px) scale(${tf.k})`, transformOrigin:'center center',
+          transition: gest.current ? 'none' : 'transform .12s ease-out' }} />
       <button onClick={onClose} style={{ position:'absolute', top:16, right:16, width:36, height:36,
-        borderRadius:'50%', background:'rgba(255,255,255,.12)', color:'#fff', fontSize:16 }}>✕</button>
+        borderRadius:'50%', background:'rgba(255,255,255,.12)', color:'#fff', fontSize:16, zIndex:2 }}>✕</button>
       {many && <>
         <button onClick={(e)=>{ e.stopPropagation(); onIndex(i=>(i-1+photos.length)%photos.length) }} style={bigNavBtn('left')}>‹</button>
         <button onClick={(e)=>{ e.stopPropagation(); onIndex(i=>(i+1)%photos.length) }} style={bigNavBtn('right')}>›</button>
