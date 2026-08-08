@@ -1091,15 +1091,24 @@ export default function App() {
             </>}
 
             {detTab==='infos' && <>
-              {[
-                ...(isVegetal(sp) ? [] : [[lang==='ru'?'Питание':'Alimentation', sp.alim]]),
-                [lang==='ru'?'Среда обитания':'Habitat & territoire', sp.hab],
-              ].filter(([,v])=>v).map(([t,v])=>(
-                <div key={t} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8 }}>
-                  <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
-                  <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
-                </div>
-              ))}
+              {(() => {
+                const infos = [
+                  ...(isVegetal(sp) ? [] : [[lang==='ru'?'Питание':'Alimentation', sp.alim]]),
+                  [lang==='ru'?'Среда обитания':'Habitat & territoire', sp.hab],
+                ].filter(([,v])=>v)
+                if (!infos.length) return null
+                return (
+                  <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:11, marginBottom:8,
+                    display:'flex', gap:16, flexWrap:'wrap' }}>
+                    {infos.map(([t,v])=>(
+                      <div key={t} style={{ flex:'1 1 150px', minWidth:150 }}>
+                        <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>{t}</div>
+                        <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.65 }}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
               {sp.niche && (
                 <div style={{ background:'#E6EAD9', border:'1px solid #C3CDA9', borderRadius:10, padding:12, marginBottom:8 }}>
                   <div style={{ fontSize:10.5, fontWeight:700, color:'#4A5D32', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6, display:'flex', alignItems:'center', gap:5 }}>

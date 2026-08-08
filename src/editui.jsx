@@ -163,6 +163,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
   const [sz, setSz] = useState(initial?.sz || 'm')
   const [alim, setAlim] = useState(initial?.alim || '')
   const [hab, setHab] = useState(initial?.hab || '')
+  const [niche, setNiche] = useState(initial?.niche || '')
   const [dng, setDng] = useState(initial?.dng || '')
   const [wiki, setWiki] = useState(initial?.wiki || '')
   const [youtube, setYoutube] = useState(initial?.youtube || '')
@@ -194,7 +195,7 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
     if (!n.trim()) return
     setBusy(true)
     const fields = { n:n.trim(), lat:lat.trim(), e, cat, sub:(newSub.trim()||sub), r, sz,
-      alim:alim.trim(), hab:hab.trim(), dng:dng.trim(), wiki:wiki.trim(), youtube:youtube.trim(), audio:audio.trim() }
+      alim:alim.trim(), hab:hab.trim(), niche:niche.trim(), dng:dng.trim(), wiki:wiki.trim(), youtube:youtube.trim(), audio:audio.trim() }
     if (isEdit) await editSpecies(initial.id, fields)
     else await addSpecies(fields)
     setBusy(false); onSaved?.(); onClose()
@@ -305,6 +306,10 @@ export function SpeciesEditor({ lang, initial, presetCat, presetSub, onClose, on
         </>}
         <label style={label}>{lang==='ru'?'Среда обитания':'Habitat & territoire'}</label>
         <textarea value={hab} onChange={ev=>setHab(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
+        <label style={label}>{lang==='ru'?'Экологическая ниша':'Niche écologique'}</label>
+        <textarea value={niche} onChange={ev=>setNiche(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }}
+          placeholder={lang==='ru'?'В чём этот вид уникален — место или источник энергии, недоступные другим.'
+                                   :'En quoi cette espèce optimise un emplacement ou une source d’énergie que d’autres ne peuvent pas exploiter.'} />
         <label style={label}>{lang==='ru'?'Знаете ли вы?':'Le saviez-vous ?'}</label>
         <textarea value={dng} onChange={ev=>setDng(ev.target.value)} rows={2} style={{ ...input, fontSize:12.5, resize:'vertical' }} />
 

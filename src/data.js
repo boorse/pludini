@@ -95,6 +95,11 @@ export const CATS = [
     subs:[
       { id:'Esocidés', lat:'Esocidae' }, { id:'Percidés', lat:'Percidae' }, { id:'Cyprinidés', lat:'Cyprinidae' },
   ]},
+  { id:'batraciens', e:'🐸', n:'Batraciens', lat:'Amphibia',
+    niche:"Les batraciens exploitent une niche que presque aucun autre vertébré du domaine ne partage : une peau perméable qui respire et absorbe l'eau, mais qui les oblige à rester en milieu humide et à retourner à l'eau pour se reproduire. Cette double vie, terrestre et aquatique, en fait un maillon essentiel entre les deux mondes — et un indicateur précoce de la qualité de l'eau et de l'air.",
+    subs:[
+      { id:'Bufonidés', lat:'Bufonidae' }, { id:'Ranidés', lat:'Ranidae' }, { id:'Salamandridés', lat:'Salamandridae' },
+  ]},
 ]
 
 export const SPECIES = [
@@ -486,6 +491,14 @@ export const SPECIES = [
     alim:'Végétation aquatique, larves, détritus.',
     hab:'Eaux calmes et peu profondes, tolère le manque d\'oxygène.', dng:'—',
     niche:"Championne de la tolérance au manque d'oxygène parmi les poissons du domaine, elle survit dans des eaux peu profondes et stagnantes que même la tanche évite en cas de gel prolongé." },
+
+  // ═══ BATRACIENS ═══
+  { id:'crapaud', n:'Crapaud commun', lat:'Bufo bufo', e:'🐸', cat:'batraciens', sub:'Bufonidés', r:'commun', sz:'s',
+    obs:{}, bonus:{}, inds:[],
+    alim:'Insectes, vers, limaces, cloportes.',
+    hab:'Jardins, sous-bois humides. Migre vers les mares au printemps pour se reproduire.',
+    dng:'Sa peau sécrète une substance irritante — se laver les mains après manipulation.',
+    niche:"Amphibie, il mène une double vie qu'aucun mammifère ou oiseau du domaine ne peut mener : terrestre et nocturne la majeure partie de l'année, chassant dans l'humidité du sous-bois, puis aquatique au printemps pour rejoindre les mares où il se reproduit." },
 
   // ═══ HUMAINS ═══
   { id:'h_ferdinand', n:'Ferdinand', lat:'Homo sapiens', e:'🧔', cat:'humains', sub:'Résidents', r:'commun', sz:'m',
