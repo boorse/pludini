@@ -1808,7 +1808,8 @@ export default function App() {
         onClose={()=>setSighting(null)}
         onSaved={(id, pts)=>{ setRefresh(r=>r+1); if(id) selSpFull(id); triggerReward(pts) }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
-      {showCalendar && <PassageCalendar sp={showCalendar} lang={lang} onClose={()=>setShowCalendar(null)} />}
+      {showCalendar && <PassageCalendar sp={showCalendar} lang={lang} edit={edit} onClose={()=>setShowCalendar(null)}
+        onOpenObs={(ind)=>{ setSighting({ editing:{ sp:showCalendar, ind } }); setShowCalendar(null) }} />}
       {toast && <Toast msg={toast} />}
       {reward && <RewardBurst points={reward.points} tier={reward.tier} onDone={()=>setReward(null)} />}
 
@@ -1824,24 +1825,27 @@ export default function App() {
 function parseFrDate(s) {
   const m = (s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
   if (!m) return null
-  return { day: parseInt(m[1],10), month: parseInt(m[2],10) }
+  return { day: parseInt(m[1],10), month: parseInt(m[2],10), year: parseInt(m[3],10) }
 }
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
 // ═════ Calendrier annuel des passages (toutes années confondues) — Type 1 uniquement ═════
-function PassageCalendar({ sp, lang, onClose }) {
-  const marks = new Set()
+function PassageCalendar({ sp, lang, edit, onClose, onOpenObs }) {
+  const marks = new Map()
   ;(sp.inds||[]).forEach(ind => {
     const p = parseFrDate(ind.d)
-    if (p) marks.add(`${p.month}-${p.day}`)
+    if (!p) return
+    const key = `${p.month}-${p.day}`
+    const prev = marks.get(key)
+    if (!prev || p.year >= prev.year) marks.set(key, { ind, year:p.year })
   })
   const REF_YEAR = 2024 // année bissextile arbitraire, seulement pour aligner les jours de la semaine
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:170,
       display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:680,
-        maxHeight:'88vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:920,
+        maxHeight:'90vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
         <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
           <div>
             <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink }}>
@@ -1854,7 +1858,7 @@ function PassageCalendar({ sp, lang, onClose }) {
             <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
           </button>
         </div>
-        <div style={{ padding:'12px 18px 6px', display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:12 }}>
+        <div style={{ padding:'12px 18px 6px', display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:16 }}>
           {Array.from({ length:12 }).map((_, mi) => {
             const month = mi+1
             const first = new Date(REF_YEAR, mi, 1)
@@ -1865,18 +1869,26 @@ function PassageCalendar({ sp, lang, onClose }) {
             for (let d=1; d<=daysInMonth; d++) cells.push(d)
             return (
               <div key={mi}>
-                <div style={{ fontSize:10.5, fontWeight:700, color:T.ink, textAlign:'center', marginBottom:4 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:T.ink, textAlign:'center', marginBottom:6 }}>
                   {(lang==='ru'?MONTHS_RU:MONTHS_FR)[mi]}
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:2 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
                   {cells.map((d,i) => {
-                    const on = d!=null && marks.has(`${month}-${d}`)
+                    const mark = d!=null ? marks.get(`${month}-${d}`) : null
+                    const on = !!mark
+                    const clickable = on && edit
+                    const Tag = clickable ? 'button' : 'div'
                     return (
-                      <div key={i} style={{ aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:7.5, borderRadius:3, color: on?'#fff':T.mute,
-                        background: on?T.clay:(d!=null?T.card:'transparent') }}>
+                      <Tag key={i}
+                        onClick={clickable ? ()=>onOpenObs(mark.ind) : undefined}
+                        title={clickable ? (lang==='ru'?'Открыть наблюдение':'Ouvrir l’observation') : undefined}
+                        style={{ aspectRatio:'1', display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:11.5, fontWeight:on?700:400, borderRadius:6, color: on?'#fff':T.mute,
+                        background: on?T.clay:(d!=null?T.card:'transparent'),
+                        border:'none', cursor: clickable?'pointer':(d!=null?'default':'default'),
+                        boxShadow: on?'0 1px 3px rgba(143,74,34,.35)':'none' }}>
                         {d!=null ? (on?'●':d) : ''}
-                      </div>
+                      </Tag>
                     )
                   })}
                 </div>
@@ -1885,8 +1897,11 @@ function PassageCalendar({ sp, lang, onClose }) {
           })}
         </div>
         <div style={{ padding:'0 20px 18px', fontSize:11, color:T.mute, lineHeight:1.5 }}>
-          {lang==='ru'?'Точки отмечают дни, когда это животное уже наблюдали (все годы вместе).'
-            :'Les points marquent les dates où cet animal a déjà été observé (toutes années confondues).'}
+          {edit
+            ? (lang==='ru'?'Точки отмечают дни, когда это животное уже наблюдали — нажмите на точку, чтобы открыть наблюдение.'
+              :'Les points marquent les dates où cet animal a déjà été observé — cliquer sur un point ouvre cette observation.')
+            : (lang==='ru'?'Точки отмечают дни, когда это животное уже наблюдали (все годы вместе).'
+              :'Les points marquent les dates où cet animal a déjà été observé (toutes années confondues).')}
         </div>
       </div>
     </div>
