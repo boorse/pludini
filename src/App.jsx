@@ -610,6 +610,11 @@ export default function App() {
         {CATS.filter(c=>SPECIES.some(s=>s.cat===c.id)).map(cat=>{
           const list = SPECIES.filter(s=>s.cat===cat.id)
           const cn = catNameOf(cat, lang)
+          // bande de luminosité par ordre (sous-famille) : chaque changement de
+          // "sub" alterne la teinte, pour repérer les zones d'un coup d'œil
+          // sans introduire de nouvelles couleurs — juste plus ou moins clair
+          let curSub = null, bandOn = false
+          const bands = list.map(s => { if (s.sub !== curSub) { curSub = s.sub; bandOn = !bandOn }; return bandOn })
           return (
             <div key={cat.id} style={{ marginBottom:20 }}>
               <div className="serif" style={{ fontSize:15, fontWeight:700, color:T.ink, marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
@@ -636,9 +641,11 @@ export default function App() {
                 <tbody>
                   {list.map((s,si)=>{
                     const r = (RARITY[s.r]||RARITY.commun), o = isObserved(s), nm = nameOf(s, lang)
+                    const newGroup = si===0 || list[si-1].sub !== s.sub
+                    const groupBorder = newGroup && si>0 ? `1px solid ${T.line}` : 'none'
                     return (
-                      <tr key={s.id} style={{ opacity:o?1:.5, background: si%2 ? 'rgba(211,199,174,.16)' : 'transparent' }}>
-                        <td onClick={()=>selSpFull(s.id)} style={{ padding:'7px 8px', borderBottom:`1px solid ${T.lineSoft}`, cursor:'pointer' }}>
+                      <tr key={s.id} style={{ opacity:o?1:.5, background: bands[si] ? 'rgba(180,166,136,.22)' : 'transparent' }}>
+                        <td onClick={()=>selSpFull(s.id)} style={{ padding:'7px 8px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder, cursor:'pointer' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:7 }}>
                             <span style={{ width:9, height:9, borderRadius:2, background:o?r.c:'#CFC3A8', flexShrink:0 }} />
                             <span style={{ fontSize:15, filter:o?'none':'grayscale(.6)' }}>{s.e}</span>
@@ -655,7 +662,7 @@ export default function App() {
                           const mine = [...resolved.named, ...resolved.sightings].filter(i=>i.by===pl.name)
                           return (
                             <td key={pl.id} onClick={()=>selSpFull(s.id)} style={{ padding:'6px 8px',
-                              borderBottom:`1px solid ${T.lineSoft}`, borderLeft:`1px solid ${T.lineSoft}`,
+                              borderBottom:`1px solid ${T.lineSoft}`, borderLeft:`1px solid ${T.lineSoft}`, borderTop:groupBorder,
                               textAlign:'center', cursor:'pointer' }}>
                               {best ? (
                                 mine.length>0 ? (
@@ -721,6 +728,8 @@ export default function App() {
       {CATS.filter(c=>SPECIES.some(s=>s.cat===c.id)).map(cat=>{
         const list = SPECIES.filter(s=>s.cat===cat.id)
         const cn = catNameOf(cat, lang)
+        let curSub = null, bandOn = false
+        const bands = list.map(s => { if (s.sub !== curSub) { curSub = s.sub; bandOn = !bandOn }; return bandOn })
         return (
           <div key={cat.id} style={{ marginBottom:16 }}>
             <div className="serif" style={{ fontSize:14, fontWeight:600, color:T.ink, marginBottom:7, display:'flex', alignItems:'center', gap:6 }}>
@@ -735,13 +744,16 @@ export default function App() {
                 {ALL_PLAYERS.map(p=><th key={p.id} title={p.name} style={{ padding:'5px 3px', textAlign:'center', color:T.soft, fontWeight:600, fontSize:10, borderBottom:`1px solid ${T.line}`, width:38 }}>{p.id}</th>)}
               </tr></thead>
               <tbody>
-                {list.map(s=>{
+                {list.map((s,si)=>{
                   const r = (RARITY[s.r]||RARITY.commun), o = isObserved(s)
                   const nm = nameOf(s, lang)
                   const nInd = (s.inds||[]).length
+                  const newGroup = si===0 || list[si-1].sub !== s.sub
+                  const groupBorder = newGroup && si>0 ? `1px solid ${T.line}` : 'none'
+                  const rowBg = bands[si] ? 'rgba(180,166,136,.22)' : 'transparent'
                   return (
-                    <tr key={s.id} onClick={()=>selSpFull(s.id)} style={{ cursor:'pointer', opacity:o?1:0.5 }}>
-                      <td style={{ padding:'5px 6px', borderBottom:`1px solid ${T.lineSoft}` }}>
+                    <tr key={s.id} onClick={()=>selSpFull(s.id)} style={{ cursor:'pointer', opacity:o?1:0.5, background:rowBg }}>
+                      <td style={{ padding:'5px 6px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                           <span style={{ width:8, height:8, borderRadius:2, background:o?r.c:'#CFC3A8', flexShrink:0 }} />
                           <span style={{ fontSize:13, filter:o?'none':'grayscale(.6)' }}>{s.e}</span>
@@ -751,7 +763,7 @@ export default function App() {
                           </span>
                         </div>
                       </td>
-                      <td style={{ padding:'5px 3px', textAlign:'center', borderBottom:`1px solid ${T.lineSoft}` }}>
+                      <td style={{ padding:'5px 3px', textAlign:'center', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder }}>
                         {nInd>0 && <span className="serif" style={{ fontSize:10.5, fontWeight:700, color:'#8F4A22', background:'#F0E4CF', borderRadius:8, padding:'1px 6px' }}>{nInd}</span>}
                       </td>
                       {PLAYERS.map(pl=>{
@@ -761,7 +773,7 @@ export default function App() {
                         const myInd = myInds.length
                         const hasUncertain = myInds.some(i=>i.uncertain)
                         return (
-                          <td key={pl.id} style={{ padding:'5px 3px', borderBottom:`1px solid ${T.lineSoft}`, textAlign:'center' }}>
+                          <td key={pl.id} style={{ padding:'5px 3px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder, textAlign:'center' }}>
                             <div title={`${best?`${pl.name} — ${METHODS[best].l}${myInd?` · ${myInd} individu(s)`:''}`:pl.name}${hasUncertain?' · identification à confirmer':''}`}
                               style={{ position:'relative', width:22, height:22, borderRadius:'50%', margin:'0 auto',
                                 display:'flex', alignItems:'center', justifyContent:'center', fontSize:9,
