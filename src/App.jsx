@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved,
-         OBS_STATES, OBS_STATE_COLOR } from './data'
+         OBS_STATES, OBS_STATE_COLOR, obsStateLabel } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
 import { gradientFor, gradientForCat, catAccentColor } from './gradients.js'
@@ -431,7 +431,6 @@ export default function App() {
   const [sighting, setSighting] = useState(null)
   const [idPicker, setIdPicker] = useState(false)
   const [showCalendar, setShowCalendar] = useState(null) // espèce dont on affiche le calendrier des passages
-  const [showStates, setShowStates] = useState(null)      // espèce dont on affiche les badges "observation particulière"
 
   useEffect(() => {
     loadAll().then(()=>setRefresh(r=>r+1))
@@ -445,7 +444,7 @@ export default function App() {
   // score, etc.) : sans ça, sur mobile, un geste de défilement dans la fenêtre
   // peut "rebondir" jusqu'au corps de page en dessous et faire bouger toute
   // la page — elle doit rester parfaitement fixe pendant qu'une fenêtre est ouverte
-  const anyModalOpen = !!(curSp || curPlayer || promoting || mergeSheet || spEditor || sighting || idPicker || showCalendar || showStates || photoTarget)
+  const anyModalOpen = !!(curSp || curPlayer || promoting || mergeSheet || spEditor || sighting || idPicker || showCalendar || photoTarget)
   useEffect(() => {
     if (!anyModalOpen) return
     const scrollY = window.scrollY
@@ -867,21 +866,33 @@ export default function App() {
           <div style={{ padding:'14px 18px 22px' }}>
             {!isPerson && <div className="serif" style={{ fontSize:15, fontWeight:600, color:T.clay, marginBottom:12 }}>{baseP} pts base · max {baseP*3+50} pts</div>}
             {speciesType(sp)===1 && (() => {
-              const seen = new Set((sp.inds||[]).map(i=>i.state).filter(Boolean))
+              const firstByState = {}
+              ;(sp.inds||[]).forEach(ind => { if (ind.state && !firstByState[ind.state]) firstByState[ind.state] = ind })
               return (
-                <button onClick={()=>setShowStates(sp)} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:12,
-                  padding:'6px 10px', borderRadius:12, border:`1px solid ${seen.size?OBS_STATE_COLOR:T.line}`,
-                  background:seen.size?'#EAF1F6':T.card }}>
-                  <div style={{ display:'flex', gap:2 }}>
-                    {Object.entries(OBS_STATES).map(([k,st])=>(
-                      <span key={k} style={{ fontSize:13, opacity:seen.has(k)?1:.45,
-                        filter:seen.has(k)?'none':'grayscale(.75)' }}>{st.e}</span>
-                    ))}
-                  </div>
-                  <span style={{ fontSize:10.5, fontWeight:600, color:seen.size?OBS_STATE_COLOR:T.mute }}>
-                    {seen.size}/{Object.keys(OBS_STATES).length}
-                  </span>
-                </button>
+                <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:6, marginBottom:12 }}>
+                  {Object.keys(OBS_STATES).map(k=>{
+                    const st = obsStateLabel(k, sp)
+                    const found = firstByState[k]
+                    return (
+                      <button key={k} onClick={found ? ()=>setCurInd(found.n) : undefined}
+                        style={{ textAlign:'center', borderRadius:10, overflow:'hidden', position:'relative',
+                          height:60, border:`1px solid ${found?OBS_STATE_COLOR:T.line}`,
+                          cursor:found?'pointer':'default' }}>
+                        {found ? <>
+                          <PhotoBg target={`ind:${sp.id}:${found.n}`} fallback={gradientFor(sp.id+found.n)} />
+                          <div style={{ position:'absolute', inset:0,
+                            background:'linear-gradient(to top, rgba(16,18,12,.68), transparent 62%)' }} />
+                        </> : <div style={{ position:'absolute', inset:0, background:T.card }} />}
+                        <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column',
+                          alignItems:'center', justifyContent:'flex-end', padding:'4px 2px' }}>
+                          <span style={{ fontSize:15, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
+                          <span style={{ fontSize:8, fontWeight:700, marginTop:1, lineHeight:1.1,
+                            color:found?'#F2EEE2':T.mute }}>{lang==='ru'?st.ru:st.l}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               )
             })()}
             {isPerson && (
@@ -1068,13 +1079,13 @@ export default function App() {
                                 color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
                                 letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
-                              {ind.state && OBS_STATES[ind.state] && (
-                                <span title={lang==='ru'?OBS_STATES[ind.state].ru:OBS_STATES[ind.state].l}
+                              {ind.state && OBS_STATES[ind.state] && (() => { const st = obsStateLabel(ind.state, sp); return (
+                                <span title={lang==='ru'?st.ru:st.l}
                                   style={{ position:'absolute', top:6, right:6, background:OBS_STATE_COLOR,
                                   color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:11,
                                   display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}>
-                                  {OBS_STATES[ind.state].e}</span>
-                              )}
+                                  {st.e}</span>
+                              )})()}
                               {isNamed && ind.mergedCount>1 && <span style={{ position:'absolute', top:6, right:6,
                                 background:'rgba(20,18,14,.72)', color:'#fff', borderRadius:8, padding:'2px 7px',
                                 fontSize:8.5, fontWeight:800, zIndex:2 }}>×{ind.mergedCount}</span>}
@@ -1857,9 +1868,7 @@ export default function App() {
         onSaved={(id, pts)=>{ setRefresh(r=>r+1); if(id) selSpFull(id); triggerReward(pts) }} />}
       {photoTarget && <PhotoManager target={photoTarget.target} label={photoTarget.label} lang={lang} onClose={()=>setPhotoTarget(null)} />}
       {showCalendar && <PassageCalendar sp={showCalendar} lang={lang} edit={edit} onClose={()=>setShowCalendar(null)}
-        onOpenObs={(ind)=>{ setSighting({ editing:{ sp:showCalendar, ind } }); setShowCalendar(null) }} />}
-      {showStates && <StateBadgesSheet sp={showStates} lang={lang} edit={edit} onClose={()=>setShowStates(null)}
-        onOpenObs={(ind)=>{ setSighting({ editing:{ sp:showStates, ind } }); setShowStates(null) }} />}
+        onOpenObs={(ind)=>{ setCurInd(ind.n); setShowCalendar(null) }} />}
       {toast && <Toast msg={toast} />}
       {reward && <RewardBurst points={reward.points} tier={reward.tier} onDone={()=>setReward(null)} />}
 
@@ -1952,67 +1961,6 @@ function PassageCalendar({ sp, lang, edit, onClose, onOpenObs }) {
               :'Les points marquent les dates où cet animal a déjà été observé — cliquer sur un point ouvre cette observation.')
             : (lang==='ru'?'Точки отмечают дни, когда это животное уже наблюдали (все годы вместе).'
               :'Les points marquent les dates où cet animal a déjà été observé (toutes années confondues).')}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ═════ Badges "observation particulière" (bébé/maman/papa/vieux/malade) d'une espèce ═════
-function StateBadgesSheet({ sp, lang, edit, onClose, onOpenObs }) {
-  // premier individu observé pour chaque état (le plus ancien, toutes personnes confondues)
-  const firstByState = {}
-  ;(sp.inds||[]).forEach(ind => {
-    if (!ind.state) return
-    const prev = firstByState[ind.state]
-    if (!prev) firstByState[ind.state] = ind
-  })
-  return (
-    <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:170,
-      display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:420,
-        maxHeight:'88vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
-        <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
-          <div>
-            <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink }}>
-              {lang==='ru'?'Значки наблюдений':'Badges d’observation'}
-            </div>
-            <div style={{ fontSize:11.5, color:T.soft, marginTop:2 }}>{sp.n}</div>
-          </div>
-          <button onClick={onClose} style={{ width:28, height:28, borderRadius:'50%', background:T.card, color:T.soft,
-            display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-            <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
-          </button>
-        </div>
-        <div style={{ padding:'12px 20px 20px', display:'flex', flexDirection:'column', gap:8 }}>
-          {Object.entries(OBS_STATES).map(([k,st])=>{
-            const found = firstByState[k]
-            const Tag = (found && edit) ? 'button' : 'div'
-            return (
-              <Tag key={k} onClick={found && edit ? ()=>onOpenObs(found) : undefined}
-                style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 12px', borderRadius:12, textAlign:'left',
-                  border:`1px solid ${found?OBS_STATE_COLOR:T.line}`, background:found?'#EAF1F6':T.card,
-                  cursor: (found && edit) ? 'pointer' : 'default', width:'100%' }}>
-                <span style={{ fontSize:22, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div className="serif" style={{ fontSize:13, fontWeight:700, color:found?OBS_STATE_COLOR:T.mute }}>
-                    {lang==='ru'?st.ru:st.l}
-                  </div>
-                  <div style={{ fontSize:11, color:T.mute, marginTop:1 }}>
-                    {found
-                      ? `${found.d}${found.by?' · '+found.by:''}`
-                      : (lang==='ru'?'Ещё не замечено':'Pas encore observé')}
-                  </div>
-                </div>
-                {found && <i className="ti ti-check" style={{ fontSize:15, color:OBS_STATE_COLOR }} aria-hidden="true" />}
-              </Tag>
-            )
-          })}
-        </div>
-        <div style={{ padding:'0 20px 18px', fontSize:11, color:T.mute, lineHeight:1.5 }}>
-          {lang==='ru'
-            ? 'Отметьте состояние животного при добавлении наблюдения, чтобы собрать значки.'
-            : 'Tague l’état de l’animal en notant une observation pour compléter ces badges.'}
         </div>
       </div>
     </div>

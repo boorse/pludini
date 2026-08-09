@@ -33,9 +33,19 @@ export const OBS_STATES = {
   papa:   { l:'Papa',   ru:'Папа',    e:'♂️' },
   vieux:  { l:'Vieux',  ru:'Старый',  e:'👴' },
   malade: { l:'Malade', ru:'Больной', e:'🤒' },
+  gite:   { l:'Terrier', ru:'Нора', e:'🕳️', lBird:'Nid', ruBird:'Гнездо', eBird:'🪺' },
 }
 export const OBS_STATE_BONUS_MULT = 1.1
 export const OBS_STATE_COLOR = '#3E6B8C'
+
+// libellé d'un état contextualisé à l'espèce : le gîte se présente comme un
+// terrier chez les mammifères, un nid chez les oiseaux
+export function obsStateLabel(key, sp) {
+  const st = OBS_STATES[key]
+  if (!st) return null
+  const bird = sp?.cat === 'oiseaux'
+  return { l: (bird && st.lBird) || st.l, ru: (bird && st.ruBird) || st.ru, e: (bird && st.eBird) || st.e }
+}
 
 export const PLAYERS = [
   { id:'G', name:'Gaël' },

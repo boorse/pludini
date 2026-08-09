@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish,
          isVegetal, allSpecies, calcPtsLive } from './store.js'
-import { METHODS, OBS_STATES, OBS_STATE_COLOR } from './data'
+import { METHODS, OBS_STATES, OBS_STATE_COLOR, obsStateLabel } from './data'
 import { uploadPhotoFile } from './photoui.jsx'
 import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker, FishSizePicker } from './editui.jsx'
 
@@ -267,7 +267,8 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
 
         <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-          {Object.entries(OBS_STATES).map(([k,st])=>{
+          {Object.keys(OBS_STATES).map(k=>{
+            const st = obsStateLabel(k, sp)
             const on = obsState===k
             return (
               <button key={k} type="button" onClick={()=>setObsState(on?'':k)}

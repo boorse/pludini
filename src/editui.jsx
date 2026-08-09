@@ -3,7 +3,7 @@ import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies,
          removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType, isVegetal,
          individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover,
          allSpecies, calcPtsLive } from './store.js'
-import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, OBS_STATES, OBS_STATE_COLOR } from './data'
+import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, OBS_STATES, OBS_STATE_COLOR, obsStateLabel } from './data'
 import { subNameOf } from './i18n.js'
 import { LUT, uploadPhotoFile, uploadAudioFile, usePhotos, PhotoCropPicker, thumbZoomStyle } from './photoui.jsx'
 import SatMap from './satmap.jsx'
@@ -589,7 +589,8 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         {speciesType(sp)===1 && <>
           <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
           <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-            {Object.entries(OBS_STATES).map(([k,st])=>{
+            {Object.keys(OBS_STATES).map(k=>{
+              const st = obsStateLabel(k, sp)
               const on = obsState===k
               return (
                 <button key={k} type="button" onClick={()=>setObsState(on?'':k)}
