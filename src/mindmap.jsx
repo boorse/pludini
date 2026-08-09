@@ -501,9 +501,9 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
         {hasKids && <Chev open={open} dark />}
         <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
           style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
-            background: hasNiche?'#4A5D32':'transparent', border: hasNiche?'none':'1.5px solid rgba(74,93,50,.55)',
+            background: hasNiche?'rgba(63,56,44,.18)':'transparent', border: hasNiche?'none':'1.5px solid rgba(63,56,44,.22)',
             padding:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color: hasNiche?'#fff':'#4A5D32', lineHeight:1 }}>i</span>
+          <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color: hasNiche?'rgba(63,56,44,.75)':'rgba(63,56,44,.4)', lineHeight:1 }}>i</span>
         </button>
         <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
         <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
