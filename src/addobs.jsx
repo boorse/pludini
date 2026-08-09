@@ -265,7 +265,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
                       :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
         </div>}
 
-        <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
+        <label style={label}>{lang==='ru'?'Особое наблюдение':'Observation particulière'}</label>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
           {Object.keys(OBS_STATES).map(k=>{
             const st = obsStateLabel(k, sp)

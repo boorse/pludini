@@ -587,7 +587,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         </div>}
 
         {speciesType(sp)===1 && <>
-          <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
+          <label style={label}>{lang==='ru'?'Особое наблюдение':'Observation particulière'}</label>
           <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
             {Object.keys(OBS_STATES).map(k=>{
               const st = obsStateLabel(k, sp)
