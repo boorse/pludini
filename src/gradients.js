@@ -34,6 +34,11 @@ export function gradientForCat(id) {
   const [a, b] = CAT_COLORS[id] || PALETTES[0]
   return `linear-gradient(140deg,${a} 0%,${b} 100%)`
 }
+// teinte pleine (unique, pas un dégradé) d'une catégorie — sert de repère
+// (bandeau, puce) ailleurs que sur ses propres cartes, ex. la matrice
+export function catAccentColor(id) {
+  return (CAT_COLORS[id] || PALETTES[0])[1]
+}
 // dégradé des cartes d'ordre (famille) de la map du vivant : la couleur de sa
 // catégorie, légèrement délavée — pour que chaque ordre reste visuellement
 // rattaché à sa catégorie sans reprendre son intensité pleine

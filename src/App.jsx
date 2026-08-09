@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
-import { gradientFor, gradientForCat } from './gradients.js'
+import { gradientFor, gradientForCat, catAccentColor } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { Calendar, Territory, Gallery, ByPerson } from './screens.jsx'
 import Experience from './experience.jsx'
@@ -615,8 +615,9 @@ export default function App() {
           // sans introduire de nouvelles couleurs — juste plus ou moins clair
           let curSub = null, bandOn = false
           const bands = list.map(s => { if (s.sub !== curSub) { curSub = s.sub; bandOn = !bandOn }; return bandOn })
+          const catColor = catAccentColor(cat.id)
           return (
-            <div key={cat.id} style={{ marginBottom:20 }}>
+            <div key={cat.id} style={{ marginBottom:26, paddingLeft:14, borderLeft:`4px solid ${catColor}` }}>
               <div className="serif" style={{ fontSize:15, fontWeight:700, color:T.ink, marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
                 <span>{cat.e}</span>{cn.main}
                 <span style={{ fontSize:11, color:T.mute, fontWeight:400 }}>· {list.filter(isObserved).length}/{list.length}</span>
@@ -644,7 +645,7 @@ export default function App() {
                     const newGroup = si===0 || list[si-1].sub !== s.sub
                     const groupBorder = newGroup && si>0 ? `1px solid ${T.line}` : 'none'
                     return (
-                      <tr key={s.id} style={{ opacity:o?1:.5, background: bands[si] ? 'rgba(180,166,136,.22)' : 'transparent' }}>
+                      <tr key={s.id} style={{ opacity:o?1:.5, background: bands[si] ? 'rgba(180,166,136,.13)' : 'transparent' }}>
                         <td onClick={()=>selSpFull(s.id)} style={{ padding:'7px 8px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder, cursor:'pointer' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:7 }}>
                             <span style={{ width:9, height:9, borderRadius:2, background:o?r.c:'#CFC3A8', flexShrink:0 }} />
@@ -730,8 +731,9 @@ export default function App() {
         const cn = catNameOf(cat, lang)
         let curSub = null, bandOn = false
         const bands = list.map(s => { if (s.sub !== curSub) { curSub = s.sub; bandOn = !bandOn }; return bandOn })
+        const catColor = catAccentColor(cat.id)
         return (
-          <div key={cat.id} style={{ marginBottom:16 }}>
+          <div key={cat.id} style={{ marginBottom:22, paddingLeft:11, borderLeft:`4px solid ${catColor}` }}>
             <div className="serif" style={{ fontSize:14, fontWeight:600, color:T.ink, marginBottom:7, display:'flex', alignItems:'center', gap:6 }}>
               <span>{cat.e}</span>{cn.main}
               <span style={{ fontSize:10.5, color:T.mute, fontWeight:400 }}>· {list.filter(isObserved).length}/{list.length}</span>
@@ -750,7 +752,7 @@ export default function App() {
                   const nInd = (s.inds||[]).length
                   const newGroup = si===0 || list[si-1].sub !== s.sub
                   const groupBorder = newGroup && si>0 ? `1px solid ${T.line}` : 'none'
-                  const rowBg = bands[si] ? 'rgba(180,166,136,.22)' : 'transparent'
+                  const rowBg = bands[si] ? 'rgba(180,166,136,.13)' : 'transparent'
                   return (
                     <tr key={s.id} onClick={()=>selSpFull(s.id)} style={{ cursor:'pointer', opacity:o?1:0.5, background:rowBg }}>
                       <td style={{ padding:'5px 6px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder }}>
