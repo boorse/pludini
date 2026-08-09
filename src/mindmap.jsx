@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { RARITY, isObserved } from './data'
 import { allSpecies, allCats, editSub } from './store.js'
-import { gradientFor, gradientForCat, GRADIENT_SUB } from './gradients.js'
+import { gradientFor, gradientForCat, gradientForSub } from './gradients.js'
 import { nameOf, catNameOf, subNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
@@ -386,6 +386,7 @@ function InfoPanel({ n, lang, edit, onClose }) {
         {editing ? (
           <>
             <textarea value={text} onChange={e=>setText(e.target.value)} autoFocus rows={6}
+              placeholder={lang==='ru'?'Экологическая ниша, роль, характерные черты…':'Niche écologique, rôle dans le domaine, ce qui le caractérise…'}
               style={{ width:'100%', fontSize:13, color:'#4A453B', lineHeight:1.6, fontFamily:'inherit',
                 padding:10, borderRadius:10, border:'1px solid #D3C7AE', background:'#fff', resize:'vertical' }} />
             <div style={{ display:'flex', gap:8, marginTop:10 }}>
@@ -399,8 +400,14 @@ function InfoPanel({ n, lang, edit, onClose }) {
               </button>
             </div>
           </>
+        ) : n.niche ? (
+          <div style={{ fontSize:13, color:'#4A453B', lineHeight:1.6 }}>{n.niche}</div>
         ) : (
-          n.niche && <div style={{ fontSize:13, color:'#4A453B', lineHeight:1.6 }}>{n.niche}</div>
+          <div style={{ fontSize:12.5, color:'#9A9081', fontStyle:'italic', lineHeight:1.6 }}>
+            {edit
+              ? (lang==='ru'?'Пока нет описания — нажмите на карандаш, чтобы его добавить.':'Pas encore de description — clique sur le crayon pour l’ajouter.')
+              : (lang==='ru'?'Пока нет описания.':'Pas encore de description.')}
+          </div>
         )}
       </div>
     </div>
@@ -486,19 +493,18 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
   if (n.kind === 'fam') {
     const m = n.members || []
     const obs = m.filter(isObserved).length
+    const hasNiche = !!n.niche
     return (
       <div role="button" tabIndex={0} onClick={toggle}
         onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
-        style={{ ...base, background:GRADIENT_SUB, justifyContent:'center', alignItems:'flex-start' }}>
+        style={{ ...base, background:gradientForSub(n.catId), justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
-        {n.niche && (
-          <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
-            style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
-              background:'#93A576', border:'none', padding:0, cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color:'#fff', lineHeight:1 }}>i</span>
-          </button>
-        )}
+        <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
+          style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
+            background: hasNiche?'#4A5D32':'transparent', border: hasNiche?'none':'1.5px solid rgba(74,93,50,.55)',
+            padding:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color: hasNiche?'#fff':'#4A5D32', lineHeight:1 }}>i</span>
+        </button>
         <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
         <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
         <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3 }}>{obs}/{m.length}</span>
