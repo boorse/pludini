@@ -16,13 +16,22 @@ const T = { bg:'#EDE7D8', card:'#E6DDC8', ink:'#2B2620', soft:'#6B6357',
 export const thumbOf = (path) => path ? path.replace(/\.jpg$/, '_t.jpg') : path
 
 // cadrage choisi pour une photo : un scale() centré sur le même point focal que
-// object-position, donc se compose avec object-fit:cover sans le casser — utilisé
-// sur les vignettes ET les bannières (jamais sur le Lightbox plein écran, qui
-// montre volontairement la photo d'origine non recadrée)
+// object-position, donc se compose avec object-fit:cover sans le casser —
+// jamais sur le Lightbox plein écran, qui montre volontairement la photo
+// d'origine non recadrée
 export function thumbZoomStyle(photo) {
   const zoom = photo?.zoom || 1
   if (zoom <= 1.001) return {}
   return { transform:`scale(${zoom})`, transformOrigin: photo?.pos || '50% 50%' }
+}
+// même point focal, mais zoom nettement atténué : la bannière est bien plus
+// grande qu'une vignette et doit garder la situation/le décor autour du sujet,
+// pas juste le plan serré qui convient à une petite vignette
+export function bannerZoomStyle(photo) {
+  const zoom = photo?.zoom || 1
+  if (zoom <= 1.001) return {}
+  const dampened = 1 + (zoom - 1) * 0.35
+  return { transform:`scale(${dampened})`, transformOrigin: photo?.pos || '50% 50%' }
 }
 
 export function compress(file, maxSide = 1600, quality = 0.82) {
@@ -181,7 +190,7 @@ export function PhotoHero({ target, fallback }) {
         {cover && (
           <img src={cover.url} alt="" loading="lazy" decoding="async" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:cover.pos||'50% 50%', filter:LUT, display:'block',
-              ...thumbZoomStyle(cover) }} />
+              ...bannerZoomStyle(cover) }} />
         )}
       </div>
       {many && <>
@@ -211,7 +220,7 @@ export function PhotoHeroSpecies({ sp, fallback }) {
         {current && (
           <img src={current.photo.url} alt="" loading="lazy" decoding="async" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'cover', objectPosition:current.photo.pos||'50% 50%', filter:LUT, display:'block',
-              ...thumbZoomStyle(current.photo) }} />
+              ...bannerZoomStyle(current.photo) }} />
         )}
       </div>
       {current && (
@@ -536,8 +545,8 @@ export function PhotoCropPicker({ target, photo, lang, onClose }) {
         </div>
         <div style={{ fontSize:13, color:T.soft, marginBottom:14, lineHeight:1.5, maxWidth:560 }}>
           {lang==='ru'
-            ? 'Нажмите на животное, затем настройте масштаб рамки. Применяется к миниатюрам и к баннеру в шапке страницы — оригинал фото (при полном просмотре) не меняется.'
-            : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : ce cadrage s’applique aux vignettes et à la bannière en haut de la fiche. La photo d’origine (en plein écran) ne change jamais.'}
+            ? 'Нажмите на животное, затем настройте масштаб рамки. Миниатюры используют этот кадр как есть, баннер в шапке страницы — более мягкую версию, чтобы сохранить контекст сцены. Оригинал фото (при полном просмотре) не меняется.'
+            : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : les vignettes suivent ce cadrage tel quel, la bannière en haut de la fiche l’applique en plus doux pour garder le contexte de la scène. La photo d’origine (en plein écran) ne change jamais.'}
         </div>
         <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'16/10',
           maxHeight:'56vh', margin:'0 auto', borderRadius:12, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
