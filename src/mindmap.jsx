@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { RARITY, isObserved } from './data'
-import { allSpecies, allCats } from './store.js'
-import { gradientFor, gradientForCat } from './gradients.js'
+import { allSpecies, allCats, editSub } from './store.js'
+import { gradientFor, gradientForCat, GRADIENT_SUB } from './gradients.js'
 import { nameOf, catNameOf, subNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
@@ -87,7 +87,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
             const onlyObs = obsOnly.has(famId)
             const shown = onlyObs ? members.filter(isObserved) : members
             return {
-              id: famId, kind: 'fam', label: sv.id, sub: sv.lat, color: sv.c, niche: sv.niche,
+              id: famId, kind: 'fam', label: sv.id, sub: sv.lat, catId: cat.id, subId: sv.id, niche: sv.niche,
               members,
               children: [
                 ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
@@ -345,29 +345,63 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
           </div>
         </div>
       )}
-      {infoNode && <InfoPanel n={infoNode} lang={lang} onClose={()=>setInfoNode(null)} />}
+      {infoNode && <InfoPanel n={infoNode} lang={lang} edit={edit} onClose={()=>setInfoNode(null)} />}
     </div>
   )
 }
 
-function InfoPanel({ n, lang, onClose }) {
-  const color = n.color || '#9A9081'
+function InfoPanel({ n, lang, edit, onClose }) {
   const name = subNameOf(n.label, lang)
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(n.niche || '')
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    await editSub(n.catId, n.subId, { niche: text })
+    setBusy(false); setEditing(false)
+  }
   return (
     <div onClick={onClose} style={{ position:'absolute', inset:0, zIndex:20,
       background:'rgba(30,26,20,.42)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ maxWidth:360, width:'100%', background:'#F2EEE2',
+      <div onClick={e=>e.stopPropagation()} style={{ maxWidth:380, width:'100%', background:'#F2EEE2',
         borderRadius:16, padding:'20px 22px', boxShadow:'0 12px 40px rgba(43,38,32,.3)',
-        borderTop:`4px solid ${color}` }}>
+        borderTop:'4px solid #93A576' }}>
         <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, marginBottom:8 }}>
           <div>
             <div className="serif" style={{ fontSize:17, fontWeight:800, color:'#2B2620' }}>{name.main}</div>
             <div style={{ fontSize:11, fontStyle:'italic', color:'#8A8172', marginTop:2 }}>{n.sub}</div>
           </div>
-          <button onClick={onClose} style={{ background:'rgba(43,38,32,.08)', border:'none', borderRadius:'50%',
-            width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', color:'#6B6357', fontSize:13, flexShrink:0 }}>✕</button>
+          <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+            {edit && !editing && (
+              <button onClick={()=>setEditing(true)} title={lang==='ru'?'Изменить':'Modifier'}
+                style={{ background:'rgba(43,38,32,.08)', border:'none', borderRadius:'50%',
+                width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', color:'#6B6357', fontSize:12 }}>
+                <i className="ti ti-pencil" aria-hidden="true" />
+              </button>
+            )}
+            <button onClick={onClose} style={{ background:'rgba(43,38,32,.08)', border:'none', borderRadius:'50%',
+              width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', color:'#6B6357', fontSize:13 }}>✕</button>
+          </div>
         </div>
-        {n.niche && <div style={{ fontSize:13, color:'#4A453B', lineHeight:1.6 }}>{n.niche}</div>}
+        {editing ? (
+          <>
+            <textarea value={text} onChange={e=>setText(e.target.value)} autoFocus rows={6}
+              style={{ width:'100%', fontSize:13, color:'#4A453B', lineHeight:1.6, fontFamily:'inherit',
+                padding:10, borderRadius:10, border:'1px solid #D3C7AE', background:'#fff', resize:'vertical' }} />
+            <div style={{ display:'flex', gap:8, marginTop:10 }}>
+              <button onClick={()=>{ setEditing(false); setText(n.niche || '') }}
+                style={{ flex:1, padding:'9px', borderRadius:9, border:'1px solid #D3C7AE', color:'#6B6357', fontSize:12.5 }}>
+                {lang==='ru'?'Отмена':'Annuler'}
+              </button>
+              <button onClick={save} disabled={busy} className="serif"
+                style={{ flex:1.3, padding:'9px', borderRadius:9, background:'#B5602F', color:'#fff', fontWeight:700, fontSize:12.5 }}>
+                {lang==='ru'?'Сохранить':'Enregistrer'}
+              </button>
+            </div>
+          </>
+        ) : (
+          n.niche && <div style={{ fontSize:13, color:'#4A453B', lineHeight:1.6 }}>{n.niche}</div>
+        )}
       </div>
     </div>
   )
@@ -452,24 +486,22 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
   if (n.kind === 'fam') {
     const m = n.members || []
     const obs = m.filter(isObserved).length
-    const color = n.color || '#9A9081'
     return (
       <div role="button" tabIndex={0} onClick={toggle}
         onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
-        style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
-        <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:color }} />
+        style={{ ...base, background:GRADIENT_SUB, justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
         {n.niche && (
           <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
-            style={{ position:'absolute', top:6, right: hasKids?26:7, width:15, height:15, borderRadius:'50%',
-              background:color, border:'none', padding:0, cursor:'pointer',
+            style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
+              background:'#93A576', border:'none', padding:0, cursor:'pointer',
               display:'flex', alignItems:'center', justifyContent:'center' }}>
             <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color:'#fff', lineHeight:1 }}>i</span>
           </button>
         )}
-        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2, marginLeft:2 }}>{subNameOf(n.label, lang).main}</span>
-        <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2, marginLeft:2 }}>{n.sub}</span>
-        <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3, marginLeft:2 }}>{obs}/{m.length}</span>
+        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
+        <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
+        <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3 }}>{obs}/{m.length}</span>
       </div>
     )
   }

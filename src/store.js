@@ -12,6 +12,7 @@ const S = {
   species: [],       // espèces ajoutées
   players: [],       // joueurs ajoutés
   edits: {},         // spId -> champs modifiés
+  subEdits: {},      // "catId:subId" -> champs modifiés (niche des ordres/familles)
   sightings: {},     // spId -> [{ind, ...}]
   sightEdits: {},    // "sedit_spId::indName" -> {fields}
   covers: {},        // target -> id de la photo choisie comme vignette
@@ -46,7 +47,7 @@ export async function loadAll() {
       caption: p.caption, by: p.author, pos: '50% 50%', zoom: 1 }
     ;(S.photos[p.target] ||= []).push(rec)
   })
-  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
+  S.named = {}; S.species = []; S.players = []; S.edits = {}; S.subEdits = {}; S.sightings = {}; S.sightEdits = {}; S.covers = {}
   S.activityEdits = {}
   S.farmTextEdits = {}
   S.quizQuestions = []; S.quizEdits = {}; S.quizThemes = []
@@ -57,6 +58,7 @@ export async function loadAll() {
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
     if (r.kind === 'player')  S.players.push({ ...r.value, key: r.key })
     if (r.kind === 'spedit')  S.edits[r.value.id] = r.value
+    if (r.kind === 'subedit') S.subEdits[r.value.id] = r.value
     if (r.kind === 'sighting') (S.sightings[r.value.spId] ||= []).push({ ...r.value, key: r.key })
     if (r.kind === 'sightedit') S.sightEdits[r.key] = r.value
     if (r.kind === 'cover')  S.covers[r.value.target] = r.value.photoId
@@ -556,9 +558,20 @@ export function allCats() {
     const base = BASE_CATS.find(x => x.id === c.cat)
     if (base && c.sub && !base.subs.some(s => s.id === c.sub)) (extra[c.cat] ||= new Set()).add(c.sub)
   })
-  return BASE_CATS.map(c => extra[c.id]
-    ? { ...c, subs: [...c.subs, ...[...extra[c.id]].map(id => ({ id, lat: '' }))] }
-    : c)
+  return BASE_CATS.map(c => {
+    const subs = extra[c.id] ? [...c.subs, ...[...extra[c.id]].map(id => ({ id, lat: '' }))] : c.subs
+    const editedSubs = subs.map(sv => {
+      const se = S.subEdits[`${c.id}:${sv.id}`]
+      return se ? { ...sv, ...se.fields } : sv
+    })
+    return { ...c, subs: editedSubs }
+  })
+}
+export async function editSub(catId, subId, fields) {
+  const key = `${catId}:${subId}`
+  const value = { id: key, fields: { ...(S.subEdits[key]?.fields || {}), ...fields } }
+  S.subEdits[key] = value; notify()
+  await sb.from('overrides').upsert({ kind: 'subedit', key: 'subedit_' + key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }
 
 // ══════ QUIZ (questions ajoutées/modifiées depuis l'éditeur) ══════

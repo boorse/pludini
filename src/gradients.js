@@ -26,3 +26,6 @@ export function gradientForCat(id) {
   }
   return map[id] || PALETTES[0]
 }
+// dégradé pastel unique pour les cartes d'ordre (famille) de la map du vivant —
+// même teinte sauge que le dégradé "mammifères" ci-dessus, très éclaircie
+export const GRADIENT_SUB = 'linear-gradient(140deg,#E9EFDD 0%,#D6E1BF 100%)'
