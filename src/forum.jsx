@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { getMe, allSpecies, speciesType, CAT_PT_MULT, allForumTopics, forumPostsFor, forumPostCount,
+import { getMe, allSpecies, speciesType, CAT_PT_MULT, REPEAT_PASSAGE_MULT, allForumTopics, forumPostsFor, forumPostCount,
          addForumTopic, addForumPost, removeForumTopic, removeForumPost } from './store.js'
-import { RARITY, SIZE_MULT } from './data'
+import { RARITY, SIZE_MULT, METHODS, FISH_SIZE_MULT } from './data'
 import { UI, nameOf } from './i18n.js'
 import { T, Modal, label, input, ValidateBar, ConfirmDialog, IdentityPicker } from './editui.jsx'
 
@@ -160,7 +160,7 @@ function TopicThread({ lang, topic, edit, onClose }) {
   }
 
   return (
-    <Modal onClose={onClose} max={topic.special==='points-table' ? 680 : 560}>
+    <Modal onClose={onClose} max={topic.special==='points-table' ? 820 : 560}>
       <div style={{ padding:'20px 22px 0' }}>
         <div className="serif" style={{ fontSize:18, fontWeight:900, color:T.ink, lineHeight:1.3 }}>{topic.title}</div>
       </div>
@@ -219,6 +219,87 @@ function maxPointsFor(sp) {
   return Math.round((rarityPts * 3 + 50) * catMult * qualityMultMax)
 }
 
+// ── Petit bloc "Nom · valeur", réutilisé pour chaque grille de référence ──
+function Chip({ l, v }) {
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:11.5, padding:'4px 0' }}>
+      <span style={{ color:T.soft }}>{l}</span>
+      <span style={{ color:T.clay, fontWeight:700 }}>{v}</span>
+    </div>
+  )
+}
+function RefBox({ title, children }) {
+  return (
+    <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px' }}>
+      <div className="serif" style={{ fontSize:12, fontWeight:700, color:T.ink, marginBottom:2 }}>{title}</div>
+      {children}
+    </div>
+  )
+}
+
+// ══════ Explication détaillée du calcul (barème complet, toujours à jour) ══════
+function PointsExplainer({ lang }) {
+  const repeatPct = Math.round(REPEAT_PASSAGE_MULT * 100)
+  return (
+    <div style={{ marginBottom:14 }}>
+      <div style={{ fontSize:12.5, color:T.soft, lineHeight:1.6, marginBottom:10 }}>
+        {lang==='ru'
+          ? 'Очки = (База + Бонусы) × множитель категории × множитель качества фото. База = редкость × размер. Первое замеченное животное данного вида приносит очки за лучший использованный метод наблюдения ; каждое следующее прохождение того же вида приносит лишь малую долю (см. ниже), чтобы нельзя было бесконечно раздувать счёт, фотографируя одно и то же узнанное животное.'
+          : "Points = (Base + Bonus) × multiplicateur de catégorie × multiplicateur de qualité photo. La base = rareté × taille. Le premier passage enregistré pour une espèce rapporte les points de sa méthode d'observation ; chaque passage suivant du même animal n'en rapporte qu'une part infime (voir plus bas), pour empêcher de gonfler son score à l'infini en repassant la même caméra devant un animal déjà reconnu."}
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:8, marginBottom:10 }}>
+        <RefBox title={lang==='ru'?'Редкость':'Rareté'}>
+          {Object.values(RARITY).map(r=><Chip key={r.l} l={r.l} v={`+${r.p}`} />)}
+        </RefBox>
+        <RefBox title={lang==='ru'?'Размер':'Taille'}>
+          <Chip l={lang==='ru'?'Очень маленький':'Très petit'} v="×1" />
+          <Chip l={lang==='ru'?'Маленький':'Petit'} v="×1.5" />
+          <Chip l={lang==='ru'?'Средний':'Moyen'} v="×2" />
+          <Chip l={lang==='ru'?'Большой':'Grand'} v="×2.5" />
+          <Chip l={lang==='ru'?'Огромный':'Géant'} v="×3" />
+        </RefBox>
+        <RefBox title={lang==='ru'?'Способ наблюдения':'Méthode d’observation'}>
+          {Object.values(METHODS).map(m=><Chip key={m.l} l={m.l} v={`×${m.mult}`} />)}
+          <div style={{ fontSize:10, color:T.mute, marginTop:4, lineHeight:1.4, fontStyle:'italic' }}>
+            {lang==='ru'?'Прямое наблюдение стоит больше, чем фотоловушка.':'Vu en direct rapporte plus que capté par une caméra piège.'}
+          </div>
+        </RefBox>
+        <RefBox title={lang==='ru'?'Поймано (рыбы)':'Prise (poissons)'}>
+          <Chip l={lang==='ru'?'Маленькая':'Petite'} v={`×${FISH_SIZE_MULT.petit}`} />
+          <Chip l={lang==='ru'?'Средняя':'Moyenne'} v={`×${FISH_SIZE_MULT.moyen}`} />
+          <Chip l={lang==='ru'?'Крупная':'Grande'} v={`×${FISH_SIZE_MULT.grand}`} />
+          <div style={{ fontSize:10, color:T.mute, marginTop:4, lineHeight:1.4, fontStyle:'italic' }}>
+            {lang==='ru'?'Заменяет способ наблюдения для рыб.':'Remplace la méthode d’observation pour les poissons.'}
+          </div>
+        </RefBox>
+        <RefBox title={lang==='ru'?'Бонусы':'Bonus'}>
+          <Chip l={lang==='ru'?'👶 Детёныши':'👶 Bébés'} v="+20" />
+          <Chip l={lang==='ru'?'🏠 Нора':'🏠 Terrier'} v="+30" />
+          <Chip l={lang==='ru'?'📸 Крупным планом':'📸 De près'} v="×2" />
+          <Chip l={lang==='ru'?'📷 Издалека':'📷 De loin'} v="÷2" />
+        </RefBox>
+        <RefBox title={lang==='ru'?'Категория':'Catégorie'}>
+          <Chip l={lang==='ru'?'Деревья, кустарники':'Arbres, arbustes'} v="×0.3" />
+          <Chip l={lang==='ru'?'Люди, домашние животные':'Humains, domestiques'} v="×0" />
+          <div style={{ fontSize:10, color:T.mute, marginTop:4, lineHeight:1.4, fontStyle:'italic' }}>
+            {lang==='ru'?'Остальные категории — ×1.':'Toutes les autres catégories — ×1.'}
+          </div>
+        </RefBox>
+      </div>
+      <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:10, padding:'9px 11px' }}>
+        <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#8F6A2E', marginBottom:3 }}>
+          {lang==='ru'?'Повторные прохождения':'Passages répétés'}
+        </div>
+        <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.6 }}>
+          {lang==='ru'
+            ? `Первое прохождение = 100% очков. Каждое следующее прохождение того же уже узнанного животного = только ${repeatPct}%.`
+            : `Le premier passage vaut 100% des points. Chaque passage suivant du même animal déjà reconnu ne vaut plus que ${repeatPct}%.`}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ══════ Tableau live de tous les points max par espèce, triés du plus au moins ══════
 function PointsTable({ lang }) {
   const rows = allSpecies()
@@ -226,6 +307,8 @@ function PointsTable({ lang }) {
     .sort((a, b) => b.max - a.max)
 
   return (
+    <>
+    <PointsExplainer lang={lang} />
     <div style={{ border:`1px solid ${T.line}`, borderRadius:12, overflow:'hidden' }}>
       <div style={{ maxHeight:420, overflowY:'auto' }}>
         <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11.5 }}>
@@ -285,5 +368,6 @@ function PointsTable({ lang }) {
           : 'Ce tableau se met à jour automatiquement selon les données actuelles des espèces.'}
       </div>
     </div>
+    </>
   )
 }

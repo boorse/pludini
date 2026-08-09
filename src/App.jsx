@@ -9,7 +9,8 @@ import Experience from './experience.jsx'
 import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT, thumbZoomStyle } from './photoui.jsx'
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
-         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain } from './store.js'
+         removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain,
+         REPEAT_PASSAGE_MULT } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -1442,7 +1443,8 @@ export default function App() {
                 ['Rareté', Object.values(RARITY).map(r=>[r.l,`+${r.p}`])],
                 ['Méthode', Object.values(METHODS).map(m=>[m.l,`×${m.mult}`])],
                 ['Taille', [['Très petit','×1'],['Petit','×1.5'],['Moyen','×2'],['Grand','×2.5'],['Géant','×3']]],
-                ['Bonus', [['👶 Bébés','+20'],['🏠 Terrier','+30'],['📸 Photo nette','+10']]],
+                ['Bonus', [['👶 Bébés','+20'],['🏠 Terrier','+30'],['📸 De près','×2'],['📷 De loin','÷2']]],
+                ['Catégorie', [['Arbres, arbustes','×0.3'],['Humains, domestiques','×0']]],
               ].map(([title,items])=>(
                 <div key={title} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:'9px 11px' }}>
                   <div className="serif" style={{ fontSize:12, fontWeight:600, color:T.ink, marginBottom:5 }}>{title}</div>
@@ -1453,6 +1455,10 @@ export default function App() {
                   ))}
                 </div>
               ))}
+            </div>
+            <div style={{ fontSize:10.5, color:T.mute, marginTop:9, lineHeight:1.6, display:'flex', alignItems:'flex-start', gap:5 }}>
+              <i className="ti ti-repeat" style={{ fontSize:13, marginTop:1, flexShrink:0 }} aria-hidden="true" />
+              <span>Passages répétés : le premier passage vaut 100% des points, chaque passage suivant du même animal déjà reconnu ne vaut plus que {Math.round(REPEAT_PASSAGE_MULT*100)}%.</span>
             </div>
           </div>
         </div>

@@ -491,6 +491,10 @@ export function isFish(sp) { return sp.cat === 'poissons' }
 // ══════ SCORES (tiennent compte des ajouts) ══════
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
 export const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
+// un individu déjà reconnu peut être repassé devant la caméra des dizaines de
+// fois : seul le tout premier passage compte plein pot, les suivants ne
+// rapportent qu'1% chacun (référencé aussi dans le forum, sujet "calcul des points")
+export const REPEAT_PASSAGE_MULT = 0.01
 export function calcPtsLive(sp, player) {
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
@@ -511,12 +515,12 @@ export function calcPtsLive(sp, player) {
   if (allMyInds.length) {
     // chaque passage compte pour les points de sa propre méthode d'observation :
     // seul le tout premier passage ajouté rapporte 100% des points de base,
-    // les suivants n'en rapportent que 10% (sinon cumuler les photos d'un
+    // les suivants n'en rapportent que 1% (sinon cumuler les photos d'un
     // même animal déjà reconnu gonflerait le score sans limite)
     const isFishSp = isFish(sp)
     base = myInds.reduce((sum, ind, i) => {
       const mult = isFishSp ? (FISH_SIZE_MULT[ind.size] || 1) : (METHODS[ind.method]?.mult || 1)
-      return sum + rarityPts * mult * (i === 0 ? 1 : 0.1)
+      return sum + rarityPts * mult * (i === 0 ? 1 : REPEAT_PASSAGE_MULT)
     }, 0)
   } else {
     // pas encore de passage enregistré : méthode(s) cochée(s) sans individu
