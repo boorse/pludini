@@ -538,8 +538,8 @@ export function PhotoCropPicker({ target, photo, lang, onClose }) {
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.7)', zIndex:150,
       display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:22,
-        maxWidth:860, width:'100%', maxHeight:'92vh', overflowY:'auto', border:`1px solid ${T.line}` }}>
+      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, padding:24,
+        maxWidth:1240, width:'100%', maxHeight:'95vh', overflowY:'auto', border:`1px solid ${T.line}` }}>
         <div className="serif" style={{ fontSize:19, fontWeight:700, color:T.ink, marginBottom:6 }}>
           {lang==='ru'?'Кадрирование фото':'Cadrage de la photo'}
         </div>
@@ -548,8 +548,8 @@ export function PhotoCropPicker({ target, photo, lang, onClose }) {
             ? 'Нажмите на животное, затем настройте масштаб рамки. Миниатюры используют этот кадр как есть, баннер в шапке страницы — более мягкую версию, чтобы сохранить контекст сцены. Оригинал фото (при полном просмотре) не меняется.'
             : 'Touche l’animal sur la photo, puis ajuste le cadre transparent : les vignettes suivent ce cadrage tel quel, la bannière en haut de la fiche l’applique en plus doux pour garder le contexte de la scène. La photo d’origine (en plein écran) ne change jamais.'}
         </div>
-        <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'16/10',
-          maxHeight:'56vh', margin:'0 auto', borderRadius:12, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
+        <div ref={boxRef} onClick={pick} style={{ position:'relative', width:'100%', aspectRatio:'16/9',
+          maxHeight:'74vh', margin:'0 auto', borderRadius:12, overflow:'hidden', cursor:'crosshair', background:'#1E2418' }}>
           <img src={photo.url} alt="" draggable={false}
             style={{ width:'100%', height:'100%', objectFit:'contain', filter:LUT, display:'block' }} />
           <div style={{ position:'absolute', left:`${px}%`, top:`${py}%`, transform:'translate(-50%,-50%)',
