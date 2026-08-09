@@ -1075,7 +1075,7 @@ export default function App() {
                         })}
                       </div>
                     )}
-                    <div style={{ display:'grid', gridTemplateColumns: (wide && showFamiliers)?'1fr 1fr':'1fr', gap:16,
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:16,
                       paddingBottom: selectMode ? 64 : 0 }}>
                       {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
                       <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
