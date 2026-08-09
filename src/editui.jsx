@@ -550,26 +550,28 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
           </div>
         )}
 
-        <label style={label}>{lang==='ru'?'Тип':'Type de rencontre'}</label>
-        <div style={{ display:'flex', gap:6 }}>
-          <button onClick={()=>setNamed(false)} style={{ flex:1, padding:'10px', borderRadius:11,
-            border:`1px solid ${!named?T.clay:T.line}`, background:!named?'#F0DDD0':'transparent',
-            fontSize:12.5, color:T.ink, fontWeight:!named?700:400 }}>
-            👁 {lang==='ru'?'Проход':'Passage'}
-          </button>
-          <button onClick={()=>setNamed(true)} style={{ flex:1, padding:'10px', borderRadius:11,
-            border:`2px solid ${named?T.gold:T.line}`, background:named?'#F5EBD6':'transparent',
-            fontSize:12.5, color:T.ink, fontWeight:named?700:400 }}>
-            ★ {lang==='ru'?'Знакомый':'Familier'}
-          </button>
-        </div>
-        <div style={{ fontSize:11, color:T.mute, marginTop:5, lineHeight:1.45 }}>
-          {named
-            ? (lang==='ru'?'Особь, которую вы узнаёте и будете отслеживать.'
-                          :'Un animal que tu reconnais et que tu suivras dans le temps.')
-            : (lang==='ru'?'Разовая встреча без опознания особи.'
-                          :'Une rencontre ponctuelle, sans identifier l’individu.')}
-        </div>
+        {speciesType(sp)===1 && <>
+          <label style={label}>{lang==='ru'?'Тип':'Type de rencontre'}</label>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={()=>setNamed(false)} style={{ flex:1, padding:'10px', borderRadius:11,
+              border:`1px solid ${!named?T.clay:T.line}`, background:!named?'#F0DDD0':'transparent',
+              fontSize:12.5, color:T.ink, fontWeight:!named?700:400 }}>
+              👁 {lang==='ru'?'Проход':'Passage'}
+            </button>
+            <button onClick={()=>setNamed(true)} style={{ flex:1, padding:'10px', borderRadius:11,
+              border:`2px solid ${named?T.gold:T.line}`, background:named?'#F5EBD6':'transparent',
+              fontSize:12.5, color:T.ink, fontWeight:named?700:400 }}>
+              ★ {lang==='ru'?'Знакомый':'Familier'}
+            </button>
+          </div>
+          <div style={{ fontSize:11, color:T.mute, marginTop:5, lineHeight:1.45 }}>
+            {named
+              ? (lang==='ru'?'Особь, которую вы узнаёте и будете отслеживать.'
+                            :'Un animal que tu reconnais et que tu suivras dans le temps.')
+              : (lang==='ru'?'Разовая встреча без опознания особи.'
+                            :'Une rencontre ponctuelle, sans identifier l’individu.')}
+          </div>
+        </>}
 
         <button type="button" onClick={()=>setUnsure(v=>!v)} style={{ width:'100%', padding:'10px', borderRadius:11, marginTop:10,
           border:`1.5px dashed ${unsure?'#D68C34':T.line}`, background:unsure?'#F5E4C8':'transparent',

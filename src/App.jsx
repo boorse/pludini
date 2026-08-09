@@ -924,9 +924,11 @@ export default function App() {
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?110:90}px,1fr))`, gap:8 }}>
                       {entries.map(({ ind, photos }, i)=>(
-                        <div key={i} style={{ position:'relative', borderRadius:10, overflow:'hidden', aspectRatio:'1',
+                        <div key={i} onClick={()=>edit && setSighting({ editing:{ sp, ind } })}
+                          style={{ position:'relative', borderRadius:10, overflow:'hidden', aspectRatio:'1',
                           border: ind.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}`,
-                          boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':'none', background:T.card }}>
+                          boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':'none', background:T.card,
+                          cursor: edit?'pointer':'default' }}>
                           {photos[0] ? (
                             <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
                               objectPosition:photos[0].pos||'50% 50%', filter:LUT, display:'block', ...thumbZoomStyle(photos[0]) }} />
@@ -953,7 +955,7 @@ export default function App() {
                                 display:'flex', alignItems:'center', justifyContent:'center' }}>?</span>
                           )}
                           {edit && (
-                            <button onClick={()=>setUncertain(sp.id, ind.n, !ind.uncertain)}
+                            <button onClick={(e)=>{ e.stopPropagation(); setUncertain(sp.id, ind.n, !ind.uncertain) }}
                               title={ind.uncertain
                                 ? (lang==='ru'?'Подтвердить определение':'Confirmer cette identification')
                                 : (lang==='ru'?'Я не уверен(а) в определении':'Je doute de cette identification')}
@@ -964,7 +966,7 @@ export default function App() {
                             </button>
                           )}
                           {edit && (
-                            <button onClick={()=>setConfirmDelSighting({ sp, ind })}
+                            <button onClick={(e)=>{ e.stopPropagation(); setConfirmDelSighting({ sp, ind }) }}
                               title={lang==='ru'?'Удалить это наблюдение':'Supprimer cette observation'}
                               style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%',
                                 background:'rgba(20,18,14,.6)', color:'#fff', fontSize:11, lineHeight:1,
