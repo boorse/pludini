@@ -3,7 +3,7 @@ import { allPlayers, addPlayer, allCats, addSpecies, editSpecies, removeSpecies,
          removeSighting, promote, demote, namedOf, getMe, setMe, setBlurry, setPixelated, setQuality, speciesType, isVegetal,
          individualCovers, setCover, clearCover, removePhoto, coverIdFor, setPhotoCover, clearPhotoCover,
          allSpecies, calcPtsLive } from './store.js'
-import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT } from './data'
+import { RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, OBS_STATES, OBS_STATE_COLOR } from './data'
 import { subNameOf } from './i18n.js'
 import { LUT, uploadPhotoFile, uploadAudioFile, usePhotos, PhotoCropPicker, thumbZoomStyle } from './photoui.jsx'
 import SatMap from './satmap.jsx'
@@ -395,6 +395,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
   const cats = allCats()
   const [named, setNamed] = useState(editInd ? !!editInd.named : false)
   const [unsure, setUnsure] = useState(editInd ? !!editInd.uncertain : false)
+  const [obsState, setObsState] = useState(editInd?.state || '')
   const [name, setName] = useState(editInd?.displayName || editInd?.n || '')
   const [note, setNote] = useState(editInd?.note || '')
   const [traits, setTraits] = useState(editInd?.traits || '')
@@ -444,7 +445,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
 
       if (isEdit) {
         const fields = { note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'), time, by, method,
-          weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps, uncertain: unsure }
+          weather: weather.trim(), story: story.trim(), traits: traits.trim(), gps, uncertain: unsure, state: obsState || null }
         await editSighting(spId, editInd.n, fields)
         const wasNamed = !!namedOf(spId, editInd.n)
         if (named) await promote(spId, editInd.n, name.trim() || editInd.n, traits.trim())
@@ -462,7 +463,7 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
       const ind = {
         n: label, named, note: note.trim(), d: new Date(d).toLocaleDateString('fr-FR'),
         time, by, method, weather: weather.trim(), story: story.trim(),
-        desc: '', b: [], traits: traits.trim(), uncertain: unsure,
+        desc: '', b: [], traits: traits.trim(), uncertain: unsure, state: obsState || null,
         ...(gps ? { gps } : {}),
       }
       await addSighting(spId, ind)
@@ -584,6 +585,28 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
           {lang==='ru'?'Не будет приносить очков, пока определение не подтверждено.'
                       :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
         </div>}
+
+        {speciesType(sp)===1 && <>
+          <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+            {Object.entries(OBS_STATES).map(([k,st])=>{
+              const on = obsState===k
+              return (
+                <button key={k} type="button" onClick={()=>setObsState(on?'':k)}
+                  style={{ padding:'7px 11px', borderRadius:10, fontSize:12,
+                    border:`1.5px solid ${on?OBS_STATE_COLOR:T.line}`, background:on?'#DCE8F0':'transparent',
+                    color:on?OBS_STATE_COLOR:T.soft, fontWeight:on?700:400,
+                    display:'flex', alignItems:'center', gap:5 }}>
+                  <span>{st.e}</span>{lang==='ru'?st.ru:st.l}
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ fontSize:11, color:T.mute, marginTop:4, lineHeight:1.45 }}>
+            {lang==='ru'?'Необязательно — даёт +10% очков и продвигает коллекцию значков вида.'
+                        :'Facultatif — rapporte 10% de points en plus et fait progresser le badge de collection de l’espèce.'}
+          </div>
+        </>}
 
         {named && <>
           <label style={label}>{lang==='ru'?'Имя':'Son nom'}</label>

@@ -23,6 +23,20 @@ export const METHODS = {
   cam:   { l:'Caméra piège',    mult:1,   c:'#C3CDAE', on:'#3B4429' },
 }
 
+// ── États particuliers d'une observation (facultatif, mammifères/oiseaux) ──
+// une observation taguée devient une "observation particulière" : contour
+// bleu distinctif + bonus de points, et fait progresser la collection de
+// badges de l'espèce (un badge par état déjà observé au moins une fois)
+export const OBS_STATES = {
+  bebe:   { l:'Bébé',   ru:'Детёныш', e:'👶' },
+  maman:  { l:'Maman',  ru:'Мама',    e:'♀️' },
+  papa:   { l:'Papa',   ru:'Папа',    e:'♂️' },
+  vieux:  { l:'Vieux',  ru:'Старый',  e:'👴' },
+  malade: { l:'Malade', ru:'Больной', e:'🤒' },
+}
+export const OBS_STATE_BONUS_MULT = 1.1
+export const OBS_STATE_COLOR = '#3E6B8C'
+
 export const PLAYERS = [
   { id:'G', name:'Gaël' },
   { id:'P', name:'Pierre' },

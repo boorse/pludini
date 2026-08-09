@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { allCats, allPlayers, getMe, addSighting, setObservation, setQuality, setPixelated, speciesType, isFish,
          isVegetal, allSpecies, calcPtsLive } from './store.js'
-import { METHODS } from './data'
+import { METHODS, OBS_STATES, OBS_STATE_COLOR } from './data'
 import { uploadPhotoFile } from './photoui.jsx'
 import { T, Modal, label, input, ValidateBar, GpsMapPicker, visuallyHiddenFileInput, PhotoQualityPicker, FishSizePicker } from './editui.jsx'
 
@@ -123,6 +123,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
   const [note, setNote] = useState('')
   const [story, setStory] = useState('')
   const [unsure, setUnsure] = useState(false)
+  const [obsState, setObsState] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -139,7 +140,7 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
       const ind = {
         n: dlabel, named:false, note: note.trim(), d: now.toLocaleDateString('fr-FR'),
         time: time || now.toTimeString().slice(0,5), by: me, method, weather:'', story: story.trim(),
-        desc:'', b:[], traits:'', uncertain: unsure,
+        desc:'', b:[], traits:'', uncertain: unsure, state: obsState || null,
         ...(gps ? { gps } : {}),
       }
       await addSighting(sp.id, ind)
@@ -263,6 +264,26 @@ function Type1Wizard({ lang, sp, screenOffset, screenTotal, onClose, onSaved, on
           {lang==='ru'?'Не будет приносить очков, пока определение не подтверждено.'
                       :'Ne rapportera pas de points tant que ce n’est pas confirmé.'}
         </div>}
+
+        <label style={label}>{lang==='ru'?'Observation particulière':'Observation particulière'}</label>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+          {Object.entries(OBS_STATES).map(([k,st])=>{
+            const on = obsState===k
+            return (
+              <button key={k} type="button" onClick={()=>setObsState(on?'':k)}
+                style={{ padding:'7px 11px', borderRadius:10, fontSize:12,
+                  border:`1.5px solid ${on?OBS_STATE_COLOR:T.line}`, background:on?'#DCE8F0':'transparent',
+                  color:on?OBS_STATE_COLOR:T.soft, fontWeight:on?700:400,
+                  display:'flex', alignItems:'center', gap:5 }}>
+                <span>{st.e}</span>{lang==='ru'?st.ru:st.l}
+              </button>
+            )
+          })}
+        </div>
+        <div style={{ fontSize:11, color:T.mute, marginTop:4, lineHeight:1.45 }}>
+          {lang==='ru'?'Необязательно — даёт +10% очков и продвигает коллекцию значков вида.'
+                      :'Facultatif — rapporte 10% de points en plus et fait progresser le badge de collection de l’espèce.'}
+        </div>
 
         {err && <div style={{ fontSize:12, color:'#B91C1C', background:'#FEF2F2', border:'1px solid #FCA5A5',
           borderRadius:9, padding:'8px 11px', marginTop:11 }}>{err}</div>}

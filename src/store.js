@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════
 import { sb, publicUrl } from './supabase.js'
 import { SPECIES as BASE_SPECIES, CATS as BASE_CATS, PLAYERS as BASE_PLAYERS,
-         RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS } from './data'
+         RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS, OBS_STATE_BONUS_MULT } from './data'
 import { QUIZ_QUESTIONS as BASE_QUIZ, QUIZ_THEMES, QUIZ_THEME_MIN_QUESTIONS } from './quizdata.js'
 
 const S = {
@@ -520,7 +520,10 @@ export function calcPtsLive(sp, player) {
     const isFishSp = isFish(sp)
     base = myInds.reduce((sum, ind, i) => {
       const mult = isFishSp ? (FISH_SIZE_MULT[ind.size] || 1) : (METHODS[ind.method]?.mult || 1)
-      return sum + rarityPts * mult * (i === 0 ? 1 : REPEAT_PASSAGE_MULT)
+      // observation particulière (bébé/maman/papa/vieux/malade) : +10% sur la
+      // valeur de ce passage précis, en plus du barème habituel
+      const stateMult = ind.state ? OBS_STATE_BONUS_MULT : 1
+      return sum + rarityPts * mult * stateMult * (i === 0 ? 1 : REPEAT_PASSAGE_MULT)
     }, 0)
   } else {
     // pas encore de passage enregistré : méthode(s) cochée(s) sans individu
