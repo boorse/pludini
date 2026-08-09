@@ -16,6 +16,15 @@
   --sage-dark:#4A5D32;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* pages "rigides" : seul le défilement vertical est permis — empêche le
+   glissement horizontal (et le geste de retour par bord sur iOS/Android)
+   si un élément dépasse la largeur de l'écran par erreur quelque part */
+html,body{
+  overflow-x:hidden;
+  overscroll-behavior-x:none;
+  touch-action:pan-y;
+  max-width:100%;
+}
 body{
   font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   background:var(--bg);

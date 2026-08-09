@@ -3,9 +3,9 @@ import { THEMES, MONTHS, MONTHS_RU, EVENTS, DEFAULT_TYPES, CENTER } from './terr
 import SatMap from './satmap.jsx'
 import { isObserved } from './data'
 import { gradientFor } from './gradients.js'
-import { UI, nameOf } from './i18n.js'
+import { UI, nameOf, catNameOf } from './i18n.js'
 import { LUT, thumbZoomStyle } from './photoui.jsx'
-import { allPhotos, allSpecies, allPlayers, subscribe, namedOf, parseFrDateTime } from './store.js'
+import { allPhotos, allSpecies, allPlayers, allCats, subscribe, namedOf, parseFrDateTime } from './store.js'
 import { getTodos, saveTodo, deleteTodo, getPins, savePin, deletePin,
          getZones, saveZone, deleteZone, getPinTypes, savePinType,
          getThemes, saveTheme, getCalEvents, saveCalEvent } from './cloud.js'
@@ -744,11 +744,32 @@ function Lightbox({ sh, lang, wide, onClose }) {
 // ══════════ PAR OBSERVATEUR ══════════
 export function ByPerson({ wide, lang, onSelectSpecies }) {
   const t = UI[lang]
-  const [who, setWho] = useState(() => allPlayers()[0]?.name || '')
-  const SPECIES = allSpecies(); const ALL_PLAYERS = allPlayers()
+  // par défaut, on ouvre sur la personne qui a fait la toute dernière observation
+  // (tous individus confondus), plutôt que sur le premier joueur de la liste
+  const [who, setWho] = useState(() => {
+    let best = null, bestT = -Infinity
+    allSpecies().forEach(sp => (sp.inds||[]).forEach(ind => {
+      const ts = parseFrDateTime(ind.d, ind.time)
+      if (ts > bestT) { bestT = ts; best = ind.by }
+    }))
+    return best || allPlayers()[0]?.name || ''
+  })
+  const [openCats, setOpenCats] = useState(() => new Set())
+  const [openSp, setOpenSp] = useState(() => new Set())
+  const SPECIES = allSpecies(); const ALL_PLAYERS = allPlayers(); const CATS = allCats()
   const mySpecies = SPECIES.filter(s=>(s.obs[who]||[]).length)
   const myInds = []
   SPECIES.forEach(sp => (sp.inds||[]).forEach(ind => { if (ind.by===who) myInds.push({sp,ind}) }))
+  // repliée par dossier : ordre (règne) > espèce > individus
+  const byCat = {}
+  myInds.forEach(({sp,ind}) => {
+    (byCat[sp.cat] ||= { cat: CATS.find(c=>c.id===sp.cat), bySpecies: {} })
+    const bucket = byCat[sp.cat].bySpecies[sp.id] ||= { sp, inds: [] }
+    bucket.inds.push(ind)
+  })
+  const catGroups = CATS.map(c => byCat[c.id]).filter(Boolean)
+  const toggleCat = (id) => setOpenCats(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleSp = (id) => setOpenSp(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   return (
     <div style={{ padding: wide?'14px 24px 30px':'12px 18px 26px' }}>
@@ -809,19 +830,73 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
             <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:9 }}>
               {myInds.length} {lang==='ru'?'особей':'individus'}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:8 }}>
-              {myInds.map(({sp,ind},i)=>(
-                <button key={i} onClick={()=>onSelectSpecies(sp.id)} style={{ textAlign:'left', background:T.card,
-                  border:`1px solid ${T.line}`, borderRadius:11, padding:'10px 12px', display:'flex', gap:10, alignItems:'flex-start' }}>
-                  <span style={{ fontSize:20 }}>{sp.e}</span>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div className="serif" style={{ fontSize:13, fontWeight:700, color:T.ink }}>{ind.n}</div>
-                    <div style={{ fontSize:10.5, color:T.mute }}>{nameOf(sp,lang).main} · {ind.d}</div>
-                    {ind.story && <div style={{ fontSize:11, color:T.soft, marginTop:4, lineHeight:1.45,
-                      display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{ind.story}</div>}
+            <div style={{ display:'flex', flexDirection:'column', gap:7 }}>
+              {catGroups.map(({ cat, bySpecies }) => {
+                const catOpen = openCats.has(cat.id)
+                const spEntries = Object.values(bySpecies)
+                const catCount = spEntries.reduce((n,b)=>n+b.inds.length,0)
+                const cn = catNameOf(cat, lang)
+                return (
+                  <div key={cat.id} style={{ border:`1px solid ${T.line}`, borderRadius:12, overflow:'hidden', background:T.card }}>
+                    <button onClick={()=>toggleCat(cat.id)} style={{ width:'100%', display:'flex', alignItems:'center', gap:9,
+                      padding:'11px 13px', textAlign:'left' }}>
+                      <i className={`ti ${catOpen?'ti-chevron-down':'ti-chevron-right'}`} style={{ fontSize:14, color:T.mute, flexShrink:0 }} aria-hidden="true" />
+                      <span style={{ fontSize:17 }}>{cat.e}</span>
+                      <span className="serif" style={{ fontSize:13.5, fontWeight:700, color:T.ink, flex:1 }}>{cn.main}</span>
+                      <span style={{ fontSize:11, color:T.mute }}>{catCount}</span>
+                    </button>
+                    {catOpen && (
+                      <div style={{ borderTop:`1px solid ${T.line}`, padding:'6px 8px 8px' }}>
+                        {spEntries.map(({ sp, inds }) => {
+                          const spOpen = openSp.has(sp.id)
+                          const nm = nameOf(sp, lang)
+                          return (
+                            <div key={sp.id} style={{ marginTop:4 }}>
+                              <button onClick={()=>toggleSp(sp.id)} style={{ width:'100%', display:'flex', alignItems:'center', gap:8,
+                                padding:'8px 9px', borderRadius:9, textAlign:'left', background: spOpen?'rgba(0,0,0,.03)':'transparent' }}>
+                                <i className={`ti ${spOpen?'ti-chevron-down':'ti-chevron-right'}`} style={{ fontSize:12, color:T.mute, flexShrink:0 }} aria-hidden="true" />
+                                <span style={{ fontSize:15 }}>{sp.e}</span>
+                                <span style={{ fontSize:12.5, fontWeight:600, color:T.ink, flex:1 }}>{nm.main}</span>
+                                <span style={{ fontSize:10.5, color:T.mute }}>{inds.length}</span>
+                              </button>
+                              {spOpen && (
+                                <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:7, padding:'6px 4px 4px 26px' }}>
+                                  {inds.map((ind,i)=>{
+                                    const ov = namedOf(sp.id, ind.n)
+                                    const named = !!ov
+                                    const unc = !!ind.uncertain
+                                    const displayName = named ? ov.name : ind.n
+                                    return (
+                                      <button key={i} onClick={()=>onSelectSpecies(sp.id)} style={{ textAlign:'left', background:T.bg,
+                                        border: unc?'1.5px solid #D68C34':named?'1.5px solid #C9A046':`1px solid ${T.line}`,
+                                        boxShadow: unc?'0 0 0 1px rgba(214,140,52,.25)':named?'0 0 0 1px rgba(201,160,70,.22)':'none',
+                                        borderRadius:10, padding:'9px 11px', display:'flex', gap:8, alignItems:'flex-start' }}>
+                                        <div style={{ flex:1, minWidth:0 }}>
+                                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                                            <div className="serif" style={{ fontSize:12.5, fontWeight:700,
+                                              color: unc?'#B5701A':named?'#A07C28':T.ink }}>{displayName}</div>
+                                            {unc && <span style={{ fontSize:8, fontWeight:800, color:'#fff', background:'#D68C34',
+                                              borderRadius:6, padding:'1.5px 6px', letterSpacing:'.3px' }}>{lang==='ru'?'ПРОВЕРИТЬ':'DOUTE'}</span>}
+                                            {!unc && named && <span style={{ fontSize:8, fontWeight:800, color:'#2B2620', background:'#C9A046',
+                                              borderRadius:6, padding:'1.5px 6px', letterSpacing:'.3px' }}>★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
+                                          </div>
+                                          <div style={{ fontSize:10, color:T.mute, marginTop:2 }}>{ind.d}</div>
+                                          {ind.story && <div style={{ fontSize:10.5, color:T.soft, marginTop:4, lineHeight:1.4,
+                                            display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{ind.story}</div>}
+                                        </div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                </button>
-              ))}
+                )
+              })}
             </div>
           </>}
         </>}
