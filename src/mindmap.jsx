@@ -15,6 +15,7 @@ const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
+  const [infoNode, setInfoNode] = useState(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
   // pour un geste fiable (pan/pincement/double-tap) — souris/trackpad (PC) :
   // comportement Pointer Events fait maison, inchangé
@@ -86,7 +87,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
             const onlyObs = obsOnly.has(famId)
             const shown = onlyObs ? members.filter(isObserved) : members
             return {
-              id: famId, kind: 'fam', label: sv.id, sub: sv.lat,
+              id: famId, kind: 'fam', label: sv.id, sub: sv.lat, color: sv.c, niche: sv.niche,
               members,
               children: [
                 ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
@@ -318,7 +319,8 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
                   expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
                   onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
                   onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
-                  onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+                  onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }}
+                  onInfo={(n)=>{ if(!G.moved) setInfoNode(n) }} />
               </div>
             </TransformComponent>
           </TransformWrapper>
@@ -338,15 +340,40 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
               expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
               onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
               onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
-              onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }} />
+              onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }}
+              onInfo={(n)=>{ if(!G.moved) setInfoNode(n) }} />
           </div>
         </div>
       )}
+      {infoNode && <InfoPanel n={infoNode} lang={lang} onClose={()=>setInfoNode(null)} />}
     </div>
   )
 }
 
-const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onSp, onAdd, view }) {
+function InfoPanel({ n, lang, onClose }) {
+  const color = n.color || '#9A9081'
+  const name = subNameOf(n.label, lang)
+  return (
+    <div onClick={onClose} style={{ position:'absolute', inset:0, zIndex:20,
+      background:'rgba(30,26,20,.42)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div onClick={e=>e.stopPropagation()} style={{ maxWidth:360, width:'100%', background:'#F2EEE2',
+        borderRadius:16, padding:'20px 22px', boxShadow:'0 12px 40px rgba(43,38,32,.3)',
+        borderTop:`4px solid ${color}` }}>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, marginBottom:8 }}>
+          <div>
+            <div className="serif" style={{ fontSize:17, fontWeight:800, color:'#2B2620' }}>{name.main}</div>
+            <div style={{ fontSize:11, fontStyle:'italic', color:'#8A8172', marginTop:2 }}>{n.sub}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(43,38,32,.08)', border:'none', borderRadius:'50%',
+            width:24, height:24, display:'flex', alignItems:'center', justifyContent:'center', color:'#6B6357', fontSize:13, flexShrink:0 }}>✕</button>
+        </div>
+        {n.niche && <div style={{ fontSize:13, color:'#4A453B', lineHeight:1.6 }}>{n.niche}</div>}
+      </div>
+    </div>
+  )
+}
+
+const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onSp, onAdd, onInfo, view }) {
   // culling : on ne dessine que ce qui est visible, avec une marge généreuse
   const vis = view
     ? nodes.filter(n => n.x > view.x0 && n.x < view.x1 && n.y > view.y0 && n.y < view.y1)
@@ -368,7 +395,8 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
         <Card key={n.id} n={n} lang={lang} expanded={expanded}
           toggle={()=>onToggle(n.id)}
           toggleObserved={()=>onToggleObserved(n)}
-          onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)} />
+          onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)}
+          onInfo={()=>onInfo(n)} />
       ))}
       <div style={{ width, height }} />
     </>
@@ -377,7 +405,7 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
 
 const btn = { fontSize:10.5, padding:'5px 9px', borderRadius:12, background:'#EDE7D8', color:'#6B6357', border:'1px solid #D3C7AE' }
 
-function Card({ n, lang, expanded, toggle, toggleObserved, onSp }) {
+function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
   const open = expanded.has(n.id)
   const hasKids = n.children?.length > 0
   const base = {
@@ -424,13 +452,25 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp }) {
   if (n.kind === 'fam') {
     const m = n.members || []
     const obs = m.filter(isObserved).length
+    const color = n.color || '#9A9081'
     return (
-      <button onClick={toggle} style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
+      <div role="button" tabIndex={0} onClick={toggle}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+        style={{ ...base, background:'#D9CDB2', justifyContent:'center', alignItems:'flex-start' }}>
+        <div style={{ position:'absolute', left:0, top:0, bottom:0, width:4, background:color }} />
         {hasKids && <Chev open={open} dark />}
-        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
-        <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
-        <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3 }}>{obs}/{m.length}</span>
-      </button>
+        {n.niche && (
+          <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
+            style={{ position:'absolute', top:6, right: hasKids?26:7, width:15, height:15, borderRadius:'50%',
+              background:color, border:'none', padding:0, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <span style={{ fontSize:9, fontStyle:'italic', fontWeight:800, color:'#fff', lineHeight:1 }}>i</span>
+          </button>
+        )}
+        <span style={{ fontSize:10, fontWeight:700, color:'#3F382C', lineHeight:1.2, marginLeft:2 }}>{subNameOf(n.label, lang).main}</span>
+        <span style={{ fontSize:8, color:'#8A8172', fontStyle:'italic', marginTop:2, marginLeft:2 }}>{n.sub}</span>
+        <span style={{ fontSize:8.5, color:'#6B6357', marginTop:3, marginLeft:2 }}>{obs}/{m.length}</span>
+      </div>
     )
   }
 
