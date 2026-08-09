@@ -865,36 +865,6 @@ export default function App() {
           </div>
           <div style={{ padding:'14px 18px 22px' }}>
             {!isPerson && <div className="serif" style={{ fontSize:15, fontWeight:600, color:T.clay, marginBottom:12 }}>{baseP} pts base · max {baseP*3+50} pts</div>}
-            {speciesType(sp)===1 && (() => {
-              const firstByState = {}
-              ;(sp.inds||[]).forEach(ind => { if (ind.state && !firstByState[ind.state]) firstByState[ind.state] = ind })
-              return (
-                <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:6, marginBottom:12 }}>
-                  {Object.keys(OBS_STATES).map(k=>{
-                    const st = obsStateLabel(k, sp)
-                    const found = firstByState[k]
-                    return (
-                      <button key={k} onClick={found ? ()=>setCurInd(found.n) : undefined}
-                        style={{ textAlign:'center', borderRadius:10, overflow:'hidden', position:'relative',
-                          height:60, border:`1px solid ${found?OBS_STATE_COLOR:T.line}`,
-                          cursor:found?'pointer':'default' }}>
-                        {found ? <>
-                          <PhotoBg target={`ind:${sp.id}:${found.n}`} fallback={gradientFor(sp.id+found.n)} />
-                          <div style={{ position:'absolute', inset:0,
-                            background:'linear-gradient(to top, rgba(16,18,12,.68), transparent 62%)' }} />
-                        </> : <div style={{ position:'absolute', inset:0, background:T.card }} />}
-                        <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column',
-                          alignItems:'center', justifyContent:'flex-end', padding:'4px 2px' }}>
-                          <span style={{ fontSize:15, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
-                          <span style={{ fontSize:8, fontWeight:700, marginTop:1, lineHeight:1.1,
-                            color:found?'#F2EEE2':T.mute }}>{lang==='ru'?st.ru:st.l}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })()}
             {isPerson && (
               <div style={{ fontSize:11.5, color:T.mute, marginBottom:12, fontStyle:'italic' }}>
                 {lang==='ru'?'Не приносит очков, но наблюдения всё равно можно записывать.'
@@ -908,6 +878,36 @@ export default function App() {
             </div>
 
             {detTab==='obs' && <>
+              {speciesType(sp)===1 && (() => {
+                const firstByState = {}
+                ;(sp.inds||[]).forEach(ind => { if (ind.state && !firstByState[ind.state]) firstByState[ind.state] = ind })
+                return (
+                  <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:6, marginBottom:14 }}>
+                    {Object.keys(OBS_STATES).map(k=>{
+                      const st = obsStateLabel(k, sp)
+                      const found = firstByState[k]
+                      return (
+                        <button key={k} onClick={found ? ()=>setCurInd(found.n) : undefined}
+                          style={{ textAlign:'center', borderRadius:10, overflow:'hidden', position:'relative',
+                            height:60, border:`1px solid ${found?OBS_STATE_COLOR:T.line}`,
+                            cursor:found?'pointer':'default' }}>
+                          {found ? <>
+                            <PhotoBg target={`ind:${sp.id}:${found.n}`} fallback={gradientFor(sp.id+found.n)} />
+                            <div style={{ position:'absolute', inset:0,
+                              background:'linear-gradient(to top, rgba(16,18,12,.68), transparent 62%)' }} />
+                          </> : <div style={{ position:'absolute', inset:0, background:T.card }} />}
+                          <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column',
+                            alignItems:'center', justifyContent:'flex-end', padding:'4px 2px' }}>
+                            <span style={{ fontSize:15, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
+                            <span style={{ fontSize:8, fontWeight:700, marginTop:1, lineHeight:1.1,
+                              color:found?'#F2EEE2':T.mute }}>{lang==='ru'?st.ru:st.l}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
               <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
                 <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
@@ -942,7 +942,7 @@ export default function App() {
                   const orphanMethods = m.filter(x=>!indMethods.has(x))
                   const orphan = edit && orphanMethods.length>0
                   return (
-                    <div key={pl.id} style={{ position:'relative', background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'9px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
+                    <div key={pl.id} style={{ position:'relative', background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'5px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
                       {orphan && (
                         <button onClick={()=>setConfirmClearObs({ sp, player:pl.name, keep:[...indMethods] })}
                           title={lang==='ru'?'Убрать способы без особи':'Retirer les méthodes sans individu'}
@@ -950,9 +950,9 @@ export default function App() {
                             background:'#8F3A2E', color:'#fff', fontSize:10, lineHeight:1, display:'flex',
                             alignItems:'center', justifyContent:'center' }}>✕</button>
                       )}
-                      <div style={{ fontSize:15, marginBottom:2 }}>{best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):'—'}</div>
-                      <div style={{ fontSize:10, color:T.soft }}>{pl.name}</div>
-                      <div className="serif" style={{ fontSize:12, fontWeight:600, color:T.ink }}>{p2?p2+' pts':'—'}</div>
+                      <div style={{ fontSize:12, marginBottom:1 }}>{best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):'—'}</div>
+                      <div style={{ fontSize:9, color:T.soft }}>{pl.name}</div>
+                      <div className="serif" style={{ fontSize:10.5, fontWeight:600, color:T.ink }}>{p2?p2+' pts':'—'}</div>
                     </div>
                   )
                 })}
