@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 // ── Carte satellite à tuiles — aucune interface tierce ──
 // Tuiles Esri World Imagery (libres d'accès, sans clé)
@@ -17,6 +18,10 @@ const y2lat = (y, z) => {
 }
 
 export default function SatMap({ center, pins = [], zones = [], draftPts = [], draftKind = null, selected, onSelect, onMapClick, height = 520, addMode = false, lineMode = false }) {
+  // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch),
+  // comme pour la mindmap — bien plus robuste sur mobile que le pan/pincement
+  // maison ci-dessous, qui reste utilisé tel quel sur PC (souris/trackpad)
+  const [isTouch] = useState(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
   const [z, setZ] = useState(16)
   const [c, setC] = useState(center)          // {lat, lon} au centre
   const wrapRef = useRef(null)
@@ -25,6 +30,8 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
   const ptrs = useRef(new Map())
   const gest = useRef(null)
   const drag = useRef({ moved: false })
+  const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste tactile en cours (relatif, remis à zéro après commit)
+  const touchApiRef = useRef(null)
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
@@ -143,10 +150,11 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
   }, [z, originX, originY, size.w, size.h])
 
   useEffect(() => {
+    if (isTouch) return   // pas de molette sur tactile
     const el = wrapRef.current; if (!el) return
     el.addEventListener('wheel', wheel, { passive: false })
     return () => el.removeEventListener('wheel', wheel)
-  }, [wheel])
+  }, [wheel, isTouch])
 
   const click = (e) => {
     if (drag.current.moved || (!addMode && !lineMode) || !onMapClick) return
@@ -155,57 +163,103 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     onMapClick({ lat: y2lat((originY + my) / TS, z), lon: x2lon((originX + mx) / TS, z) })
   }
 
+  // ── Tactile : la bibliothèque pilote pan + pincement, on ne fait que "committer"
+  // le geste terminé en un nouveau centre lat/lon + niveau de zoom discret (les
+  // tuiles doivent être rechargées, on ne peut pas juste zoomer en CSS indéfiniment) ──
+  const onTouchTransform = useCallback((_ref, state) => {
+    liveRef.current = { x: state.positionX, y: state.positionY, k: state.scale }
+    if (Math.abs(state.positionX) > 3 || Math.abs(state.positionY) > 3 || Math.abs(state.scale - 1) > 0.02) {
+      drag.current.moved = true
+    }
+  }, [])
+  const commitTouchTransform = useCallback(() => {
+    const { x: tx, y: ty, k } = liveRef.current
+    if (tx === 0 && ty === 0 && k === 1) return
+    const screenCx = size.w / 2, screenCy = size.h / 2
+    const worldX = (screenCx - tx) / k + originX
+    const worldY = (screenCy - ty) / k + originY
+    const lon = x2lon(worldX / TS, z)
+    const lat = y2lat(worldY / TS, z)
+    const dz = Math.round(Math.log2(k))
+    const nz = Math.max(3, Math.min(19, z + dz))
+    setC({ lat, lon })
+    if (nz !== z) setZ(nz)
+    liveRef.current = { x: 0, y: 0, k: 1 }
+    touchApiRef.current?.resetTransform(0)
+    setTimeout(() => { drag.current.moved = false }, 0)
+  }, [z, originX, originY, size.w, size.h])
+
+  const content = (
+    <>
+      {tiles.map(t => (
+        <img key={t.key} src={t.url} alt="" draggable={false}
+          style={{ position:'absolute', left:t.left, top:t.top, width:TS, height:TS, display:'block', pointerEvents:'none' }} />
+      ))}
+
+      <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:2 }}>
+        {zones.map(zn => {
+          const pts = zn.pts.map(([la,lo]) => { const sp = toScreen(la,lo); return `${sp.left},${sp.top}` }).join(' ')
+          if (zn.kind === 'zone') return <polygon key={zn.id} points={pts} fill={zn.color+'40'} stroke={zn.color} strokeWidth="2" />
+          return <polyline key={zn.id} points={pts} fill="none" stroke={zn.color} strokeWidth="2.5" strokeDasharray="7 5" />
+        })}
+        {draftPts.length>0 && (() => {
+          const pts = draftPts.map(([la,lo]) => { const sp = toScreen(la,lo); return `${sp.left},${sp.top}` }).join(' ')
+          return <>
+            {draftKind==='zone'
+              ? <polygon points={pts} fill="rgba(122,139,92,.28)" stroke="#7A8B5C" strokeWidth="2" />
+              : <polyline points={pts} fill="none" stroke="#B5602F" strokeWidth="2.5" strokeDasharray="7 5" />}
+            {draftPts.map(([la,lo],i)=>{ const sp = toScreen(la,lo)
+              return <circle key={i} cx={sp.left} cy={sp.top} r="5" fill="#fff" stroke="#B5602F" strokeWidth="2" /> })}
+          </>
+        })()}
+      </svg>
+
+      {pins.map(p => {
+        const s = toScreen(p.lat, p.lon)
+        if (s.left < -60 || s.top < -60 || s.left > size.w + 60 || s.top > size.h + 60) return null
+        const on = selected?.id === p.id
+        return (
+          <button key={p.id} onClick={(e)=>{ e.stopPropagation(); if(!drag.current.moved) onSelect?.(on ? null : p) }}
+            style={{ position:'absolute', left:s.left, top:s.top, transform:'translate(-50%,-100%)',
+              display:'flex', flexDirection:'column', alignItems:'center', zIndex:on?5:3, padding:0 }}>
+            <span style={{ width:on?30:24, height:on?30:24, borderRadius:'50%', background:p.color,
+              border:`2px solid ${on?'#fff':'rgba(255,255,255,.8)'}`, display:'flex', alignItems:'center',
+              justifyContent:'center', fontSize:on?14:11.5, boxShadow:'0 2px 9px rgba(0,0,0,.45)',
+              transition:'all .16s' }}>{p.emoji}</span>
+            <span style={{ width:2, height:8, background:p.color, boxShadow:'0 1px 3px rgba(0,0,0,.4)' }} />
+            {on && <span style={{ marginTop:2, fontSize:10, background:'rgba(20,22,14,.88)', color:'#F2EEE2',
+              padding:'2px 7px', borderRadius:8, whiteSpace:'nowrap' }}>{p.label}</span>}
+          </button>
+        )
+      })}
+    </>
+  )
+
   return (
     <div ref={wrapRef}
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-      onPointerLeave={up} onLostPointerCapture={up}
-      onClick={click} onDragStart={e=>e.preventDefault()}
+      onDragStart={e=>e.preventDefault()}
       style={{ position:'relative', width:'100%', height, overflow:'hidden', background:'#1E2418',
-        cursor: (addMode||lineMode) ? 'crosshair' : 'grab',
-        touchAction:'none', userSelect:'none' }}>
-      <div ref={stageRef} style={{ position:'absolute', inset:0, transformOrigin:'0 0' }}>
-        {tiles.map(t => (
-          <img key={t.key} src={t.url} alt="" draggable={false}
-            style={{ position:'absolute', left:t.left, top:t.top, width:TS, height:TS, display:'block', pointerEvents:'none' }} />
-        ))}
-
-        <svg style={{ position:'absolute', inset:0, width:'100%', height:'100%', pointerEvents:'none', zIndex:2 }}>
-          {zones.map(z => {
-            const pts = z.pts.map(([la,lo]) => { const sp = toScreen(la,lo); return `${sp.left},${sp.top}` }).join(' ')
-            if (z.kind === 'zone') return <polygon key={z.id} points={pts} fill={z.color+'40'} stroke={z.color} strokeWidth="2" />
-            return <polyline key={z.id} points={pts} fill="none" stroke={z.color} strokeWidth="2.5" strokeDasharray="7 5" />
-          })}
-          {draftPts.length>0 && (() => {
-            const pts = draftPts.map(([la,lo]) => { const sp = toScreen(la,lo); return `${sp.left},${sp.top}` }).join(' ')
-            return <>
-              {draftKind==='zone'
-                ? <polygon points={pts} fill="rgba(122,139,92,.28)" stroke="#7A8B5C" strokeWidth="2" />
-                : <polyline points={pts} fill="none" stroke="#B5602F" strokeWidth="2.5" strokeDasharray="7 5" />}
-              {draftPts.map(([la,lo],i)=>{ const sp = toScreen(la,lo)
-                return <circle key={i} cx={sp.left} cy={sp.top} r="5" fill="#fff" stroke="#B5602F" strokeWidth="2" /> })}
-            </>
-          })()}
-        </svg>
-
-        {pins.map(p => {
-          const s = toScreen(p.lat, p.lon)
-          if (s.left < -60 || s.top < -60 || s.left > size.w + 60 || s.top > size.h + 60) return null
-          const on = selected?.id === p.id
-          return (
-            <button key={p.id} onClick={(e)=>{ e.stopPropagation(); if(!drag.current.moved) onSelect?.(on ? null : p) }}
-              style={{ position:'absolute', left:s.left, top:s.top, transform:'translate(-50%,-100%)',
-                display:'flex', flexDirection:'column', alignItems:'center', zIndex:on?5:3, padding:0 }}>
-              <span style={{ width:on?30:24, height:on?30:24, borderRadius:'50%', background:p.color,
-                border:`2px solid ${on?'#fff':'rgba(255,255,255,.8)'}`, display:'flex', alignItems:'center',
-                justifyContent:'center', fontSize:on?14:11.5, boxShadow:'0 2px 9px rgba(0,0,0,.45)',
-                transition:'all .16s' }}>{p.emoji}</span>
-              <span style={{ width:2, height:8, background:p.color, boxShadow:'0 1px 3px rgba(0,0,0,.4)' }} />
-              {on && <span style={{ marginTop:2, fontSize:10, background:'rgba(20,22,14,.88)', color:'#F2EEE2',
-                padding:'2px 7px', borderRadius:8, whiteSpace:'nowrap' }}>{p.label}</span>}
-            </button>
-          )
-        })}
-      </div>
+        cursor: (addMode||lineMode) ? 'crosshair' : 'grab', userSelect:'none' }}>
+      {isTouch ? (
+        <TransformWrapper ref={touchApiRef}
+          initialScale={1} initialPositionX={0} initialPositionY={0}
+          minScale={0.4} maxScale={4} limitToBounds={false} centerOnInit={false}
+          doubleClick={{ disabled: true }}
+          onTransform={onTouchTransform}
+          onPanningStop={commitTouchTransform} onPinchStop={commitTouchTransform}>
+          <TransformComponent wrapperStyle={{ width:'100%', height:'100%' }} contentStyle={{ width:size.w, height:size.h }}>
+            <div style={{ position:'relative', width:size.w, height:size.h }} onClick={click}>{content}</div>
+          </TransformComponent>
+        </TransformWrapper>
+      ) : (
+        <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+          onPointerLeave={up} onLostPointerCapture={up} onClick={click}
+          style={{ position:'absolute', inset:0, touchAction:'none' }}>
+          <div ref={stageRef} style={{ position:'absolute', inset:0, transformOrigin:'0 0' }}>
+            {content}
+          </div>
+        </div>
+      )}
 
       {/* contrôles minimalistes */}
       <div style={{ position:'absolute', right:10, bottom:10, display:'flex', flexDirection:'column', gap:5, zIndex:6 }}>
