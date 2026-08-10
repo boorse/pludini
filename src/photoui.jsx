@@ -85,7 +85,7 @@ export async function uploadPhotoFile(target, file, caption = '', by = '') {
   const isHero = String(target) === 'site:hero'
   const [blob, thumb] = await Promise.all([
     compress(file, isHero ? 2560 : 1600, isHero ? 0.9 : 0.82),
-    compress(file, 260, 0.72),
+    compress(file, 520, 0.78),
   ])
   const base = `${String(target).replace(/[^a-zA-Z0-9_-]/g,'_')}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`
   const path = base + '.jpg'
@@ -101,7 +101,7 @@ export async function replacePhotoFile(target, photo, file) {
   const isHero = String(target) === 'site:hero'
   const [blob, thumb] = await Promise.all([
     compress(file, isHero ? 2560 : 1600, isHero ? 0.9 : 0.82),
-    compress(file, 260, 0.72),
+    compress(file, 520, 0.78),
   ])
   const base = `${String(target).replace(/[^a-zA-Z0-9_-]/g,'_')}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`
   const path = base + '.jpg'

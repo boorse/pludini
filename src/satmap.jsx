@@ -30,6 +30,8 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
   const ptrs = useRef(new Map())
   const gest = useRef(null)
   const drag = useRef({ moved: false })
+  const wheelLive = useRef({ mx: null, my: null, scale: 1 })
+  const wheelTimer = useRef(null)
   const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste tactile en cours (relatif, remis à zéro après commit)
   const touchApiRef = useRef(null)
 
@@ -73,7 +75,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     drag.current.moved = false
     if (ptrs.current.size === 1) {
-      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, clat:c.lat, clon:c.lon }
+      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, clat:c.lat, clon:c.lon, dx:0, dy:0 }
     } else if (ptrs.current.size === 2) {
       try { el.setPointerCapture?.(e.pointerId) } catch {}
       const [a,b] = [...ptrs.current.values()]
@@ -82,6 +84,9 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top, scale:1 }
     }
   }
+  // pendant le geste on ne bouge que le transform CSS du stage (aucun re-rendu
+  // React) — même principe que la mindmap : c'était le calcul de toute la
+  // grille de tuiles à chaque pixel de souris qui rendait le pan saccadé sur PC
   const move = (e) => {
     if (!ptrs.current.has(e.pointerId)) return
     ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -93,9 +98,8 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         drag.current.moved = true
         wrapRef.current?.setPointerCapture?.(e.pointerId)   // capture seulement en glissant
       }
-      const px = lon2x(g.clon, z) * TS - dx
-      const py = lat2y(g.clat, z) * TS - dy
-      setC({ lon: x2lon(px / TS, z), lat: y2lat(py / TS, z) })
+      g.dx = dx; g.dy = dy
+      if (stageRef.current) stageRef.current.style.transform = `translate3d(${dx}px,${dy}px,0)`
     } else if (g.mode === 'zoom' && ptrs.current.size >= 2) {
       const [a,b] = [...ptrs.current.values()]
       const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
@@ -112,7 +116,11 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     ptrs.current.delete(e.pointerId)
     const g = gest.current
     if (ptrs.current.size === 0) {
-      if (g?.mode === 'zoom' && g.scale !== 1) {
+      if (g?.mode === 'pan' && drag.current.moved) {
+        const px = lon2x(g.clon, z) * TS - g.dx
+        const py = lat2y(g.clat, z) * TS - g.dy
+        setC({ lon: x2lon(px / TS, z), lat: y2lat(py / TS, z) })
+      } else if (g?.mode === 'zoom' && g.scale !== 1) {
         const dz = Math.round(Math.log2(g.scale))
         const nz = Math.max(3, Math.min(19, g.z0 + dz))
         if (nz !== z) {
@@ -122,31 +130,49 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
           setZ(nz)
           setC({ lon: x2lon((nx - g.mx + size.w / 2) / TS, nz), lat: y2lat((ny - g.my + size.h / 2) / TS, nz) })
         }
-        clearStageTransform()
       }
+      clearStageTransform()
       gest.current = null
       setTimeout(() => { drag.current.moved = false }, 0)
     } else if (ptrs.current.size === 1) {
       clearStageTransform()
       const [p] = [...ptrs.current.values()]
-      gest.current = { mode:'pan', sx:p.x, sy:p.y, clat:c.lat, clon:c.lon }
+      gest.current = { mode:'pan', sx:p.x, sy:p.y, clat:c.lat, clon:c.lon, dx:0, dy:0 }
     }
   }
 
+  // molette/trackpad : accumulation dans un scale CSS live ancré sous le
+  // curseur, un seul commit (rechargement des tuiles) après une pause —
+  // sinon chaque petit deltaY d'un trackpad déclenchait un changement de
+  // niveau de zoom complet, illisible en rafale
   const wheel = useCallback((e) => {
     e.preventDefault()
     const el = wrapRef.current; if (!el) return
     const r = el.getBoundingClientRect()
     const mx = e.clientX - r.left, my = e.clientY - r.top
-    const dz = e.deltaY < 0 ? 1 : -1
-    const nz = Math.max(3, Math.min(19, z + dz))
-    if (nz === z) return
-    // garder le point sous le curseur
-    const lon = x2lon((originX + mx) / TS, z)
-    const lat = y2lat((originY + my) / TS, z)
-    const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
-    setZ(nz)
-    setC({ lon: x2lon((nx - mx + size.w / 2) / TS, nz), lat: y2lat((ny - my + size.h / 2) / TS, nz) })
+    const live = wheelLive.current
+    if (live.mx == null) live.scale = 1
+    live.mx = mx; live.my = my
+    live.scale = Math.min(4, Math.max(0.25, live.scale * (1 - e.deltaY * 0.0018)))
+    if (stageRef.current) {
+      stageRef.current.style.transform =
+        `translate(${mx}px,${my}px) scale(${live.scale}) translate(${-mx}px,${-my}px)`
+    }
+    clearTimeout(wheelTimer.current)
+    wheelTimer.current = setTimeout(() => {
+      const { scale, mx: cmx, my: cmy } = wheelLive.current
+      const dz = Math.round(Math.log2(scale))
+      const nz = Math.max(3, Math.min(19, z + dz))
+      if (nz !== z) {
+        const lon = x2lon((originX + cmx) / TS, z)
+        const lat = y2lat((originY + cmy) / TS, z)
+        const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
+        setZ(nz)
+        setC({ lon: x2lon((nx - cmx + size.w / 2) / TS, nz), lat: y2lat((ny - cmy + size.h / 2) / TS, nz) })
+      }
+      clearStageTransform()
+      wheelLive.current = { mx: null, my: null, scale: 1 }
+    }, 160)
   }, [z, originX, originY, size.w, size.h])
 
   useEffect(() => {
