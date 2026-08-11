@@ -647,8 +647,18 @@ export function allPlayers() {
   return [...BASE_PLAYERS, ...S.players.map(p => ({ id: p.id, name: p.name, custom: true }))]
 }
 export async function addPlayer(name) {
-  const id = name.trim()[0]?.toUpperCase() || '?'
-  const value = { id, name: name.trim() }
+  const trimmed = name.trim()
+  // évite qu'un nouvel observateur récupère la même initiale qu'un autre déjà
+  // présent (avatars et en-têtes de matrice n'affichent qu'une seule lettre) —
+  // on essaie chaque lettre du prénom dans l'ordre, sinon on se rabat sur un chiffre
+  const existingIds = new Set(allPlayers().map(p => p.id))
+  let id = null
+  for (const ch of trimmed) {
+    const up = ch.toUpperCase()
+    if (/[A-ZÀ-Ÿ]/.test(up) && !existingIds.has(up)) { id = up; break }
+  }
+  if (!id) { let n = 2; while (existingIds.has(String(n))) n++; id = String(n) }
+  const value = { id, name: trimmed }
   S.players.push({ ...value, key: 'pl_' + value.name }); notify()
   await sb.from('overrides').upsert({ kind: 'player', key: 'pl_' + value.name, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
 }

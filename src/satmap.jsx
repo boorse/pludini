@@ -173,7 +173,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         doubleClick={{ disabled: true }}
         panning={{ velocityDisabled: true }}
         trackPadPanning={{ velocityDisabled: true }}
-        wheel={{ step: 0.2 }}
+        wheel={{ step: 0.04 }}
         onTransform={onTransform}
         onPanningStop={commit} onPinchStop={commit} onWheelStop={commit}>
         <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
