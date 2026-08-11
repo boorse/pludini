@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, TIER_THRESHOLDS, calcPts, totalPts, speciesPts, isObserved,
-         OBS_STATES, OBS_STATE_COLOR, obsStateLabel } from './data'
+         OBS_STATE_COLOR, obsStateLabel, statesFor } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
 import { gradientFor, gradientForCat, catAccentColor } from './gradients.js'
@@ -902,12 +902,13 @@ export default function App() {
             )}
 
             {detTab==='obs' && <>
-              {speciesType(sp)===1 && (() => {
+              {statesFor(sp) && (() => {
+                const STATES = statesFor(sp)
                 const firstByState = {}
                 ;(sp.inds||[]).forEach(ind => { if (ind.state && !firstByState[ind.state]) firstByState[ind.state] = ind })
                 return (
-                  <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:7, marginBottom:16 }}>
-                    {Object.keys(OBS_STATES).map(k=>{
+                  <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(STATES).length},1fr)`, gap:7, marginBottom:16 }}>
+                    {Object.keys(STATES).map(k=>{
                       const st = obsStateLabel(k, sp)
                       const found = firstByState[k]
                       return (
@@ -996,6 +997,12 @@ export default function App() {
                             <span style={{ position:'absolute', top:4, left:4, background:'rgba(20,18,14,.6)',
                               color:'#fff', fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:8,
                               textTransform:'capitalize' }}>{ind.size}</span>
+                          )}
+                          {ind.state && obsStateLabel(ind.state, sp) && (
+                            <span title={lang==='ru'?obsStateLabel(ind.state, sp).ru:obsStateLabel(ind.state, sp).l}
+                              style={{ position:'absolute', top:4, left:4, background:OBS_STATE_COLOR,
+                              color:'#fff', borderRadius:'50%', width:18, height:18, fontSize:10,
+                              display:'flex', alignItems:'center', justifyContent:'center' }}>{obsStateLabel(ind.state, sp).e}</span>
                           )}
                           {photos.length>1 && (
                             <span style={{ position:'absolute', bottom:4, left:4, background:'rgba(20,18,14,.6)',
@@ -1086,7 +1093,7 @@ export default function App() {
                                 color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
                                 letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
-                              {ind.state && OBS_STATES[ind.state] && (() => { const st = obsStateLabel(ind.state, sp); return (
+                              {ind.state && obsStateLabel(ind.state, sp) && (() => { const st = obsStateLabel(ind.state, sp); return (
                                 <span title={lang==='ru'?st.ru:st.l}
                                   style={{ position:'absolute', top:6, right:6, background:OBS_STATE_COLOR,
                                   color:'#fff', borderRadius:'50%', width:20, height:20, fontSize:11,
