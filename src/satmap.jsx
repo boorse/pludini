@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { flushSync } from 'react-dom'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 // ── Carte satellite à tuiles — aucune interface tierce ──
@@ -208,8 +209,14 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     const lat = y2lat(worldY / TS, z)
     const dz = Math.round(Math.log2(k))
     const nz = Math.max(3, Math.min(19, z + dz))
-    setC({ lat, lon })
-    if (nz !== z) setZ(nz)
+    // flushSync : la bibliothèque tactile appelle ce commit hors du cycle React
+    // habituel — sans forcer le re-rendu (nouvelles tuiles) à se produire AVANT
+    // resetTransform, un frame intermédiaire pouvait s'afficher (la vue saute à
+    // l'ancienne position le temps d'un frame, "on dirait que ça ne bouge pas")
+    flushSync(() => {
+      setC({ lat, lon })
+      if (nz !== z) setZ(nz)
+    })
     liveRef.current = { x: 0, y: 0, k: 1 }
     touchApiRef.current?.resetTransform(0)
     setTimeout(() => { drag.current.moved = false }, 0)
@@ -265,7 +272,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     <div ref={wrapRef}
       onDragStart={e=>e.preventDefault()}
       style={{ position:'relative', width:'100%', height, overflow:'hidden', background:'#1E2418',
-        cursor: (addMode||lineMode) ? 'crosshair' : 'grab', userSelect:'none' }}>
+        cursor: (addMode||lineMode) ? 'crosshair' : 'grab', userSelect:'none', touchAction:'none' }}>
       {isTouch ? (
         <TransformWrapper ref={touchApiRef}
           initialScale={1} initialPositionX={0} initialPositionY={0}
@@ -273,7 +280,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
           doubleClick={{ disabled: true }}
           onTransform={onTouchTransform}
           onPanningStop={commitTouchTransform} onPinchStop={commitTouchTransform}>
-          <TransformComponent wrapperStyle={{ width:'100%', height:'100%' }} contentStyle={{ width:size.w, height:size.h }}>
+          <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
             <div style={{ position:'relative', width:size.w, height:size.h }} onClick={click}>{content}</div>
           </TransformComponent>
         </TransformWrapper>
