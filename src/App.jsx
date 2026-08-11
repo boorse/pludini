@@ -1474,12 +1474,20 @@ export default function App() {
                 <div className="serif" style={{ width:32, height:32, borderRadius:'50%', background:T.sage, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:600, flexShrink:0 }}>{p.id}</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div className="serif" style={{ fontSize:14, fontWeight:600, color:T.ink }}>{p.name}</div>
-                  <div style={{ fontSize:11, color:T.mute }}>{p.sps} espèce{p.sps!==1?'s':''} · {p.bp} pts de badges</div>
+                  <div style={{ fontSize:11, color:T.mute, display:'flex', alignItems:'center', gap:5, marginTop:1 }}>
+                    <span>{p.sps} espèce{p.sps!==1?'s':''}</span>
+                    {p.bp>0 && <span style={{ fontSize:9.5, fontWeight:800, color:'#8F6A2E', background:'#F0E4CF',
+                      border:'1px solid #DCC79E', borderRadius:8, padding:'1.5px 7px', display:'flex', alignItems:'center', gap:3 }}>
+                      <i className="ti ti-award" style={{ fontSize:10.5 }} aria-hidden="true" />+{p.bp}</span>}
+                  </div>
                 </div>
                 <div style={{ flex:1, maxWidth:110, background:'#DDD3BE', borderRadius:5, height:7, overflow:'hidden' }}>
                   <div style={{ height:'100%', borderRadius:5, background:T.clay, width:`${Math.round(p.pts/max*100)}%` }} />
                 </div>
-                <div className="serif" style={{ fontSize:15, fontWeight:900, color:T.clay, minWidth:48, textAlign:'right' }}>{p.pts}</div>
+                <div style={{ minWidth:56, textAlign:'right' }}>
+                  <div className="serif" style={{ fontSize:15, fontWeight:900, color:T.clay }}>{p.pts}</div>
+                  {p.bp>0 && <div style={{ fontSize:8.5, color:T.mute, marginTop:1 }}>{p.spp} + 🏅{p.bp}</div>}
+                </div>
                 <i className="ti ti-chevron-right" style={{ fontSize:14, color:T.mute }} aria-hidden="true" />
               </button>
             ))}
