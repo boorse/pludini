@@ -629,46 +629,50 @@ export const SPECIES = [
     alim:'Croquettes, restes de table.', hab:'Vit sur la propriété.', dng:'Aucun.' },
 ]
 
+// paliers de recensement : nombre d'espèces (le dernier palier = SPECIES.length,
+// résolu dynamiquement là où c'est utilisé)
+export const TIER_THRESHOLDS = [10, 25, 50, 80, null]
+
+// achievements "tier" (paliers) : progression calculée automatiquement, par
+// joueur, à partir du nombre d'espèces qu'il a personnellement observées.
+// achievements manuels (manual:true) : aucune donnée ne prouve automatiquement
+// qu'ils sont faits (ex. "voir le lynx") — chaque joueur les déclare lui-même
+// (auto-déclaratif, voir badgeclaim dans store.js), et c'est cette déclaration
+// qui fait progresser sa courbe de 0 à 100%
 export const ACHIEVEMENTS = [
   // ── Paliers de recensement ──
-  { e:'🌱', n:'Premiers pas',      d:'10 espèces observées',                w:'—', on:false, pts:60,  tier:1 },
-  { e:'🌿', n:'Naturaliste',       d:'25 espèces observées',                w:'—', on:false, pts:150, tier:2 },
-  { e:'🌳', n:'Connaisseur',       d:'50 espèces observées',                w:'—', on:false, pts:300, tier:3 },
-  { e:'🏞️', n:'Encyclopédiste',    d:'80 espèces observées',                w:'—', on:false, pts:500, tier:4 },
-  { e:'👑', n:'Maître du vivant',  d:'Toutes les espèces du Conservatoire', w:'—', on:false, pts:900, tier:5 },
+  { id:'tier_10',  e:'🌱', n:'Premiers pas',      d:'10 espèces observées',                pts:60,  tier:1 },
+  { id:'tier_25',  e:'🌿', n:'Naturaliste',       d:'25 espèces observées',                pts:150, tier:2 },
+  { id:'tier_50',  e:'🌳', n:'Connaisseur',       d:'50 espèces observées',                pts:300, tier:3 },
+  { id:'tier_80',  e:'🏞️', n:'Encyclopédiste',    d:'80 espèces observées',                pts:500, tier:4 },
+  { id:'tier_all', e:'👑', n:'Maître du vivant',  d:'Toutes les espèces du Conservatoire', pts:900, tier:5 },
 
   // ── Grands prédateurs & espèces difficiles ──
-  { e:'🐆', n:'Le fantôme',        d:'Voir le lynx de ses propres yeux',    w:'—', on:false, pts:400 },
-  { e:'🐺', n:'Trace de loup',     d:'Observer un loup ou identifier sa piste', w:'—', on:false, pts:350 },
-  { e:'🐻', n:'L\'ours',           d:'Observer un ours brun',               w:'—', on:false, pts:600 },
-  { e:'🌊', n:'La loutre',         d:'Observer une loutre sur la Līčupe',   w:'—', on:false, pts:280 },
-  { e:'🦅', n:'Le pygargue',       d:'Observer un pygargue à queue blanche',w:'—', on:false, pts:220 },
-  { e:'🦃', n:'Place de chant',    d:'Assister à la parade du grand tétras',w:'—', on:false, pts:450 },
+  { id:'lynx',     e:'🐆', n:'Le fantôme',        d:'Voir le lynx de ses propres yeux',    pts:400, manual:true },
+  { id:'loup',     e:'🐺', n:'Trace de loup',     d:'Observer un loup ou identifier sa piste', pts:350, manual:true },
+  { id:'ours',     e:'🐻', n:'L\'ours',           d:'Observer un ours brun',               pts:600, manual:true },
+  { id:'loutre',   e:'🌊', n:'La loutre',         d:'Observer une loutre sur la Līčupe',   pts:280, manual:true },
+  { id:'pygargue', e:'🦅', n:'Le pygargue',       d:'Observer un pygargue à queue blanche',pts:220, manual:true },
+  { id:'tetras',   e:'🦃', n:'Place de chant',    d:'Assister à la parade du grand tétras',pts:450, manual:true },
 
   // ── Terrain difficile ──
-  { e:'💀', n:'Charognard',        d:'Trouver une carcasse et identifier l\'espèce', w:'—', on:false, pts:180 },
-  { e:'🥚', n:'Découvreur de nid', d:'Trouver 3 nids occupés d\'espèces différentes', w:'—', on:false, pts:200 },
-  { e:'🕳️', n:'Cartographe souterrain', d:'Localiser 5 terriers ou gîtes actifs', w:'—', on:false, pts:250 },
-  { e:'🦫', n:'Ingénieur du castor', d:'Trouver un barrage actif',          w:'—', on:false, pts:190 },
-  { e:'🐾', n:'Pisteur',           d:'Identifier 10 empreintes d\'espèces différentes', w:'—', on:false, pts:230 },
-  { e:'🍖', n:'Reste de repas',    d:'Trouver une proie mise en cache par un prédateur', w:'—', on:false, pts:320 },
+  { id:'charogne', e:'💀', n:'Charognard',        d:'Trouver une carcasse et identifier l\'espèce', pts:180, manual:true },
+  { id:'nid',      e:'🥚', n:'Découvreur de nid', d:'Trouver 3 nids occupés d\'espèces différentes', pts:200, manual:true },
+  { id:'terrier',  e:'🕳️', n:'Cartographe souterrain', d:'Localiser 5 terriers ou gîtes actifs', pts:250, manual:true },
+  { id:'barrage',  e:'🦫', n:'Ingénieur du castor', d:'Trouver un barrage actif',          pts:190, manual:true },
+  { id:'empreinte',e:'🐾', n:'Pisteur',           d:'Identifier 10 empreintes d\'espèces différentes', pts:230, manual:true },
+  { id:'cache',    e:'🍖', n:'Reste de repas',    d:'Trouver une proie mise en cache par un prédateur', pts:320, manual:true },
 
   // ── Individus & suivi ──
-  { e:'⭐', n:'Premier familier',  d:'Reconnaître et nommer un individu',   w:'—', on:false, pts:120 },
-  { e:'🔖', n:'Le clan',           d:'Suivre 5 familiers différents',       w:'—', on:false, pts:280 },
-  { e:'📅', n:'Fidélité',          d:'Revoir le même familier sur 3 saisons', w:'—', on:false, pts:340 },
+  { id:'familier1',e:'⭐', n:'Premier familier',  d:'Reconnaître et nommer un individu',   pts:120, manual:true },
+  { id:'clan',     e:'🔖', n:'Le clan',           d:'Suivre 5 familiers différents',       pts:280, manual:true },
+  { id:'fidelite', e:'📅', n:'Fidélité',          d:'Revoir le même familier sur 3 saisons', pts:340, manual:true },
 
   // ── Méthode ──
-  { e:'👁️', n:'Œil de lynx',       d:'20 espèces vues à l\'œil nu',         w:'—', on:false, pts:260 },
-  { e:'🌙', n:'Créature de la nuit', d:'10 espèces en vision nocturne',     w:'—', on:false, pts:240 },
-  { e:'🏆', n:'Le grand chelem',   d:'Une espèce de chaque règne, à l\'œil nu', w:'—', on:false, pts:380 },
+  { id:'oeil',     e:'👁️', n:'Œil de lynx',       d:'20 espèces vues à l\'œil nu',         pts:260, manual:true },
+  { id:'nuit',     e:'🌙', n:'Créature de la nuit', d:'10 espèces en vision nocturne',     pts:240, manual:true },
+  { id:'chelem',   e:'🏆', n:'Le grand chelem',   d:'Une espèce de chaque règne, à l\'œil nu', pts:380, manual:true },
 ]
-
-// points de badges par joueur
-export function badgePts(playerName) {
-  return ACHIEVEMENTS.filter(a => a.on && a.w.includes(playerName))
-    .reduce((s, a) => s + (a.pts || 0), 0)
-}
 
 export function calcPts(sp, playerName) {
   const methods = sp.obs[playerName] || []

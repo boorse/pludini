@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { THEMES, MONTHS, MONTHS_RU, EVENTS, DEFAULT_TYPES, CENTER } from './territory.js'
 import SatMap from './satmap.jsx'
-import { isObserved } from './data'
+import { isObserved, obsStateLabel } from './data'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
 import { LUT, thumbZoomStyle } from './photoui.jsx'
@@ -810,11 +810,29 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
           <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?150:130}px,1fr))`, gap:9, marginBottom:20 }}>
             {mySpecies.map(sp=>{
               const nm = nameOf(sp,lang)
+              // individus de CETTE personne pour cette espèce : liseré orange si un
+              // doute traîne dessus, badges ronds pour chaque état bonus déjà croisé
+              // (bébé/maman/papa/vieux/malade/gîte) — un coup d'œil, pas le détail
+              const spInds = (sp.inds||[]).filter(ind=>ind.by===who)
+              const unc = spInds.some(ind=>ind.uncertain)
+              const states = [...new Set(spInds.map(ind=>ind.state).filter(Boolean))]
               return (
                 <button key={sp.id} onClick={()=>onSelectSpecies(sp.id)} style={{ textAlign:'left', borderRadius:12,
-                  overflow:'hidden', border:`1px solid ${T.line}`, padding:0, position:'relative', minHeight:86 }}>
+                  overflow:'hidden', padding:0, position:'relative', minHeight:86,
+                  border: unc?'2px solid #D68C34':`1px solid ${T.line}`,
+                  boxShadow: unc?'0 0 0 1px rgba(214,140,52,.3), 0 3px 12px rgba(214,140,52,.22)':'none' }}>
                   <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
                   <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.72), transparent 58%)' }} />
+                  {states.length>0 && (
+                    <div style={{ position:'absolute', top:6, right:6, display:'flex', gap:3, zIndex:2 }}>
+                      {states.map(k=>{
+                        const st = obsStateLabel(k, sp)
+                        return <span key={k} title={lang==='ru'?st.ru:st.l} style={{ width:17, height:17, borderRadius:'50%',
+                          background:'rgba(20,22,14,.75)', border:'1px solid rgba(242,238,226,.35)',
+                          display:'flex', alignItems:'center', justifyContent:'center', fontSize:9.5 }}>{st.e}</span>
+                      })}
+                    </div>
+                  )}
                   <div style={{ position:'relative', minHeight:86, display:'flex', flexDirection:'column', justifyContent:'space-between', padding:9 }}>
                     <span style={{ fontSize:19 }}>{sp.e}</span>
                     <div>

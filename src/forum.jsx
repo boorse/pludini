@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { getMe, allSpecies, speciesType, CAT_PT_MULT, REPEAT_PASSAGE_MULT, allForumTopics, forumPostsFor, forumPostCount,
-         addForumTopic, addForumPost, removeForumTopic, removeForumPost } from './store.js'
+         addForumTopic, addForumPost, removeForumTopic } from './store.js'
 import { RARITY, SIZE_MULT, METHODS, FISH_SIZE_MULT } from './data'
 import { UI, nameOf } from './i18n.js'
 import { T, Modal, label, input, ValidateBar, ConfirmDialog, IdentityPicker } from './editui.jsx'
@@ -94,7 +94,7 @@ export function ForumPage({ wide, lang, edit, onBack }) {
       </div>
 
       {newTopic && <NewTopicModal lang={lang} onClose={()=>setNewTopic(false)} />}
-      {openTopic && <TopicThread lang={lang} topic={openTopic} edit={edit} onClose={()=>setOpenTopic(null)} />}
+      {openTopic && <TopicThread lang={lang} topic={openTopic} onClose={()=>setOpenTopic(null)} />}
       {confirmDel && <ConfirmDialog lang={lang}
         title={lang==='ru'?'Удалить эту тему?':'Supprimer ce sujet ?'}
         message={lang==='ru'?'Все сообщения будут потеряны. Это действие необратимо.'
@@ -144,11 +144,10 @@ function NewTopicModal({ lang, onClose }) {
 }
 
 // ══════ Fil d'un sujet — messages + réponse (+ tableau des points pour le sujet dédié) ══════
-function TopicThread({ lang, topic, edit, onClose }) {
+function TopicThread({ lang, topic, onClose }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [idPicker, setIdPicker] = useState(false)
-  const [confirmDelPost, setConfirmDelPost] = useState(null)
   const posts = forumPostsFor(topic.id)
 
   const reply = async () => {
@@ -175,12 +174,6 @@ function TopicThread({ lang, topic, edit, onClose }) {
               </div>
               <div style={{ fontSize:12.5, color:T.ink, lineHeight:1.6, whiteSpace:'pre-wrap' }}>{p.text}</div>
             </div>
-            {edit && (
-              <button onClick={()=>setConfirmDelPost(p)} title={lang==='ru'?'Удалить':'Supprimer'}
-                style={{ position:'absolute', top:0, right:0, width:20, height:20, borderRadius:'50%',
-                  background:'rgba(43,38,32,.5)', color:'#fff', fontSize:10, display:'flex',
-                  alignItems:'center', justifyContent:'center' }}>✕</button>
-            )}
           </div>
         ))}
         {topic.special==='points-table' && <PointsTable lang={lang} />}
@@ -199,11 +192,6 @@ function TopicThread({ lang, topic, edit, onClose }) {
         </button>
       </div>
       {idPicker && <IdentityPicker lang={lang} onClose={()=>setIdPicker(false)} />}
-      {confirmDelPost && <ConfirmDialog lang={lang}
-        title={lang==='ru'?'Удалить это сообщение?':'Supprimer ce message ?'}
-        message={lang==='ru'?'Это действие необратимо.':'Cette action est irréversible.'}
-        onCancel={()=>setConfirmDelPost(null)}
-        onConfirm={async()=>{ await removeForumPost(confirmDelPost.id); setConfirmDelPost(null) }} />}
     </Modal>
   )
 }

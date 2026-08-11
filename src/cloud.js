@@ -67,3 +67,28 @@ export async function saveCalEvent(e) {
   await sb.from('overrides').upsert({ kind:'calevent', key:`calevent_${e.id}`, value:e, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
 export async function deleteCalEvent(id) { await sb.from('overrides').delete().eq('key', `calevent_${id}`) }
+
+// Badges — déclaration d'un joueur qu'il a rempli les conditions d'un badge
+// "manuel" (rien dans les données ne le prouve automatiquement, ex. "voir le
+// lynx") : c'est cette déclaration qui fait progresser sa courbe de 0 à 100%
+export async function getBadgeClaims() {
+  const { data } = await sb.from('overrides').select('*').eq('kind','badgeclaim').order('updated_at')
+  return (data||[]).map(r=>r.value)
+}
+export async function setBadgeClaim(achId, player, done) {
+  const key = `badgeclaim_${achId}_${player}`
+  if (done) await sb.from('overrides').upsert({ kind:'badgeclaim', key, value:{ achId, player, done:true }, updated_at:new Date().toISOString() }, { onConflict:'key' })
+  else await sb.from('overrides').delete().eq('key', key)
+}
+
+// Badges — propositions (nouveau badge, ou modification du texte d'un badge
+// existant) : n'affecte jamais le badge réel tout seul, reste "en attente"
+// jusqu'à être repris à la main (par Claude Code) pour devenir fonctionnel
+export async function getBadgeProposals() {
+  const { data } = await sb.from('overrides').select('*').eq('kind','badgeproposal').order('updated_at')
+  return (data||[]).map(r=>r.value)
+}
+export async function saveBadgeProposal(p) {
+  await sb.from('overrides').upsert({ kind:'badgeproposal', key:`badgeproposal_${p.id}`, value:p, updated_at:new Date().toISOString() }, { onConflict:'key' })
+}
+export async function deleteBadgeProposal(id) { await sb.from('overrides').delete().eq('key', `badgeproposal_${id}`) }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, calcPts, totalPts, speciesPts, badgePts, isObserved,
+import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, TIER_THRESHOLDS, calcPts, totalPts, speciesPts, isObserved,
          OBS_STATES, OBS_STATE_COLOR, obsStateLabel } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
@@ -11,7 +11,8 @@ import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT, thu
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
          removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain,
-         REPEAT_PASSAGE_MULT } from './store.js'
+         REPEAT_PASSAGE_MULT, achievementProgress, achievementDoneBy, setBadgeClaim,
+         badgeProposals, addBadgeProposal, removeBadgeProposal } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
 import { AddObservation } from './addobs.jsx'
 import Quiz from './quiz.jsx'
@@ -642,14 +643,14 @@ export default function App() {
                 </tr></thead>
                 <tbody>
                   {list.map((s,si)=>{
-                    const r = (RARITY[s.r]||RARITY.commun), o = isObserved(s), nm = nameOf(s, lang)
+                    const o = isObserved(s), nm = nameOf(s, lang)
                     const newGroup = si===0 || list[si-1].sub !== s.sub
                     const groupBorder = newGroup && si>0 ? `1px solid ${T.line}` : 'none'
                     return (
                       <tr key={s.id} style={{ opacity:o?1:.5, background: bands[si] ? 'rgba(180,166,136,.13)' : 'transparent' }}>
                         <td onClick={()=>selSpFull(s.id)} style={{ padding:'7px 8px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder, cursor:'pointer' }}>
                           <div style={{ display:'flex', alignItems:'center', gap:7 }}>
-                            <span style={{ width:9, height:9, borderRadius:2, background:o?r.c:'#CFC3A8', flexShrink:0 }} />
+                            <span style={{ width:9, height:9, borderRadius:2, background:o?T.sage:'#CFC3A8', flexShrink:0 }} />
                             <span style={{ fontSize:15, filter:o?'none':'grayscale(.6)' }}>{s.e}</span>
                             <span>
                               <span style={{ display:'block', fontSize:12, fontWeight:o?600:400, color:T.ink }}>{nm.main}</span>
@@ -748,7 +749,7 @@ export default function App() {
               </tr></thead>
               <tbody>
                 {list.map((s,si)=>{
-                  const r = (RARITY[s.r]||RARITY.commun), o = isObserved(s)
+                  const o = isObserved(s)
                   const nm = nameOf(s, lang)
                   const nInd = (s.inds||[]).length
                   const newGroup = si===0 || list[si-1].sub !== s.sub
@@ -758,7 +759,7 @@ export default function App() {
                     <tr key={s.id} onClick={()=>selSpFull(s.id)} style={{ cursor:'pointer', opacity:o?1:0.5, background:rowBg }}>
                       <td style={{ padding:'5px 6px', borderBottom:`1px solid ${T.lineSoft}`, borderTop:groupBorder }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <span style={{ width:8, height:8, borderRadius:2, background:o?r.c:'#CFC3A8', flexShrink:0 }} />
+                          <span style={{ width:8, height:8, borderRadius:2, background:o?T.sage:'#CFC3A8', flexShrink:0 }} />
                           <span style={{ fontSize:13, filter:o?'none':'grayscale(.6)' }}>{s.e}</span>
                           <span style={{ minWidth:0 }}>
                             <span style={{ display:'block', fontSize:11, fontWeight:o?600:400, color:T.ink, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:100 }}>{nm.main}</span>
@@ -871,25 +872,48 @@ export default function App() {
                             :'Ne rapporte pas de points, mais on peut quand même noter des observations.'}
               </div>
             )}
-            <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:14 }}>
+            <div style={{ display:'flex', borderBottom:`1px solid ${T.line}`, marginBottom:16 }}>
               {tabs.map(([id,l])=>(
                 <button key={id} onClick={()=>setDetTab(id)} style={{ fontSize:12.5, padding:'8px 14px', color:detTab===id?T.clayDark:T.soft, borderBottom:`2px solid ${detTab===id?T.clay:'transparent'}`, marginBottom:-1, fontWeight:detTab===id?600:400 }}>{l}</button>
               ))}
             </div>
+
+            {/* deux actions principales, toujours au même endroit et à la même taille
+                quel que soit l'onglet actif — on ne les cache pas dans un coin */}
+            {(speciesType(sp)===1 || edit) && (
+              <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+                {speciesType(sp)===1 && (
+                  <button onClick={()=>setShowCalendar(sp)} style={{ flex:1, display:'flex', alignItems:'center',
+                    justifyContent:'center', gap:7, padding:'12px 10px', borderRadius:14,
+                    background:T.sage, color:'#fff', fontWeight:700, fontSize:12.5 }}>
+                    <i className="ti ti-calendar-event" style={{ fontSize:16 }} aria-hidden="true" />
+                    {lang==='ru'?'Календарь':'Calendrier'}
+                  </button>
+                )}
+                {edit && (
+                  <button onClick={()=>setSighting({ sp })} style={{ flex:1, display:'flex', alignItems:'center',
+                    justifyContent:'center', gap:7, padding:'12px 10px', borderRadius:14,
+                    background:T.clay, color:'#fff', fontWeight:700, fontSize:12.5 }}>
+                    <i className="ti ti-plus" style={{ fontSize:16 }} aria-hidden="true" />
+                    {isFish(sp) ? (lang==='ru'?'Поймана':'Pêché') : (lang==='ru'?'Наблюдение':'Observation')}
+                  </button>
+                )}
+              </div>
+            )}
 
             {detTab==='obs' && <>
               {speciesType(sp)===1 && (() => {
                 const firstByState = {}
                 ;(sp.inds||[]).forEach(ind => { if (ind.state && !firstByState[ind.state]) firstByState[ind.state] = ind })
                 return (
-                  <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:6, marginBottom:14 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:`repeat(${Object.keys(OBS_STATES).length},1fr)`, gap:7, marginBottom:16 }}>
                     {Object.keys(OBS_STATES).map(k=>{
                       const st = obsStateLabel(k, sp)
                       const found = firstByState[k]
                       return (
                         <button key={k} onClick={found ? ()=>setCurInd(found.n) : undefined}
                           style={{ textAlign:'center', borderRadius:10, overflow:'hidden', position:'relative',
-                            height:60, border:`1px solid ${found?OBS_STATE_COLOR:T.line}`,
+                            height:52, border:`1px solid ${found?OBS_STATE_COLOR:T.line}`,
                             cursor:found?'pointer':'default' }}>
                           {found ? <>
                             <PhotoBg target={`ind:${sp.id}:${found.n}`} fallback={gradientFor(sp.id+found.n)} />
@@ -897,10 +921,10 @@ export default function App() {
                               background:'linear-gradient(to top, rgba(16,18,12,.68), transparent 62%)' }} />
                           </> : <div style={{ position:'absolute', inset:0, background:T.card }} />}
                           <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column',
-                            alignItems:'center', justifyContent:'flex-end', padding:'4px 2px' }}>
-                            <span style={{ fontSize:15, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
-                            <span style={{ fontSize:8, fontWeight:700, marginTop:1, lineHeight:1.1,
-                              color:found?'#F2EEE2':T.mute }}>{lang==='ru'?st.ru:st.l}</span>
+                            alignItems:'center', justifyContent:'center', padding:'2px 2px', gap:1 }}>
+                            <span style={{ fontSize:14, opacity:found?1:.45, filter:found?'none':'grayscale(.75)' }}>{st.e}</span>
+                            <span style={{ fontSize:7.5, fontWeight:700, lineHeight:1.1,
+                              color:found?'#F2EEE2':T.mute, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%' }}>{lang==='ru'?st.ru:st.l}</span>
                           </div>
                         </button>
                       )
@@ -908,28 +932,9 @@ export default function App() {
                   </div>
                 )
               })()}
-              <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
-                <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px' }}>{t.whoObserved}</div>
-                <div style={{ marginLeft:'auto', display:'flex', gap:5 }}>
-                  {speciesType(sp)===1 && (
-                    <button onClick={()=>setShowCalendar(sp)}
-                      title={lang==='ru'?'Календарь появлений':'Calendrier des passages'}
-                      style={{ width:32, height:32, borderRadius:'50%', border:`1px solid ${T.line}`,
-                        background:T.card, color:T.clay, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <i className="ti ti-calendar-event" style={{ fontSize:15 }} aria-hidden="true" />
-                    </button>
-                  )}
-                  {edit && (
-                    <button onClick={()=>setSighting({ sp })} style={{ fontSize:12.5,
-                      padding:'7px 14px', borderRadius:14, background:T.clay, color:'#fff', fontWeight:600,
-                      display:'flex', alignItems:'center', gap:5 }}>
-                      <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
-                      {isFish(sp) ? (lang==='ru'?'Поймана':'Pêché') : (lang==='ru'?'Наблюдение':'Observation')}
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:`repeat(${wide?5:3},1fr)`, gap:8, marginBottom:16 }}>
+              <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
+                letterSpacing:'.6px', marginBottom:8, paddingBottom:5, borderBottom:`1px solid ${T.line}` }}>{t.whoObserved}</div>
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${ALL_PLAYERS.length},1fr)`, gap:7, marginBottom:16 }}>
                 {ALL_PLAYERS.map(pl=>{
                   const m = sp.obs[pl.name]||[]
                   const best = m.length ? m.reduce((b,x)=>(METHODS[x]?.mult||0)>(METHODS[b]?.mult||0)?x:b, m[0]) : null
@@ -942,7 +947,9 @@ export default function App() {
                   const orphanMethods = m.filter(x=>!indMethods.has(x))
                   const orphan = edit && orphanMethods.length>0
                   return (
-                    <div key={pl.id} style={{ position:'relative', background:best?`${METHODS[best].c}33`:T.card, border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'5px 6px', textAlign:'center', opacity:pl.demo?.7:1 }}>
+                    <div key={pl.id} style={{ position:'relative', height:52, background:best?`${METHODS[best].c}33`:T.card,
+                      border:`1px solid ${best?METHODS[best].c:T.line}`, borderRadius:10, padding:'2px 3px', textAlign:'center',
+                      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:1, opacity:pl.demo?.7:1 }}>
                       {orphan && (
                         <button onClick={()=>setConfirmClearObs({ sp, player:pl.name, keep:[...indMethods] })}
                           title={lang==='ru'?'Убрать способы без особи':'Retirer les méthodes sans individu'}
@@ -950,9 +957,9 @@ export default function App() {
                             background:'#8F3A2E', color:'#fff', fontSize:10, lineHeight:1, display:'flex',
                             alignItems:'center', justifyContent:'center' }}>✕</button>
                       )}
-                      <div style={{ fontSize:12, marginBottom:1 }}>{best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):'—'}</div>
-                      <div style={{ fontSize:9, color:T.soft }}>{pl.name}</div>
-                      <div className="serif" style={{ fontSize:10.5, fontWeight:600, color:T.ink }}>{p2?p2+' pts':'—'}</div>
+                      <div style={{ fontSize:11, lineHeight:1 }}>{best?(best==='eye'?'👁':best==='scope'?'🔭':best==='night'?'🌙':'📷'):'—'}</div>
+                      <div style={{ fontSize:8.5, color:T.soft, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'100%' }}>{pl.name}</div>
+                      <div className="serif" style={{ fontSize:9.5, fontWeight:600, color:T.ink, lineHeight:1 }}>{p2?p2+' pts':'—'}</div>
                     </div>
                   )
                 })}
@@ -1157,7 +1164,7 @@ export default function App() {
               })()}
 
               {Object.entries(sp.bonus||{}).some(([,b])=>b.length) && (
-                <div style={{ marginTop:14 }}>
+                <div style={{ marginTop:16 }}>
                   <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>Bonus</div>
                   {Object.entries(sp.bonus).map(([pl,bs])=>bs.map(b=>(
                     <div key={pl+b} style={{ fontSize:11.5, color:T.soft, marginBottom:3 }}>• <b>{pl}</b> : {b==='terrier'?'🏠 Terrier trouvé (+30 pts)':b==='bebe'?'👶 Bébés observés (+20 pts)':b}</div>
@@ -1617,38 +1624,70 @@ export default function App() {
   const Badges = () => {
     const tiers = ACHIEVEMENTS.filter(a=>a.tier).sort((a,b)=>a.tier-b.tier)
     const rest  = ACHIEVEMENTS.filter(a=>!a.tier)
-    const doneCount = SPECIES.filter(isObserved).length
+    const proposals = badgeProposals()
+    const me = getMe()
+    const [proposalEditor, setProposalEditor] = useState(null) // {type:'new'|'edit', targetId?, e,n,d,pts}
+
     const Card = ({ a }) => {
-      const locked = !a.on
+      const doneBy = achievementDoneBy(a)
+      const locked = doneBy.length === 0
+      const myDone = me ? achievementProgress(a, me) >= 1 : false
       return (
-        <div style={{ borderRadius:14, overflow:'hidden', position:'relative', minHeight:124,
+        <div style={{ borderRadius:14, overflow:'hidden', position:'relative', minHeight:150,
           border: locked?`1px solid ${T.line}`:'2px solid #C9A046',
           boxShadow: locked?'none':'0 0 0 1px rgba(201,160,70,.25), 0 3px 14px rgba(201,160,70,.2)' }}>
           <div style={{ position:'absolute', inset:0, background: locked?'#DDD3BE':gradientFor(a.n) }} />
           {!locked && <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.55), transparent 60%)' }} />}
-          <div style={{ position:'relative', height:'100%', minHeight:124, display:'flex', flexDirection:'column',
-            justifyContent:'space-between', padding:12 }}>
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+          <div style={{ position:'relative', height:'100%', minHeight:150, display:'flex', flexDirection:'column', padding:12 }}>
+            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:6 }}>
               <span style={{ fontSize:26, filter: locked?'grayscale(1)':'none', opacity: locked?.3:1 }}>{a.e}</span>
-              <span className="serif" style={{ fontSize:13, fontWeight:900,
-                color: locked?T.mute:'#F0D9A8' }}>+{a.pts}</span>
+              {/* un macaron par joueur qui a rempli le badge */}
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap', justifyContent:'flex-end', maxWidth:'62%' }}>
+                {doneBy.map(name=>{
+                  const pl = ALL_PLAYERS.find(p=>p.name===name)
+                  return <span key={name} title={name} style={{ width:19, height:19, borderRadius:'50%',
+                    background:'#C9A046', color:'#2B2620', fontSize:9, fontWeight:800, flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center', border:'1.5px solid #F0D9A8' }}>{pl?.id||name[0]}</span>
+                })}
+              </div>
             </div>
-            <div>
-              <div className="serif" style={{ fontSize:13.5, fontWeight:700, color: locked?T.ink:'#F2EEE2' }}>{a.n}</div>
+            <div style={{ marginTop:'auto' }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+                <div className="serif" style={{ fontSize:13.5, fontWeight:700, color: locked?T.ink:'#F2EEE2', flex:1 }}>{a.n}</div>
+                <span className="serif" style={{ fontSize:13, fontWeight:900, color: locked?T.mute:'#F0D9A8' }}>+{a.pts}</span>
+              </div>
               <div style={{ fontSize:10.5, color: locked?T.mute:'rgba(242,238,226,.82)', marginTop:2, lineHeight:1.4 }}>{a.d}</div>
-              {a.tier && locked && (
-                <div style={{ marginTop:6 }}>
-                  <div style={{ height:4, background:'#CFC3A8', borderRadius:3, overflow:'hidden' }}>
-                    <div style={{ height:'100%', background:'#C9A046',
-                      width:`${Math.min(100, Math.round(doneCount / [10,25,50,80,SPECIES.length][a.tier-1] * 100))}%` }} />
-                  </div>
-                  <div style={{ fontSize:9, color:T.mute, marginTop:3 }}>
-                    {doneCount} / {[10,25,50,80,SPECIES.length][a.tier-1]}
-                  </div>
-                </div>
+
+              {/* courbe de progression de chaque joueur, pas seulement la mienne */}
+              <div style={{ display:'flex', gap:3, marginTop:8 }}>
+                {ALL_PLAYERS.map(p=>{
+                  const pr = achievementProgress(a, p.name)
+                  return (
+                    <div key={p.id} title={`${p.name} · ${Math.round(pr*100)}%`} style={{ flex:1, minWidth:0 }}>
+                      <div style={{ height:5, borderRadius:3, overflow:'hidden', background: locked?'#CFC3A8':'rgba(255,255,255,.28)' }}>
+                        <div style={{ height:'100%', width:`${Math.round(pr*100)}%`, background:'#C9A046' }} />
+                      </div>
+                      <div style={{ fontSize:7.5, textAlign:'center', marginTop:2, fontWeight:700,
+                        color: locked?T.mute:'rgba(242,238,226,.7)' }}>{p.id}</div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {edit && a.manual && me && (
+                <button onClick={()=>setBadgeClaim(a.id, me, !myDone)}
+                  style={{ marginTop:8, width:'100%', fontSize:10.5, fontWeight:700, padding:'6px 8px', borderRadius:9,
+                    background: myDone?'#8F4A22':'rgba(255,255,255,.85)', color: myDone?'#fff':'#6B5330',
+                    border:`1px solid ${myDone?'#8F4A22':'#DCC79E'}` }}>
+                  {myDone ? (lang==='ru'?'✓ Отменить':'✓ Fait — annuler') : (lang==='ru'?'Отметить как сделано':'Je l\'ai fait')}
+                </button>
               )}
-              {!a.tier && locked && <div style={{ fontSize:9.5, color:T.mute, marginTop:4 }}>Non débloqué</div>}
-              {!locked && <div style={{ fontSize:10, color:'#C9DBA4', marginTop:4, fontWeight:600 }}>{a.w}</div>}
+              {edit && (
+                <button onClick={()=>setProposalEditor({ type:'edit', targetId:a.id, e:a.e, n:a.n, d:a.d, pts:a.pts })}
+                  style={{ marginTop:6, width:'100%', fontSize:9.5, color: locked?T.mute:'rgba(242,238,226,.65)', textAlign:'center' }}>
+                  {lang==='ru'?'Предложить изменение':'Proposer une modification'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1659,26 +1698,121 @@ export default function App() {
         <div className="serif" style={{ fontSize:13, fontWeight:700, color:T.mute, textTransform:'uppercase',
           letterSpacing:'1px', marginBottom:10 }}>{title}</div>
         <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?185:150}px,1fr))`,
-          gap:10, marginBottom:22 }}>{list.map(a=><Card key={a.n} a={a} />)}</div>
+          gap:10, marginBottom:22 }}>{list.map(a=><Card key={a.id} a={a} />)}</div>
       </>
     )
+    const ProposalEditor = () => {
+      const p = proposalEditor
+      const isEdit = p.type === 'edit'
+      const [e_, setE_] = useState(p.e || '🏅')
+      const [n_, setN_] = useState(p.n || '')
+      const [d_, setD_] = useState(p.d || '')
+      const [pts_, setPts_] = useState(p.pts ?? 100)
+      const [note, setNote] = useState('')
+      const fLabel = { fontSize:11, color:T.mute, display:'block', margin:'12px 0 5px' }
+      const fInput = { width:'100%', padding:'10px 12px', borderRadius:10, border:`1px solid ${T.line}`,
+        background:T.card, fontSize:13, color:T.ink }
+      const save = async () => {
+        if (!n_.trim() || !d_.trim()) return
+        await addBadgeProposal({ type:p.type, targetId:p.targetId||null, e:e_.trim()||'🏅',
+          n:n_.trim(), d:d_.trim(), pts:Number(pts_)||0, note:note.trim(), by:me||'' })
+        setProposalEditor(null)
+      }
+      return (
+        <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.55)', zIndex:80,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:16 }} onClick={()=>setProposalEditor(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:420,
+            maxHeight:'88vh', overflowY:'auto', border:`1px solid ${T.line}`, padding:20 }}>
+            <div className="serif" style={{ fontSize:16, fontWeight:800, color:T.ink, marginBottom:4 }}>
+              {isEdit ? (lang==='ru'?'Предложить изменение':'Proposer une modification')
+                      : (lang==='ru'?'Предложить новый значок':'Proposer un nouveau badge')}
+            </div>
+            <div style={{ fontSize:11.5, color:T.mute, lineHeight:1.5 }}>
+              {lang==='ru'
+                ? 'Предложение сохраняется в ожидании — оно ничего не меняет, пока не станет рабочим.'
+                : 'Ta proposition est enregistrée en attente — elle ne change rien tant qu\'elle n\'a pas été reprise pour devenir fonctionnelle.'}
+            </div>
+            <label style={fLabel}>{lang==='ru'?'Эмодзи':'Emoji'}</label>
+            <input value={e_} onChange={ev=>setE_(ev.target.value)} style={{ ...fInput, width:70, textAlign:'center', fontSize:20 }} />
+            <label style={fLabel}>{lang==='ru'?'Название':'Titre'}</label>
+            <input value={n_} onChange={ev=>setN_(ev.target.value)} style={fInput} autoFocus />
+            <label style={fLabel}>Description</label>
+            <textarea value={d_} onChange={ev=>setD_(ev.target.value)} rows={3} style={{ ...fInput, resize:'vertical' }} />
+            <label style={fLabel}>{lang==='ru'?'Очки (предложение)':'Points suggérés'}</label>
+            <input type="number" value={pts_} onChange={ev=>setPts_(ev.target.value)} style={{ ...fInput, width:110 }} />
+            <label style={fLabel}>{lang==='ru'?'Заметка (необязательно)':'Note (optionnel)'}</label>
+            <textarea value={note} onChange={ev=>setNote(ev.target.value)} rows={2} style={{ ...fInput, resize:'vertical' }}
+              placeholder={lang==='ru'?'Как это можно проверить...':'Comment le vérifier / le détecter, contexte…'} />
+            <div style={{ display:'flex', gap:8, marginTop:18 }}>
+              <button onClick={()=>setProposalEditor(null)} style={{ flex:1, padding:'11px', borderRadius:12,
+                border:`1px solid ${T.line}`, color:T.soft }}>{lang==='ru'?'Отмена':'Annuler'}</button>
+              <button onClick={save} disabled={!n_.trim()||!d_.trim()} style={{ flex:1, padding:'11px', borderRadius:12,
+                background:T.clay, color:'#fff', fontWeight:700, opacity:(!n_.trim()||!d_.trim())?.5:1 }}>
+                {lang==='ru'?'Отправить':'Proposer'}</button>
+            </div>
+          </div>
+        </div>
+      )
+    }
     return (
       <div style={{ padding: wide?'18px 40px 40px':'16px 20px 30px' }}>
         <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:12,
-          padding:'12px 14px', marginBottom:20 }}>
-          <div className="serif" style={{ fontSize:14, fontWeight:700, color:'#8F6A2E', marginBottom:3,
-            display:'flex', alignItems:'center', gap:6 }}>
-            <i className="ti ti-award" style={{ fontSize:16 }} aria-hidden="true" />
-            {lang==='ru'?'Все значки трудные':'Tous les badges sont difficiles'}
+          padding:'12px 14px', marginBottom:20, display:'flex', gap:12, alignItems:'flex-start', flexWrap:'wrap' }}>
+          <div style={{ flex:1, minWidth:200 }}>
+            <div className="serif" style={{ fontSize:14, fontWeight:700, color:'#8F6A2E', marginBottom:3,
+              display:'flex', alignItems:'center', gap:6 }}>
+              <i className="ti ti-award" style={{ fontSize:16 }} aria-hidden="true" />
+              {lang==='ru'?'Все значки трудные':'Tous les badges sont difficiles'}
+            </div>
+            <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.55 }}>
+              {lang==='ru'
+                ? 'От 60 до 900 очков. Ни один не даётся легко — это настоящие цели на годы.'
+                : 'De 60 à 900 points. Aucun ne s\'obtient par hasard — ce sont de vrais objectifs, certains sur plusieurs années.'}
+            </div>
           </div>
-          <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.55 }}>
-            {lang==='ru'
-              ? 'От 60 до 900 очков. Ни один не даётся легко — это настоящие цели на годы.'
-              : 'De 60 à 900 points. Aucun ne s\'obtient par hasard — ce sont de vrais objectifs, certains sur plusieurs années.'}
-          </div>
+          {edit && (
+            <button onClick={()=>setProposalEditor({ type:'new' })} style={{ fontSize:12, fontWeight:700, padding:'9px 14px',
+              borderRadius:12, background:T.clay, color:'#fff', display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+              <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" />
+              {lang==='ru'?'Предложить значок':'Proposer un badge'}
+            </button>
+          )}
         </div>
         <Section title={lang==='ru'?'Этапы каталога':'Paliers du recensement'} list={tiers} />
         <Section title={lang==='ru'?'Испытания':'Défis de terrain'} list={rest} />
+        {proposals.length>0 && (
+          <>
+            <div className="serif" style={{ fontSize:13, fontWeight:700, color:T.mute, textTransform:'uppercase',
+              letterSpacing:'1px', marginBottom:10 }}>
+              {lang==='ru'?`Предложения в ожидании (${proposals.length})`:`Propositions en attente (${proposals.length})`}
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:10 }}>
+              {proposals.map(p=>(
+                <div key={p.id} style={{ background:T.card, border:`1px dashed ${T.line}`, borderRadius:12,
+                  padding:'10px 12px', display:'flex', gap:10, alignItems:'flex-start' }}>
+                  <span style={{ fontSize:20 }}>{p.e}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                      <span className="serif" style={{ fontSize:12.5, fontWeight:700, color:T.ink }}>{p.n}</span>
+                      <span style={{ fontSize:8.5, fontWeight:800, color:'#8F6A2E', background:'#F0E4CF', borderRadius:7,
+                        padding:'1.5px 6px', textTransform:'uppercase' }}>
+                        {p.type==='edit' ? (lang==='ru'?'изменение':'modification') : (lang==='ru'?'новый':'nouveau')}
+                      </span>
+                      {p.pts>0 && <span style={{ fontSize:10.5, color:T.clay, fontWeight:700 }}>+{p.pts}</span>}
+                    </div>
+                    <div style={{ fontSize:11, color:T.soft, marginTop:2, lineHeight:1.4 }}>{p.d}</div>
+                    {p.note && <div style={{ fontSize:10, color:T.mute, marginTop:3, fontStyle:'italic' }}>« {p.note} »</div>}
+                    <div style={{ fontSize:9.5, color:T.mute, marginTop:4 }}>
+                      {p.by && `${p.by} · `}{new Date(p.createdAt).toLocaleDateString(lang==='ru'?'ru-RU':'fr-FR')}
+                    </div>
+                  </div>
+                  {edit && <button onClick={()=>removeBadgeProposal(p.id)} style={{ color:T.mute, fontSize:13 }}>✕</button>}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {proposalEditor && <ProposalEditor />}
       </div>
     )
   }

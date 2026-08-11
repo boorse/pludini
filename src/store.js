@@ -3,8 +3,10 @@
 // ══════════════════════════════════════════════════════════════
 import { sb, publicUrl } from './supabase.js'
 import { SPECIES as BASE_SPECIES, CATS as BASE_CATS, PLAYERS as BASE_PLAYERS,
-         RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS, OBS_STATE_BONUS_MULT } from './data'
+         RARITY, METHODS, SIZE_MULT, FISH_SIZE_MULT, ACHIEVEMENTS, TIER_THRESHOLDS, OBS_STATE_BONUS_MULT } from './data'
 import { QUIZ_QUESTIONS as BASE_QUIZ, QUIZ_THEMES, QUIZ_THEME_MIN_QUESTIONS } from './quizdata.js'
+import { setBadgeClaim as cloudSetBadgeClaim, saveBadgeProposal as cloudSaveBadgeProposal,
+         deleteBadgeProposal as cloudDeleteBadgeProposal } from './cloud.js'
 
 const S = {
   photos: {},        // target -> [{id,url,caption,by,path}]
@@ -24,6 +26,8 @@ const S = {
   forumTopics: [],    // sujets du forum
   forumPosts: [],      // messages du forum (topicId, author, text, createdAt)
   quizScores: [],     // parties de quiz jouées (player, score, total, createdAt)
+  badgeClaims: {},    // "achId::player" -> true (badge manuel auto-déclaré fait)
+  badgeProposals: [],  // badges proposés (nouveaux ou modification d'un existant), en attente
   ready: false,
 }
 const subs = new Set()
@@ -53,6 +57,7 @@ export async function loadAll() {
   S.quizQuestions = []; S.quizEdits = {}; S.quizThemes = []
   S.forumTopics = []; S.forumPosts = []
   S.quizScores = []
+  S.badgeClaims = {}; S.badgeProposals = []
   ;(ov.data || []).forEach(r => {
     if (r.kind === 'named')   S.named[r.key] = r.value
     if (r.kind === 'species') S.species.push({ ...r.value, key: r.key })
@@ -85,6 +90,8 @@ export async function loadAll() {
     if (r.kind === 'forumtopic') S.forumTopics.push({ ...r.value, key: r.key })
     if (r.kind === 'forumpost')  S.forumPosts.push({ ...r.value, key: r.key })
     if (r.kind === 'quizscore') S.quizScores.push({ ...r.value, key: r.key })
+    if (r.kind === 'badgeclaim') S.badgeClaims[`${r.value.achId}::${r.value.player}`] = true
+    if (r.kind === 'badgeproposal') S.badgeProposals.push(r.value)
   })
   S.ready = true
   notify()
@@ -537,10 +544,46 @@ export function calcPtsLive(sp, player) {
 export function speciesPtsLive(player) {
   return allSpecies().reduce((s, sp) => s + calcPtsLive(sp, player), 0)
 }
+// ══════ BADGES ══════
+// progression d'un joueur sur un badge, de 0 à 1 : les paliers de recensement
+// se calculent depuis les espèces qu'il a personnellement observées, les
+// badges manuels depuis sa déclaration (badgeclaim) — rien entre les deux
+export function achievementProgress(ach, player) {
+  if (ach.tier) {
+    const threshold = TIER_THRESHOLDS[ach.tier - 1] ?? allSpecies().length
+    const mine = allSpecies().filter(sp => (sp.obs[player] || []).length > 0).length
+    return Math.min(1, mine / (threshold || 1))
+  }
+  return S.badgeClaims[`${ach.id}::${player}`] ? 1 : 0
+}
+export function achievementDoneBy(ach) {
+  return allPlayers().filter(p => achievementProgress(ach, p.name) >= 1).map(p => p.name)
+}
 export function badgePtsLive(player) {
-  return ACHIEVEMENTS.filter(a => a.on && a.w.includes(player)).reduce((s,a)=>s+(a.pts||0), 0)
+  return ACHIEVEMENTS.filter(a => achievementProgress(a, player) >= 1).reduce((s,a)=>s+(a.pts||0), 0)
 }
 export function totalPtsLive(player) { return speciesPtsLive(player) + badgePtsLive(player) }
+
+// déclaration manuelle "j'ai rempli ce défi" — bascule à vue avant confirmation serveur
+export async function setBadgeClaim(achId, player, done) {
+  const key = `${achId}::${player}`
+  if (done) S.badgeClaims[key] = true; else delete S.badgeClaims[key]
+  notify()
+  await cloudSetBadgeClaim(achId, player, done)
+}
+
+// propositions de badge (création ou modification de texte) : n'affecte jamais
+// le badge réel, reste "en attente" jusqu'à être repris à la main
+export function badgeProposals() { return S.badgeProposals }
+export async function addBadgeProposal(p) {
+  const value = { id: 'prop_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), createdAt: new Date().toISOString(), ...p }
+  S.badgeProposals = [...S.badgeProposals, value]; notify()
+  await cloudSaveBadgeProposal(value)
+}
+export async function removeBadgeProposal(id) {
+  S.badgeProposals = S.badgeProposals.filter(p => p.id !== id); notify()
+  await cloudDeleteBadgeProposal(id)
+}
 
 // ══════ JOUEURS ══════
 export function allPlayers() {

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { RARITY, isObserved } from './data'
+import { isObserved } from './data'
 import { allSpecies, allCats, editSub } from './store.js'
 import { gradientFor, gradientForCat, gradientForSub } from './gradients.js'
 import { nameOf, catNameOf, subNameOf } from './i18n.js'
@@ -522,7 +522,7 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
     </button>
   )
 
-  const sp = n.sp, o = isObserved(sp), r = RARITY[sp.r] || RARITY.commun
+  const sp = n.sp, o = isObserved(sp)
   const uncertain = (sp.inds || []).some(i => i.uncertain)
   return (
     <button onClick={onSp} style={{ ...base, background:'#DDD3BE', opacity:o?1:.68,
@@ -533,7 +533,7 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
         : <div style={{ position:'absolute', inset:0, background:'#DDD3BE' }} />}
       {o && <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.66), transparent 55%)' }} />}
       <span style={{ position:'absolute', top:6, left:8, fontSize:17, filter:o?'none':'grayscale(.65)' }}>{sp.e}</span>
-      <span style={{ position:'absolute', top:8, right:8, width:8, height:8, borderRadius:2, background:o?r.c:'#BFB39A' }} />
+      <span style={{ position:'absolute', top:8, right:8, width:8, height:8, borderRadius:2, background:o?'#7A8B5C':'#BFB39A' }} />
       {uncertain && <span title="Identification à confirmer" style={{ position:'absolute', bottom:6, right:6, width:13, height:13,
         borderRadius:'50%', background:'#D68C34', color:'#fff', fontSize:9, fontWeight:800, display:'flex',
         alignItems:'center', justifyContent:'center', lineHeight:1, zIndex:2 }}>?</span>}
