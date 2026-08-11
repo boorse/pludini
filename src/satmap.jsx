@@ -18,25 +18,23 @@ const y2lat = (y, z) => {
   return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
 }
 
+// ── Pan/zoom/pincement : entièrement délégués à react-zoom-pan-pinch (déjà
+// utilisée pour la mindmap sur tactile) plutôt qu'à du pan/pincement maison —
+// le glisser souris fait maison perdait la main en cours de geste (capture de
+// pointeur fragile), et la molette ne distinguait pas trackpad/souris. La
+// bibliothèque gère nativement souris, trackpad (glissement à deux doigts via
+// trackPadPanning) et tactile, de façon éprouvée — on ne fait plus que
+// "committer" le geste terminé en un nouveau centre lat/lon + niveau de zoom
+// discret (les tuiles doivent être rechargées, on ne peut pas zoomer en CSS
+// indéfiniment) ──
 export default function SatMap({ center, pins = [], zones = [], draftPts = [], draftKind = null, selected, onSelect, onMapClick, height = 520, addMode = false, lineMode = false }) {
-  // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch),
-  // comme pour la mindmap — bien plus robuste sur mobile que le pan/pincement
-  // maison ci-dessous, qui reste utilisé tel quel sur PC (souris/trackpad)
-  const [isTouch] = useState(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches)
   const [z, setZ] = useState(16)
   const [c, setC] = useState(center)          // {lat, lon} au centre
   const wrapRef = useRef(null)
-  const stageRef = useRef(null)
   const [size, setSize] = useState({ w: 800, h: typeof height === 'number' ? height : 520 })
-  const ptrs = useRef(new Map())
-  const gest = useRef(null)
   const drag = useRef({ moved: false })
-  const wheelLive = useRef({ mx: null, my: null, scale: 1 })
-  const wheelTimer = useRef(null)
-  const panWheelLive = useRef({ dx: 0, dy: 0 })
-  const panWheelTimer = useRef(null)
-  const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste tactile en cours (relatif, remis à zéro après commit)
-  const touchApiRef = useRef(null)
+  const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste en cours (relatif, remis à zéro après commit)
+  const apiRef = useRef(null)
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
@@ -71,158 +69,20 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     top: lat2y(lat, z) * TS - originY,
   }), [z, originX, originY])
 
-  const clearStageTransform = () => { if (stageRef.current) stageRef.current.style.transform = '' }
-
-  const down = (e) => {
-    const el = wrapRef.current; if (!el) return
-    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    drag.current.moved = false
-    if (ptrs.current.size === 1) {
-      gest.current = { mode:'pan', sx:e.clientX, sy:e.clientY, clat:c.lat, clon:c.lon, dx:0, dy:0 }
-    } else if (ptrs.current.size === 2) {
-      try { el.setPointerCapture?.(e.pointerId) } catch {}
-      const [a,b] = [...ptrs.current.values()]
-      const r = el.getBoundingClientRect()
-      gest.current = { mode:'zoom', d:Math.hypot(a.x-b.x, a.y-b.y), z0:z,
-        mx:(a.x+b.x)/2 - r.left, my:(a.y+b.y)/2 - r.top, scale:1 }
-    }
-  }
-  // pendant le geste on ne bouge que le transform CSS du stage (aucun re-rendu
-  // React) — même principe que la mindmap : c'était le calcul de toute la
-  // grille de tuiles à chaque pixel de souris qui rendait le pan saccadé sur PC
-  const move = (e) => {
-    if (!ptrs.current.has(e.pointerId)) return
-    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    const g = gest.current; if (!g) return
-
-    if (g.mode === 'pan' && ptrs.current.size === 1) {
-      const dx = e.clientX - g.sx, dy = e.clientY - g.sy
-      if (!drag.current.moved && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-        drag.current.moved = true
-        wrapRef.current?.setPointerCapture?.(e.pointerId)   // capture seulement en glissant
-      }
-      g.dx = dx; g.dy = dy
-      if (stageRef.current) stageRef.current.style.transform = `translate3d(${dx}px,${dy}px,0)`
-    } else if (g.mode === 'zoom' && ptrs.current.size >= 2) {
-      const [a,b] = [...ptrs.current.values()]
-      const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
-      g.scale = Math.min(4, Math.max(0.25, ratio))
-      drag.current.moved = true
-      if (stageRef.current) {
-        stageRef.current.style.transform =
-          `translate(${g.mx}px,${g.my}px) scale(${g.scale}) translate(${-g.mx}px,${-g.my}px)`
-      }
-    }
-  }
-  const up = (e) => {
-    try { wrapRef.current?.releasePointerCapture?.(e.pointerId) } catch {}
-    ptrs.current.delete(e.pointerId)
-    const g = gest.current
-    if (ptrs.current.size === 0) {
-      if (g?.mode === 'pan' && drag.current.moved) {
-        const px = lon2x(g.clon, z) * TS - g.dx
-        const py = lat2y(g.clat, z) * TS - g.dy
-        setC({ lon: x2lon(px / TS, z), lat: y2lat(py / TS, z) })
-      } else if (g?.mode === 'zoom' && g.scale !== 1) {
-        const dz = Math.round(Math.log2(g.scale))
-        const nz = Math.max(3, Math.min(19, g.z0 + dz))
-        if (nz !== z) {
-          const lon = x2lon((originX + g.mx) / TS, z)
-          const lat = y2lat((originY + g.my) / TS, z)
-          const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
-          setZ(nz)
-          setC({ lon: x2lon((nx - g.mx + size.w / 2) / TS, nz), lat: y2lat((ny - g.my + size.h / 2) / TS, nz) })
-        }
-      }
-      clearStageTransform()
-      gest.current = null
-      setTimeout(() => { drag.current.moved = false }, 0)
-    } else if (ptrs.current.size === 1) {
-      clearStageTransform()
-      const [p] = [...ptrs.current.values()]
-      gest.current = { mode:'pan', sx:p.x, sy:p.y, clat:c.lat, clon:c.lon, dx:0, dy:0 }
-    }
-  }
-
-  // Ctrl/Cmd + molette (le navigateur envoie ainsi le pincement trackpad, et
-  // c'est aussi la convention "zoomer" de la plupart des éditeurs) : zoom,
-  // ancré sous le curseur, en accumulant dans un scale CSS live — un seul
-  // commit (rechargement des tuiles) après une pause.
-  // Molette seule : déplacement — c'est le geste naturel pour "bouger" sur
-  // une carte au trackpad (glissement à deux doigts, sans clic), qui envoie
-  // aussi un simple wheel ; sans ça ce geste ne faisait jamais rien puisque
-  // tout wheel était interprété comme un zoom
-  const wheel = useCallback((e) => {
-    e.preventDefault()
-    const el = wrapRef.current; if (!el) return
-    const r = el.getBoundingClientRect()
-
-    if (e.ctrlKey || e.metaKey) {
-      const mx = e.clientX - r.left, my = e.clientY - r.top
-      const live = wheelLive.current
-      if (live.mx == null) live.scale = 1
-      live.mx = mx; live.my = my
-      live.scale = Math.min(4, Math.max(0.25, live.scale * (1 - e.deltaY * 0.0018)))
-      if (stageRef.current) {
-        stageRef.current.style.transform =
-          `translate(${mx}px,${my}px) scale(${live.scale}) translate(${-mx}px,${-my}px)`
-      }
-      clearTimeout(wheelTimer.current)
-      wheelTimer.current = setTimeout(() => {
-        const { scale, mx: cmx, my: cmy } = wheelLive.current
-        const dz = Math.round(Math.log2(scale))
-        const nz = Math.max(3, Math.min(19, z + dz))
-        if (nz !== z) {
-          const lon = x2lon((originX + cmx) / TS, z)
-          const lat = y2lat((originY + cmy) / TS, z)
-          const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
-          setZ(nz)
-          setC({ lon: x2lon((nx - cmx + size.w / 2) / TS, nz), lat: y2lat((ny - cmy + size.h / 2) / TS, nz) })
-        }
-        clearStageTransform()
-        wheelLive.current = { mx: null, my: null, scale: 1 }
-      }, 160)
-      return
-    }
-
-    const live = panWheelLive.current
-    live.dx -= e.deltaX; live.dy -= e.deltaY
-    if (stageRef.current) stageRef.current.style.transform = `translate3d(${live.dx}px,${live.dy}px,0)`
-    clearTimeout(panWheelTimer.current)
-    panWheelTimer.current = setTimeout(() => {
-      const { dx, dy } = panWheelLive.current
-      const px = lon2x(c.lon, z) * TS - dx
-      const py = lat2y(c.lat, z) * TS - dy
-      setC({ lon: x2lon(px / TS, z), lat: y2lat(py / TS, z) })
-      clearStageTransform()
-      panWheelLive.current = { dx: 0, dy: 0 }
-    }, 160)
-  }, [z, originX, originY, size.w, size.h, c.lat, c.lon])
-
-  useEffect(() => {
-    if (isTouch) return   // pas de molette sur tactile
-    const el = wrapRef.current; if (!el) return
-    el.addEventListener('wheel', wheel, { passive: false })
-    return () => el.removeEventListener('wheel', wheel)
-  }, [wheel, isTouch])
-
-  const click = (e) => {
-    if (drag.current.moved || (!addMode && !lineMode) || !onMapClick) return
-    const r = wrapRef.current.getBoundingClientRect()
-    const mx = e.clientX - r.left, my = e.clientY - r.top
-    onMapClick({ lat: y2lat((originY + my) / TS, z), lon: x2lon((originX + mx) / TS, z) })
-  }
-
-  // ── Tactile : la bibliothèque pilote pan + pincement, on ne fait que "committer"
-  // le geste terminé en un nouveau centre lat/lon + niveau de zoom discret (les
-  // tuiles doivent être rechargées, on ne peut pas juste zoomer en CSS indéfiniment) ──
-  const onTouchTransform = useCallback((_ref, state) => {
+  // pendant le geste (glisser souris/trackpad/doigt, molette, pincement) : on
+  // ne fait que suivre le transform que la bibliothèque applique déjà elle-même
+  // en CSS — aucun re-rendu React tant que le geste n'est pas terminé
+  const onTransform = useCallback((_ref, state) => {
     liveRef.current = { x: state.positionX, y: state.positionY, k: state.scale }
     if (Math.abs(state.positionX) > 3 || Math.abs(state.positionY) > 3 || Math.abs(state.scale - 1) > 0.02) {
       drag.current.moved = true
     }
   }, [])
-  const commitTouchTransform = useCallback(() => {
+
+  // flushSync : la bibliothèque appelle ce commit hors du cycle React habituel —
+  // sans forcer le re-rendu (nouvelles tuiles) à se produire avant resetTransform,
+  // un frame intermédiaire pouvait s'afficher à l'ancienne position
+  const commit = useCallback(() => {
     const { x: tx, y: ty, k } = liveRef.current
     if (tx === 0 && ty === 0 && k === 1) return
     const screenCx = size.w / 2, screenCy = size.h / 2
@@ -232,18 +92,29 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     const lat = y2lat(worldY / TS, z)
     const dz = Math.round(Math.log2(k))
     const nz = Math.max(3, Math.min(19, z + dz))
-    // flushSync : la bibliothèque tactile appelle ce commit hors du cycle React
-    // habituel — sans forcer le re-rendu (nouvelles tuiles) à se produire AVANT
-    // resetTransform, un frame intermédiaire pouvait s'afficher (la vue saute à
-    // l'ancienne position le temps d'un frame, "on dirait que ça ne bouge pas")
     flushSync(() => {
       setC({ lat, lon })
       if (nz !== z) setZ(nz)
     })
     liveRef.current = { x: 0, y: 0, k: 1 }
-    touchApiRef.current?.resetTransform(0)
+    // setTransform(0,0,1,0) remet l'état interne de la bibliothèque à zéro,
+    // mais juste après un flushSync le contentComponent qu'elle vise pouvait
+    // être temporairement périmé : applyTransformation() ne touchait alors
+    // jamais le style réel, laissant l'ancien transform affiché en plus des
+    // tuiles déjà repositionnées (double décalage, zone noire sur un bord).
+    // On force donc aussi le nettoyage du DOM nous-mêmes, en filet de sécurité.
+    apiRef.current?.setTransform(0, 0, 1, 0)
+    const contentEl = apiRef.current?.instance?.contentComponent
+    if (contentEl) contentEl.style.transform = ''
     setTimeout(() => { drag.current.moved = false }, 0)
   }, [z, originX, originY, size.w, size.h])
+
+  const click = (e) => {
+    if (drag.current.moved || (!addMode && !lineMode) || !onMapClick) return
+    const r = wrapRef.current.getBoundingClientRect()
+    const mx = e.clientX - r.left, my = e.clientY - r.top
+    onMapClick({ lat: y2lat((originY + my) / TS, z), lon: x2lon((originX + mx) / TS, z) })
+  }
 
   const content = (
     <>
@@ -296,26 +167,19 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
       onDragStart={e=>e.preventDefault()}
       style={{ position:'relative', width:'100%', height, overflow:'hidden', background:'#1E2418',
         cursor: (addMode||lineMode) ? 'crosshair' : 'grab', userSelect:'none', touchAction:'none' }}>
-      {isTouch ? (
-        <TransformWrapper ref={touchApiRef}
-          initialScale={1} initialPositionX={0} initialPositionY={0}
-          minScale={0.4} maxScale={4} limitToBounds={false} centerOnInit={false}
-          doubleClick={{ disabled: true }}
-          onTransform={onTouchTransform}
-          onPanningStop={commitTouchTransform} onPinchStop={commitTouchTransform}>
-          <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
-            <div style={{ position:'relative', width:size.w, height:size.h }} onClick={click}>{content}</div>
-          </TransformComponent>
-        </TransformWrapper>
-      ) : (
-        <div onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
-          onPointerLeave={up} onLostPointerCapture={up} onClick={click}
-          style={{ position:'absolute', inset:0, touchAction:'none' }}>
-          <div ref={stageRef} style={{ position:'absolute', inset:0, transformOrigin:'0 0' }}>
-            {content}
-          </div>
-        </div>
-      )}
+      <TransformWrapper ref={apiRef}
+        initialScale={1} initialPositionX={0} initialPositionY={0}
+        minScale={0.25} maxScale={4} limitToBounds={false} centerOnInit={false}
+        doubleClick={{ disabled: true }}
+        panning={{ velocityDisabled: true }}
+        trackPadPanning={{ velocityDisabled: true }}
+        wheel={{ step: 0.2 }}
+        onTransform={onTransform}
+        onPanningStop={commit} onPinchStop={commit} onWheelStop={commit}>
+        <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
+          <div style={{ position:'relative', width:size.w, height:size.h }} onClick={click}>{content}</div>
+        </TransformComponent>
+      </TransformWrapper>
 
       {/* contrôles minimalistes */}
       <div style={{ position:'absolute', right:10, bottom:10, display:'flex', flexDirection:'column', gap:5, zIndex:6 }}>
