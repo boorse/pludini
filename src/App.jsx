@@ -11,6 +11,7 @@ import { PhotoManager, PhotoBg, PhotoHero, PhotoHeroSpecies, usePhotos, LUT, thu
 import { loadAll, subscribe, allSpecies, allPlayers, allCats, splitInds, promote, demote, mergeAsIndividual,
          namedOf, getMe, setMe, isReady, totalPtsLive, speciesPtsLive, badgePtsLive, calcPtsLive,
          removeSighting, setObservation, setBlurry, speciesType, isVegetal, isFish, photosFor, sightingsNearGps, setUncertain,
+         familierPassages, removeFamilierCascade, removePassageFromFamilier, findInd,
          REPEAT_PASSAGE_MULT, achievementProgress, achievementDoneBy, setBadgeClaim,
          badgeProposals, addBadgeProposal, removeBadgeProposal } from './store.js'
 import { IdentityPicker, SpeciesEditor, SightingEditor, ConfirmDialog } from './editui.jsx'
@@ -422,6 +423,7 @@ export default function App() {
   const [merging, setMerging] = useState(null)        // {spId, selected:Set<string>} — mode multi-sélection des passages
   const [mergeSheet, setMergeSheet] = useState(null)  // {sp, indNames} — fenêtre de nommage après sélection
   const [confirmDelSighting, setConfirmDelSighting] = useState(null) // {sp, ind}
+  const [confirmDelFamilier, setConfirmDelFamilier] = useState(null) // {sp, ind}
   const [confirmClearObs, setConfirmClearObs] = useState(null) // {sp, player}
   const [refresh, setRefresh] = useState(0)
   const [mapExpanded, setMapExpanded] = useState(() => new Set())
@@ -1100,9 +1102,12 @@ export default function App() {
                                   display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}>
                                   {st.e}</span>
                               )})()}
-                              {isNamed && ind.mergedCount>1 && <span style={{ position:'absolute', top:6, right:6,
-                                background:'rgba(20,18,14,.72)', color:'#fff', borderRadius:8, padding:'2px 7px',
-                                fontSize:8.5, fontWeight:800, zIndex:2 }}>×{ind.mergedCount}</span>}
+                              {isNamed && (() => {
+                                const n = (ind.mergedCount || 1) + familierPassages(sp, ind.n).length
+                                return n>1 && <span style={{ position:'absolute', top:6, right:6,
+                                  background:'rgba(20,18,14,.72)', color:'#fff', borderRadius:8, padding:'2px 7px',
+                                  fontSize:8.5, fontWeight:800, zIndex:2 }}>×{n}</span>
+                              })()}
                               {!isNamed && selectMode && <span style={{ position:'absolute', top:6, right:6, width:18, height:18,
                                 borderRadius:'50%', border:'1.5px solid #fff', background:isSel?'#B5602F':'rgba(20,18,14,.4)',
                                 display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}>
@@ -1273,9 +1278,10 @@ export default function App() {
     if (!curInd || !sp) return null
     // curInd est juste le nom technique (clé) de l'individu — on relit toujours
     // sa version à jour dans sp.inds, sinon la fiche affiche une photo figée
-    // (ex: "incertain" qui ne se met pas à jour après un clic sur le bouton)
-    const { named: namedList, sightings: sightingsList } = splitInds(sp)
-    const ind = [...namedList, ...sightingsList].find(i => i.n === curInd)
+    // (ex: "incertain" qui ne se met pas à jour après un clic sur le bouton) ;
+    // findInd (pas splitInds) car un passage rattaché à un familier doit
+    // pouvoir s'ouvrir aussi, alors qu'il n'apparaît plus dans les listes
+    const ind = findInd(sp, curInd)
     if (!ind) return null
     const M = ind.method ? METHODS[ind.method] : null
     const [addingPassage, setAddingPassage] = useState(false)
@@ -1380,7 +1386,26 @@ export default function App() {
                 <div style={{ fontSize:11.5, color:T.soft, lineHeight:1.6 }}>{(ind.mergedDates||[]).join(' · ')}</div>
               </div>
             )}
-            {edit && !ind.named && speciesType(sp)!==3 && (
+
+            {/* passage rattaché à un familier : lien vers sa fiche + option de le détacher, plutôt que le disparaître */}
+            {edit && ind.familierOf && (
+              <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+                <button onClick={()=>setCurInd(ind.familierOf)}
+                  style={{ flex:1, padding:'11px', borderRadius:12, border:`1px solid ${T.line}`,
+                    color:T.ink, fontSize:12.5, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <i className="ti ti-arrow-back" style={{ fontSize:14 }} aria-hidden="true" />
+                  {lang==='ru'?'К особи':'Voir le familier'}
+                </button>
+                <button onClick={async()=>{ await removePassageFromFamilier(sp.id, ind.n); setRefresh(r=>r+1) }}
+                  style={{ flex:1, padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
+                    color:'#8F4A22', fontSize:12.5, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <i className="ti ti-unlink" style={{ fontSize:14 }} aria-hidden="true" />
+                  {lang==='ru'?'Отсоединить':'Retirer du familier'}
+                </button>
+              </div>
+            )}
+
+            {edit && !ind.named && !ind.familierOf && speciesType(sp)!==3 && (
               <button onClick={()=>{ setCurInd(null); setPromoting({ sp, ind }) }}
                 style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
                   background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
@@ -1389,14 +1414,38 @@ export default function App() {
                 {lang==='ru'?'Опознать эту особь и дать имя':'Reconnaître cet individu et lui donner un nom'}
               </button>
             )}
+
+            {/* familier : même bascule Passage/Familier que dans le formulaire d'observation, au même
+                endroit — juste à côté, l'action pour tout supprimer (individu + passages rattachés) */}
             {edit && ind.named && speciesType(sp)!==3 && (
-              <button onClick={()=>{ setAddingPassage(true); setAddSel(new Set()) }}
-                style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
-                  background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
-                  marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
-                {lang==='ru'?'Добавить проход этой особи':'Ajouter un passage à cet individu'}
-              </button>
+              <>
+                <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+                  <button onClick={async()=>{ await demote(sp.id, ind.n); setRefresh(r=>r+1) }}
+                    style={{ flex:1, padding:'11px', borderRadius:12, border:`1px solid ${T.line}`,
+                      background:'transparent', color:T.ink, fontSize:12.5, fontWeight:400 }}>
+                    👁 {lang==='ru'?'Проход':'Passage'}
+                  </button>
+                  <button disabled
+                    style={{ flex:1, padding:'11px', borderRadius:12, border:`2px solid #C9A046`,
+                      background:'#F5EBD6', color:T.ink, fontSize:12.5, fontWeight:700 }}>
+                    ★ {lang==='ru'?'Знакомый':'Familier'}
+                  </button>
+                </div>
+                <button onClick={()=>setConfirmDelFamilier({ sp, ind })}
+                  style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9877C',
+                    background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
+                    marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
+                  {lang==='ru'?'Удалить особь и все её проходы':'Supprimer le familier et tous ses passages'}
+                </button>
+                <button onClick={()=>{ setAddingPassage(true); setAddSel(new Set()) }}
+                  style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
+                    background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
+                    marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                  <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
+                  {lang==='ru'?'Добавить проход этой особи':'Ajouter un passage à cet individu'}
+                </button>
+              </>
             )}
             {addingPassage && (
               <div onClick={e=>e.stopPropagation()} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13, marginBottom:10 }}>
@@ -1434,8 +1483,10 @@ export default function App() {
                     {lang==='ru'?'Отмена':'Annuler'}
                   </button>
                   <button disabled={addSel.size===0} onClick={async()=>{
+                      // l'identité du familier ne bouge jamais ici (il est déjà nommé) : pas
+                      // besoin de fermer la fiche, elle affichera les passages ajoutés juste après
                       await mergeAsIndividual(sp.id, [ind.n, ...addSel], ind.displayName, ind.traits || '')
-                      setAddingPassage(false); setCurInd(null); setRefresh(r=>r+1)
+                      setAddingPassage(false); setRefresh(r=>r+1)
                     }}
                     className="serif" style={{ flex:1.4, padding:'9px', borderRadius:9, background: addSel.size===0?'#B5A98C':'#B5602F',
                       color:'#fff', fontSize:12.5, fontWeight:700 }}>
@@ -1444,6 +1495,32 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* tous les passages rattachés à ce familier : chacun reste une fiche à part
+                entière (photos, récit, état…), cliquable pour l'ouvrir, modifier ou supprimer */}
+            {ind.named && (() => {
+              const passages = familierPassages(sp, ind.n)
+              return passages.length>0 && (
+                <div style={{ marginBottom:10 }}>
+                  <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
+                    letterSpacing:'.6px', marginBottom:8 }}>
+                    {lang==='ru'?`Проходы этой особи (${passages.length})`:`Passages de ce familier (${passages.length})`}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?100:88}px,1fr))`, gap:7 }}>
+                    {passages.map((p,i)=>(
+                      <button key={i} onClick={()=>setCurInd(p.n)}
+                        style={{ textAlign:'left', borderRadius:10, overflow:'hidden', padding:0, position:'relative', minHeight:76,
+                          border: p.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}` }}>
+                        <PhotoBg target={`ind:${sp.id}:${p.n}`} fallback={gradientFor(sp.id+p.n)} />
+                        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
+                        <div style={{ position:'relative', padding:6, fontSize:9, color:'rgba(242,238,226,.85)' }}>{p.d}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {ind.desc && (
               <div style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13 }}>
                 <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }}>Description</div>
@@ -1995,6 +2072,15 @@ export default function App() {
             await setObservation(sp.id, ind.by, remaining)
           }
           setConfirmDelSighting(null); setCurInd(null); setRefresh(r=>r+1) }} />}
+      {confirmDelFamilier && <ConfirmDialog lang={lang}
+        title={lang==='ru'?'Удалить особь и все её проходы?':'Supprimer le familier et tous ses passages ?'}
+        message={lang==='ru'?'Особь, её имя и все привязанные к ней проходы (включая фото) будут удалены. Это действие необратимо.'
+          :'Le nom, la fiche du familier et tous les passages qui lui sont rattachés (photos comprises) seront supprimés. Cette action est irréversible.'}
+        onCancel={()=>setConfirmDelFamilier(null)}
+        onConfirm={async()=>{
+          const { sp, ind } = confirmDelFamilier
+          await removeFamilierCascade(sp.id, ind.n)
+          setConfirmDelFamilier(null); setCurInd(null); setRefresh(r=>r+1) }} />}
       {confirmClearObs && <ConfirmDialog lang={lang}
         title={lang==='ru'?'Убрать способы без особи?':'Retirer les méthodes sans individu ?'}
         message={lang==='ru'?'Способы наблюдения, для которых больше нет особи, будут убраны (очки соответственно уменьшатся).'
@@ -2203,8 +2289,8 @@ function MergeSheet({ sp, indNames, lang, wide, onClose, onDone }) {
         <div style={{ fontSize:12, color:'#6B6357', lineHeight:1.55, marginBottom:14 }}>
           {n>1
             ? (lang==='ru'
-              ? `Ces ${n} наблюдения объединятся en un seul individu récurrent — toutes leurs photos seront rassemblées.`
-              : `Ces ${n} passages deviendront un seul individu récurrent — toutes leurs photos seront rassemblées sous cette fiche.`)
+              ? `Эти ${n} наблюдений станут одной особью — каждый проход останется отдельным и доступным для редактирования.`
+              : `Ces ${n} passages seront rattachés au même individu récurrent — chacun reste consultable et modifiable séparément depuis sa fiche.`)
             : (lang==='ru'
               ? 'Если вы узнаёте это животное по приметам — дайте ему имя.'
               : "Si tu reconnais cet animal à des signes distinctifs, donne-lui un nom.")}

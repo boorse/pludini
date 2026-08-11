@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getMe, allSpecies, speciesType, CAT_PT_MULT, REPEAT_PASSAGE_MULT, allForumTopics, forumPostsFor, forumPostCount,
+import { getMe, allSpecies, speciesType, CAT_PT_MULT, REPEAT_PASSAGE_MULT, FAMILIER_PTS_MULT, allForumTopics, forumPostsFor, forumPostCount,
          addForumTopic, addForumPost, removeForumTopic } from './store.js'
 import { RARITY, SIZE_MULT, METHODS, FISH_SIZE_MULT } from './data'
 import { UI, nameOf } from './i18n.js'
@@ -274,14 +274,26 @@ function PointsExplainer({ lang }) {
           </div>
         </RefBox>
       </div>
-      <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:10, padding:'9px 11px' }}>
-        <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#8F6A2E', marginBottom:3 }}>
-          {lang==='ru'?'Повторные прохождения':'Passages répétés'}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))', gap:8 }}>
+        <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:10, padding:'9px 11px' }}>
+          <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#8F6A2E', marginBottom:3 }}>
+            {lang==='ru'?'Повторные прохождения':'Passages répétés'}
+          </div>
+          <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.6 }}>
+            {lang==='ru'
+              ? `Для животного, НЕ опознанного как знакомая особь : первое прохождение = 100% очков, каждое следующее того же животного = только ${repeatPct}%.`
+              : `Pour un animal qui n'est PAS un familier reconnu : le premier passage vaut 100% des points, chaque passage suivant du même animal ne vaut plus que ${repeatPct}%.`}
+          </div>
         </div>
-        <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.6 }}>
-          {lang==='ru'
-            ? `Первое прохождение = 100% очков. Каждое следующее прохождение того же уже узнанного животного = только ${repeatPct}%.`
-            : `Le premier passage vaut 100% des points. Chaque passage suivant du même animal déjà reconnu ne vaut plus que ${repeatPct}%.`}
+        <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:10, padding:'9px 11px' }}>
+          <div className="serif" style={{ fontSize:12, fontWeight:700, color:'#8F6A2E', marginBottom:3 }}>
+            ⭐ {lang==='ru'?'Знакомые особи':'Familiers'}
+          </div>
+          <div style={{ fontSize:11.5, color:'#6B5330', lineHeight:1.6 }}>
+            {lang==='ru'
+              ? `Особь, которую вы узнали и назвали, приносит ×${FAMILIER_PTS_MULT} очков — каждый раз полностью, без снижения. Проходы, привязанные к этой особи, сами по себе очков больше не приносят : только сам факт узнавания.`
+              : `Un individu reconnu et nommé rapporte ×${FAMILIER_PTS_MULT} points — à chaque fois plein pot, jamais dégressif. Les passages qui lui sont rattachés ne rapportent plus rien individuellement : seule la reconnaissance de l'individu compte.`}
+          </div>
         </div>
       </div>
     </div>

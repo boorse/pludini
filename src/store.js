@@ -242,28 +242,68 @@ export async function demote(spId, obsName) {
   const key = `${spId}::${obsName}`
   delete S.named[key]; notify()
   await sb.from('overrides').delete().eq('key', key)
+  // les passages qui étaient rattachés à ce familier redeviennent des passages
+  // indépendants plutôt que de disparaître avec le nom
+  const sp = allSpecies().find(s => s.id === spId)
+  const children = (sp?.inds || []).filter(i => i.familierOf === obsName)
+  for (const c of children) await editSighting(spId, c.n, { familierOf: null })
 }
 export function parseFrDateTime(d, time) {
   const [dd, mm, yyyy] = (d || '').split('/').map(Number)
   const [hh, mi] = (time || '00:00').split(':').map(Number)
   return new Date(yyyy || 0, (mm || 1) - 1, dd || 1, hh || 0, mi || 0).getTime()
 }
-// regroupe plusieurs passages (même espèce) en un seul individu reconnu : toutes
-// les photos rejoignent le passage le plus ancien (conservé comme clé), les
-// autres passages sont supprimés, et le nombre fusionné est mémorisé pour
-// l'affichage ("×N") sans multiplier les vignettes
+// rattache plusieurs passages (même espèce) à un seul individu reconnu : chaque
+// passage GARDE sa propre fiche (date, photos, récit, état…) — on ne fait que
+// le taguer "familierOf" vers le passage de référence, rien n'est déplacé ni
+// supprimé. Si l'un des passages sélectionnés est déjà le familier reconnu, son
+// identité ne bouge jamais (même si un autre passage choisi est plus ancien) ;
+// sinon le plus ancien devient la référence
 export async function mergeAsIndividual(spId, indNames, name, traits = '') {
   const sp = allSpecies().find(s => s.id === spId)
   if (!sp) return
   const inds = indNames.map(n => (sp.inds || []).find(i => i.n === n)).filter(Boolean)
   if (!inds.length) return
-  const sorted = [...inds].sort((a, b) => parseFrDateTime(a.d, a.time) - parseFrDateTime(b.d, b.time))
-  const keep = sorted[0]
-  const rest = sorted.slice(1)
-  for (const r of rest) await movePhotos(`ind:${spId}:${r.n}`, `ind:${spId}:${keep.n}`)
-  if (sorted.length > 1) await editSighting(spId, keep.n, { mergedCount: sorted.length, mergedDates: sorted.map(i => i.d) })
-  for (const r of rest) await removeSighting(spId, r.n)
+  const alreadyNamed = inds.find(i => S.named[`${spId}::${i.n}`])
+  const keep = alreadyNamed || [...inds].sort((a, b) => parseFrDateTime(a.d, a.time) - parseFrDateTime(b.d, b.time))[0]
+  const rest = inds.filter(i => i.n !== keep.n)
+  for (const r of rest) await editSighting(spId, r.n, { familierOf: keep.n })
   await promote(spId, keep.n, name, traits)
+}
+// tous les passages rattachés à un familier (hors sa propre fiche) — chacun
+// reste consultable, modifiable et supprimable individuellement
+export function familierPassages(sp, founderName) {
+  return (sp.inds || [])
+    .filter(ind => ind.familierOf === founderName)
+    .map(ind => ({ ...ind, displayName: ind.n }))
+    .sort((a, b) => parseFrDateTime(b.d, b.time) - parseFrDateTime(a.d, a.time))
+}
+// détache un passage de son familier — redevient un passage indépendant,
+// rien n'est supprimé
+export async function removePassageFromFamilier(spId, passageName) {
+  await editSighting(spId, passageName, { familierOf: null })
+}
+// supprime le familier ET tous les passages qui lui sont rattachés (photos
+// comprises) — irréversible, contrairement à "Retirer"/demote qui ne fait
+// que dénommer sans rien effacer
+export async function removeFamilierCascade(spId, founderName) {
+  const sp = allSpecies().find(s => s.id === spId)
+  if (!sp) return
+  const children = (sp.inds || []).filter(i => i.familierOf === founderName)
+  for (const c of children) await removeSighting(spId, c.n)
+  await demote(spId, founderName)
+  await removeSighting(spId, founderName)
+}
+// retrouve un individu précis par sa clé, y compris s'il est rattaché à un
+// familier (donc absent de splitInds, qui ne le montre pas en double) —
+// utilisé par la fiche individu, qui doit pouvoir s'ouvrir sur n'importe
+// quel passage, groupé ou non
+export function findInd(sp, name) {
+  const ind = (sp.inds || []).find(i => i.n === name)
+  if (!ind) return null
+  const ov = S.named[`${sp.id}::${ind.n}`]
+  return ov ? { ...ind, named: true, displayName: ov.name, traits: ov.traits }
+            : { ...ind, displayName: ind.n, named: !!ind.named }
 }
 export function splitInds(sp) {
   const all = (sp.inds || []).map(ind => {
@@ -274,7 +314,10 @@ export function splitInds(sp) {
   // du plus récent au plus ancien — sans ça les vignettes restaient dans l'ordre
   // d'import/création, pas dans l'ordre chronologique des passages
   const byDateDesc = (a, b) => parseFrDateTime(b.d, b.time) - parseFrDateTime(a.d, a.time)
-  return { named: all.filter(i => i.named).sort(byDateDesc), sightings: all.filter(i => !i.named).sort(byDateDesc) }
+  // les passages rattachés à un familier ne s'affichent plus comme passages
+  // isolés — ils restent consultables depuis la fiche du familier lui-même
+  return { named: all.filter(i => i.named).sort(byDateDesc),
+    sightings: all.filter(i => !i.named && !i.familierOf).sort(byDateDesc) }
 }
 
 // trouve toutes les observations (toutes espèces) partageant à peu près les mêmes
@@ -498,10 +541,14 @@ export function isFish(sp) { return sp.cat === 'poissons' }
 // ══════ SCORES (tiennent compte des ajouts) ══════
 // humains/animaux domestiques : ne rapportent aucun point — arbres/arbustes : bien moins, mais pas zéro
 export const CAT_PT_MULT = { humains:0, domestiques:0, arbres:0.3, arbustes:0.3 }
-// un individu déjà reconnu peut être repassé devant la caméra des dizaines de
-// fois : seul le tout premier passage compte plein pot, les suivants ne
-// rapportent qu'1% chacun (référencé aussi dans le forum, sujet "calcul des points")
+// un animal non reconnu peut être photographié plusieurs fois : seul le tout
+// premier passage compte plein pot, les suivants ne rapportent qu'1% chacun —
+// mais un familier (individu reconnu et nommé) échappe à cette dégressivité :
+// chacun compte plein pot avec un bonus ×2, et ses passages rattachés ne
+// comptent plus individuellement (référencé aussi dans le forum, sujet
+// "calcul des points")
 export const REPEAT_PASSAGE_MULT = 0.01
+export const FAMILIER_PTS_MULT = 2
 export function calcPtsLive(sp, player) {
   const bonuses = sp.bonus?.[player] || []
   const catMult = CAT_PT_MULT[sp.cat] ?? 1
@@ -520,18 +567,28 @@ export function calcPtsLive(sp, player) {
   const myInds = allMyInds.filter(i => !i.uncertain)
   let base
   if (allMyInds.length) {
-    // chaque passage compte pour les points de sa propre méthode d'observation :
-    // seul le tout premier passage ajouté rapporte 100% des points de base,
-    // les suivants n'en rapportent que 1% (sinon cumuler les photos d'un
-    // même animal déjà reconnu gonflerait le score sans limite)
     const isFishSp = isFish(sp)
-    base = myInds.reduce((sum, ind, i) => {
+    const passagePts = ind => {
       const mult = isFishSp ? (FISH_SIZE_MULT[ind.size] || 1) : (METHODS[ind.method]?.mult || 1)
       // observation particulière (bébé/maman/papa/vieux/malade) : +10% sur la
       // valeur de ce passage précis, en plus du barème habituel
       const stateMult = ind.state ? OBS_STATE_BONUS_MULT : 1
-      return sum + rarityPts * mult * stateMult * (i === 0 ? 1 : REPEAT_PASSAGE_MULT)
-    }, 0)
+      return rarityPts * mult * stateMult
+    }
+    // les passages rattachés à un familier ne comptent plus pour eux-mêmes —
+    // seul le familier (sa propre fiche) compte, plein pot ×2, à chaque fois
+    // (pas de dégressif entre familiers : ce sont des individus différents)
+    const scored = myInds.filter(ind => !ind.familierOf)
+    const named = scored.filter(ind => !!S.named[`${sp.id}::${ind.n}`])
+    const unnamed = scored.filter(ind => !S.named[`${sp.id}::${ind.n}`])
+    // chaque passage non reconnu compte pour les points de sa propre méthode
+    // d'observation : seul le tout premier ajouté rapporte 100% des points de
+    // base, les suivants n'en rapportent que 1% (sinon cumuler les photos d'un
+    // même animal non reconnu gonflerait le score sans limite)
+    const unnamedBase = unnamed.reduce((sum, ind, i) =>
+      sum + passagePts(ind) * (i === 0 ? 1 : REPEAT_PASSAGE_MULT), 0)
+    const namedBase = named.reduce((sum, ind) => sum + passagePts(ind) * FAMILIER_PTS_MULT, 0)
+    base = unnamedBase + namedBase
   } else {
     // pas encore de passage enregistré : méthode(s) cochée(s) sans individu
     const methods = sp.obs?.[player] || []
