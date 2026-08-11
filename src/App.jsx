@@ -2049,12 +2049,23 @@ function PassageCalendar({ sp, lang, edit, onClose, onOpenObs }) {
     if (!prev || p.year >= prev.year) marks.set(key, { ind, year:p.year })
   })
   const REF_YEAR = 2024 // année bissextile arbitraire, seulement pour aligner les jours de la semaine
+  // premier mois (dans l'ordre calendaire) qui contient au moins un passage —
+  // c'est là qu'on ouvre directement la vue, sinon sur mobile (une seule
+  // colonne) il faut faire défiler tous les mois vides avant de tomber dessus
+  const monthHasMark = mi => Array.from({length:31}, (_,i)=>i+1).some(d => marks.has(`${mi+1}-${d}`))
+  const firstMonthWithMark = Array.from({length:12}, (_,mi)=>mi).find(monthHasMark)
+  const scrollRef = useRef(null)
+  const targetMonthRef = useRef(null)
+  useEffect(() => {
+    targetMonthRef.current?.scrollIntoView({ block:'start' })
+  }, [])
   return (
     <div onClick={onClose} style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:170,
       display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:920,
+      <div ref={scrollRef} onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:18, width:'100%', maxWidth:920,
         maxHeight:'90vh', overflow:'auto', overscrollBehavior:'contain', border:`1px solid ${T.line}` }}>
-        <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+        <div style={{ padding:'18px 20px 4px', display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+          position:'sticky', top:0, background:T.bg, zIndex:2 }}>
           <div>
             <div className="serif" style={{ fontSize:17, fontWeight:900, color:T.ink }}>
               {lang==='ru'?'Календарь появлений':'Calendrier des passages'}
@@ -2076,7 +2087,7 @@ function PassageCalendar({ sp, lang, edit, onClose, onOpenObs }) {
             for (let i=0;i<startDow;i++) cells.push(null)
             for (let d=1; d<=daysInMonth; d++) cells.push(d)
             return (
-              <div key={mi}>
+              <div key={mi} ref={mi===firstMonthWithMark ? targetMonthRef : undefined} style={{ scrollMarginTop:66 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:T.ink, textAlign:'center', marginBottom:6 }}>
                   {(lang==='ru'?MONTHS_RU:MONTHS_FR)[mi]}
                 </div>
