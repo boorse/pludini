@@ -33,6 +33,8 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
   const drag = useRef({ moved: false })
   const wheelLive = useRef({ mx: null, my: null, scale: 1 })
   const wheelTimer = useRef(null)
+  const panWheelLive = useRef({ dx: 0, dy: 0 })
+  const panWheelTimer = useRef(null)
   const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste tactile en cours (relatif, remis à zéro après commit)
   const touchApiRef = useRef(null)
 
@@ -142,39 +144,60 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     }
   }
 
-  // molette/trackpad : accumulation dans un scale CSS live ancré sous le
-  // curseur, un seul commit (rechargement des tuiles) après une pause —
-  // sinon chaque petit deltaY d'un trackpad déclenchait un changement de
-  // niveau de zoom complet, illisible en rafale
+  // Ctrl/Cmd + molette (le navigateur envoie ainsi le pincement trackpad, et
+  // c'est aussi la convention "zoomer" de la plupart des éditeurs) : zoom,
+  // ancré sous le curseur, en accumulant dans un scale CSS live — un seul
+  // commit (rechargement des tuiles) après une pause.
+  // Molette seule : déplacement — c'est le geste naturel pour "bouger" sur
+  // une carte au trackpad (glissement à deux doigts, sans clic), qui envoie
+  // aussi un simple wheel ; sans ça ce geste ne faisait jamais rien puisque
+  // tout wheel était interprété comme un zoom
   const wheel = useCallback((e) => {
     e.preventDefault()
     const el = wrapRef.current; if (!el) return
     const r = el.getBoundingClientRect()
-    const mx = e.clientX - r.left, my = e.clientY - r.top
-    const live = wheelLive.current
-    if (live.mx == null) live.scale = 1
-    live.mx = mx; live.my = my
-    live.scale = Math.min(4, Math.max(0.25, live.scale * (1 - e.deltaY * 0.0018)))
-    if (stageRef.current) {
-      stageRef.current.style.transform =
-        `translate(${mx}px,${my}px) scale(${live.scale}) translate(${-mx}px,${-my}px)`
-    }
-    clearTimeout(wheelTimer.current)
-    wheelTimer.current = setTimeout(() => {
-      const { scale, mx: cmx, my: cmy } = wheelLive.current
-      const dz = Math.round(Math.log2(scale))
-      const nz = Math.max(3, Math.min(19, z + dz))
-      if (nz !== z) {
-        const lon = x2lon((originX + cmx) / TS, z)
-        const lat = y2lat((originY + cmy) / TS, z)
-        const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
-        setZ(nz)
-        setC({ lon: x2lon((nx - cmx + size.w / 2) / TS, nz), lat: y2lat((ny - cmy + size.h / 2) / TS, nz) })
+
+    if (e.ctrlKey || e.metaKey) {
+      const mx = e.clientX - r.left, my = e.clientY - r.top
+      const live = wheelLive.current
+      if (live.mx == null) live.scale = 1
+      live.mx = mx; live.my = my
+      live.scale = Math.min(4, Math.max(0.25, live.scale * (1 - e.deltaY * 0.0018)))
+      if (stageRef.current) {
+        stageRef.current.style.transform =
+          `translate(${mx}px,${my}px) scale(${live.scale}) translate(${-mx}px,${-my}px)`
       }
+      clearTimeout(wheelTimer.current)
+      wheelTimer.current = setTimeout(() => {
+        const { scale, mx: cmx, my: cmy } = wheelLive.current
+        const dz = Math.round(Math.log2(scale))
+        const nz = Math.max(3, Math.min(19, z + dz))
+        if (nz !== z) {
+          const lon = x2lon((originX + cmx) / TS, z)
+          const lat = y2lat((originY + cmy) / TS, z)
+          const nx = lon2x(lon, nz) * TS, ny = lat2y(lat, nz) * TS
+          setZ(nz)
+          setC({ lon: x2lon((nx - cmx + size.w / 2) / TS, nz), lat: y2lat((ny - cmy + size.h / 2) / TS, nz) })
+        }
+        clearStageTransform()
+        wheelLive.current = { mx: null, my: null, scale: 1 }
+      }, 160)
+      return
+    }
+
+    const live = panWheelLive.current
+    live.dx -= e.deltaX; live.dy -= e.deltaY
+    if (stageRef.current) stageRef.current.style.transform = `translate3d(${live.dx}px,${live.dy}px,0)`
+    clearTimeout(panWheelTimer.current)
+    panWheelTimer.current = setTimeout(() => {
+      const { dx, dy } = panWheelLive.current
+      const px = lon2x(c.lon, z) * TS - dx
+      const py = lat2y(c.lat, z) * TS - dy
+      setC({ lon: x2lon(px / TS, z), lat: y2lat(py / TS, z) })
       clearStageTransform()
-      wheelLive.current = { mx: null, my: null, scale: 1 }
+      panWheelLive.current = { dx: 0, dy: 0 }
     }, 160)
-  }, [z, originX, originY, size.w, size.h])
+  }, [z, originX, originY, size.w, size.h, c.lat, c.lon])
 
   useEffect(() => {
     if (isTouch) return   // pas de molette sur tactile
