@@ -700,13 +700,13 @@ export function SightingEditor({ lang, species, presetSp, editing, onClose, onSa
         )}
 
         <div style={{ display:'flex', gap:8 }}>
-          <div style={{ flex:1 }}>
+          <div style={{ flex:1.3, minWidth:0 }}>
             <label style={label}>{lang==='ru'?'Дата':'Date'}</label>
-            <input type="date" value={d} onChange={e=>setD(e.target.value)} style={input} />
+            <input type="date" value={d} onChange={e=>setD(e.target.value)} style={{ ...input, minWidth:0 }} />
           </div>
-          <div style={{ width:120 }}>
+          <div style={{ flex:1, minWidth:0 }}>
             <label style={label}>{lang==='ru'?'Время':'Heure'}</label>
-            <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={input} />
+            <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{ ...input, minWidth:0 }} />
           </div>
         </div>
 
