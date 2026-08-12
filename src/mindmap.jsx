@@ -13,7 +13,29 @@ const STAGGER = [0, 46, 16, 62, 30, 74]
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
 const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
-export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, edit, onAddSpecies }) {
+// filtre vertical : calcule l'ensemble des noeuds à déplier pour atteindre
+// exactement le niveau demandé sur toutes les catégories actuellement visibles
+// — remplace "expanded" plutôt que de le compléter, comme "Tout replier"
+const DEPTHS = ['cat', 'ordre', 'famille', 'espece']
+function expandedForDepth(CATS, catVisible, depth) {
+  const ids = new Set()
+  if (depth === 'cat') return ids
+  for (const cat of CATS) {
+    if (!catVisible.has(cat.id)) continue
+    ids.add(cat.id)
+    if (depth === 'ordre') continue
+    const hasOrdres = cat.subs.some(sv => sv.ordre)
+    if (hasOrdres) {
+      const ordreKeys = new Set(cat.subs.map(sv => sv.ordre || sv.id))
+      for (const key of ordreKeys) ids.add(cat.id + ':ord:' + key)
+    }
+    if (depth === 'famille') continue
+    for (const sv of cat.subs) ids.add(cat.id + ':' + sv.id)
+  }
+  return ids
+}
+
+export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, depth, setDepth, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   const [infoNode, setInfoNode] = useState(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
@@ -69,6 +91,16 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
 
   const SPECIES = allSpecies()
   const CATS = allCats()
+
+  // filtre vertical : jusqu'où déplier par défaut (catégorie / ordre / famille / espèce)
+  // — un simple repère visuel local, pas une contrainte : un dépli manuel peut
+  // toujours s'en écarter ensuite, comme "Tout replier" ne "verrouille" rien non plus
+  // (état levé dans App — voir mapDepth — car Explore redéfinit MindMap à chaque
+  // re-rendu et un useState ici serait réinitialisé à chaque clic)
+  const pickDepth = useCallback((d) => {
+    setDepth(d)
+    setExpanded(expandedForDepth(CATS, catVisible, d))
+  }, [CATS, catVisible, setExpanded, setDepth])
 
   const { nodes, links, width, height } = useMemo(() => {
     const root = {
@@ -333,7 +365,10 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
         <button onClick={fit} style={btn}>Recentrer</button>
       </div>
-      <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
+      <div style={{ position:'absolute', top:9, left:10, zIndex:6, display:'flex', alignItems:'flex-start', gap:5, flexWrap:'wrap' }}>
+        <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
+        <DepthFilter depth={depth} onPick={pickDepth} lang={lang} />
+      </div>
       {isTouch ? (
         <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
           <TransformWrapper ref={touchApiRef}
@@ -456,7 +491,7 @@ function CatFilter({ cats, visible, setVisible, lang }) {
     return n
   })
   return (
-    <div style={{ position:'absolute', top:9, left:10, zIndex:6 }}>
+    <div style={{ position:'relative' }}>
       <button onClick={()=>setOpen(v=>!v)} style={{ ...btn, display:'flex', alignItems:'center', gap:5 }}>
         <i className="ti ti-list-check" style={{ fontSize:12 }} aria-hidden="true" />
         {lang==='ru'?'Ветви':'Embranchements'}
@@ -488,6 +523,28 @@ function CatFilter({ cats, visible, setVisible, lang }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// filtre vertical : jusqu'où déplier par défaut (toutes catégories visibles
+// confondues) — un bouton actif remplace "expanded" par le niveau choisi,
+// comme "Tout replier" le fait déjà pour repartir de zéro
+const DEPTH_LABELS = {
+  cat:    { fr:'Catégorie', ru:'Царство' },
+  ordre:  { fr:'Ordre',     ru:'Отряд' },
+  famille:{ fr:'Famille',   ru:'Семья' },
+  espece: { fr:'Espèce',    ru:'Вид' },
+}
+function DepthFilter({ depth, onPick, lang }) {
+  return (
+    <div style={{ display:'flex', background:'#EDE7D8', border:'1px solid #D3C7AE', borderRadius:12, overflow:'hidden' }}>
+      {DEPTHS.map(d => (
+        <button key={d} onClick={()=>onPick(d)} style={{ fontSize:10, padding:'6px 9px', fontWeight: depth===d?700:400,
+          background: depth===d ? '#B5602F' : 'transparent', color: depth===d ? '#fff' : '#6B6357' }}>
+          {DEPTH_LABELS[d][lang==='ru'?'ru':'fr']}
+        </button>
+      ))}
     </div>
   )
 }

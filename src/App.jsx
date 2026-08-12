@@ -433,6 +433,11 @@ export default function App() {
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
   const [mapObsOnly, setMapObsOnly] = useState(() => new Set())
   const [mapCatVisible, setMapCatVisible] = useState(() => new Set(allCats().map(c => c.id)))
+  // état local à MindMap (comme mapExpanded/mapTf ci-dessus) : Explore/MatrixPane
+  // étant redéfinis à chaque re-rendu d'App (voir plus haut), MindMap est démonté/
+  // remonté en boucle — un useState interne pour la profondeur serait réinitialisé
+  // à chaque clic, d'où la nécessité de le faire vivre ici
+  const [mapDepth, setMapDepth] = useState('ordre')
 
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
   const [sighting, setSighting] = useState(null)
@@ -2003,7 +2008,7 @@ export default function App() {
             ...(mobileTab==='map'
               ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
-            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
+            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} depth={mapDepth} setDepth={setMapDepth} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
           </div>
         </div>
       )
@@ -2019,7 +2024,7 @@ export default function App() {
             transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
           <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" />
           <div style={{ flex:1, overflow:'hidden' }}>
-            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
+            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} depth={mapDepth} setDepth={setMapDepth} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
           </div>
         </div>
         <div onMouseEnter={()=>setFocus('matrix')} onClick={()=>setFocus('matrix')}

@@ -46,6 +46,10 @@ export const SUB_RU = {
   'Gallinacés':'Курообразные', 'Gruiformes':'Журавлеобразные', 'Piciformes':'Дятлообразные',
   'Ciconiiformes':'Аистообразные', 'Coraciiformes':'Ракшеобразные', 'Ansériformes':'Гусеобразные',
   'Columbiformes':'Голубеобразные',
+  'Fagales':'Букоцветные', 'Conifères':'Хвойные', 'Malpighiales':'Мальпигиецветные', 'Rosales':'Розоцветные',
+  'Sapindales':'Сапиндоцветные', 'Malvales':'Мальвоцветные', 'Éricales':'Верескоцветные', 'Dipsacales':'Ворсянкоцветные',
+  'Esociformes':'Щукообразные', 'Perciformes':'Окунеобразные', 'Cypriniformes':'Карпообразные',
+  'Anoures':'Бесхвостые', 'Urodèles':'Хвостатые',
   'Fagacées':'Буковые', 'Bétulacées':'Березовые', 'Pinacées':'Сосновые', 'Salicacées':'Ивовые',
   'Rosacées':'Розоцветные', 'Sapindacées':'Сапиндовые', 'Malvacées':'Мальвовые',
   'Éléagnacées':'Лоховые', 'Éricacées':'Вересковые', 'Adoxacées':'Адоксовые', 'Cupressacées':'Кипарисовые',
@@ -55,6 +59,8 @@ export const SUB_RU = {
   'Résidents':'Резиденты', 'Visiteurs':'Гости',
   'Chiens':'Собаки', 'Chats':'Кошки',
   'Lépidoptères':'Чешуекрылые', 'Coléoptères':'Жесткокрылые', 'Odonates':'Стрекозы', 'Hyménoptères':'Перепончатокрылые',
+  'Esocidés':'Щуковые', 'Percidés':'Окуневые', 'Cyprinidés':'Карповые',
+  'Bufonidés':'Жабовые', 'Ranidés':'Лягушковые', 'Salamandridés':'Саламандровые',
 }
 
 export const UI = {
