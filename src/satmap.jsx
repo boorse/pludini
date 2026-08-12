@@ -174,6 +174,12 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         panning={{ velocityDisabled: true }}
         trackPadPanning={{ velocityDisabled: true }}
         wheel={{ step: 0.04 }}
+        // "autoAlignment" (snap-back aux limites) est activé par défaut
+        // indépendamment de limitToBounds, et se déclenche à chaque fin de
+        // geste dès que la vélocité est désactivée : ça ajoutait un second
+        // déplacement, incontrôlé, par-dessus celui qu'on vient de committer
+        // nous-mêmes (la carte "faisait deux fois la distance")
+        autoAlignment={{ disabled: true }}
         onTransform={onTransform}
         onPanningStop={commit} onPinchStop={commit} onWheelStop={commit}>
         <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
