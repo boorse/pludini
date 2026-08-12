@@ -27,9 +27,11 @@ const y2lat = (y, z) => {
 // "committer" le geste terminé en un nouveau centre lat/lon + niveau de zoom
 // discret (les tuiles doivent être rechargées, on ne peut pas zoomer en CSS
 // indéfiniment) ──
-export default function SatMap({ center, pins = [], zones = [], draftPts = [], draftKind = null, selected, onSelect, onMapClick, height = 520, addMode = false, lineMode = false }) {
+export default function SatMap({ center, pins = [], zones = [], draftPts = [], draftKind = null, selected, onSelect, onMapClick,
+  obsPins = [], onObsSelect, height = 520, addMode = false, lineMode = false }) {
   const [z, setZ] = useState(16)
   const [c, setC] = useState(center)          // {lat, lon} au centre
+  const [hoveredObs, setHoveredObs] = useState(null)
   const wrapRef = useRef(null)
   const [size, setSize] = useState({ w: 800, h: typeof height === 'number' ? height : 520 })
   const drag = useRef({ moved: false })
@@ -171,6 +173,36 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
             {on && <span style={{ marginTop:2, fontSize:10, background:'rgba(20,22,14,.88)', color:'#F2EEE2',
               padding:'2px 7px', borderRadius:8, whiteSpace:'nowrap' }}>{p.label}</span>}
           </button>
+        )
+      })}
+
+      {/* spots d'observation (couleur du joueur + initiale, ou pastille sombre avec
+          un nombre quand plusieurs observations sont regroupées) — aperçu photo au
+          survol (souris), fiche/liste au clic, géré par le parent via onObsSelect */}
+      {obsPins.map(p => {
+        const s = toScreen(p.lat, p.lon)
+        if (s.left < -40 || s.top < -40 || s.left > size.w + 40 || s.top > size.h + 40) return null
+        const hovered = hoveredObs === p.id
+        return (
+          <div key={p.id}
+            onMouseEnter={()=>setHoveredObs(p.id)} onMouseLeave={()=>setHoveredObs(h=>h===p.id?null:h)}
+            style={{ position:'absolute', left:s.left, top:s.top, transform:'translate(-50%,-50%)',
+              zIndex: hovered?9:4 }}>
+            {hovered && p.thumbUrl && (
+              <div style={{ position:'absolute', bottom:'130%', left:'50%', transform:'translateX(-50%)',
+                width:64, height:64, borderRadius:10, overflow:'hidden', border:'2px solid #fff',
+                boxShadow:'0 5px 16px rgba(0,0,0,.45)', pointerEvents:'none' }}>
+                <img src={p.thumbUrl} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+              </div>
+            )}
+            <button onClick={(e)=>{ e.stopPropagation(); if(!drag.current.moved) onObsSelect?.(p) }}
+              style={{ width: hovered?26:21, height: hovered?26:21, borderRadius:'50%', background:p.color,
+                border:'2px solid #fff', color:'#fff', fontSize: hovered?11:9.5, fontWeight:800,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                boxShadow:'0 2px 8px rgba(0,0,0,.45)', transition:'all .12s' }}>
+              {p.label}
+            </button>
+          </div>
         )
       })}
     </>

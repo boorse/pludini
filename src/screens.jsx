@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
 import { THEMES, MONTHS, MONTHS_RU, EVENTS, DEFAULT_TYPES, CENTER } from './territory.js'
 import SatMap from './satmap.jsx'
-import { isObserved, obsStateLabel } from './data'
+import { isObserved, obsStateLabel, METHODS, playerColor } from './data'
 import { gradientFor } from './gradients.js'
 import { UI, nameOf, catNameOf } from './i18n.js'
-import { LUT, thumbZoomStyle } from './photoui.jsx'
-import { allPhotos, allSpecies, allPlayers, allCats, subscribe, namedOf, parseFrDateTime } from './store.js'
+import { LUT, thumbZoomStyle, PhotoHero, PhotoBg } from './photoui.jsx'
+import { allPhotos, allSpecies, allPlayers, allCats, subscribe, namedOf, parseFrDateTime, allGpsSightings, photosFor } from './store.js'
 import { getTodos, saveTodo, deleteTodo, getPins, savePin, deletePin,
          getZones, saveZone, deleteZone, getPinTypes, savePinType,
          getThemes, saveTheme, getCalEvents, saveCalEvent } from './cloud.js'
@@ -354,6 +354,37 @@ function EventEditor({ lang, months, allThemes, initial, onClose, onSaved }) {
   )
 }
 
+// ── distance approximative en mètres entre deux points GPS (équirectangulaire —
+// largement assez précis à l'échelle d'une propriété, pas besoin de Haversine) ──
+const distMeters = (lat1, lon1, lat2, lon2) => {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const meanLat = (lat1 + lat2) / 2 * Math.PI / 180
+  const x = dLon * Math.cos(meanLat), y = dLat
+  return R * Math.sqrt(x * x + y * y)
+}
+// regroupe les observations géolocalisées à moins de 10 m les unes des autres
+// (zone de ~20 m de diamètre) en un seul spot sur la carte — algorithme glouton :
+// largement suffisant ici, la plupart des regroupements sont en fait des
+// coordonnées identiques (même caméra piège), pas un vrai nuage de points épars
+const CLUSTER_RADIUS_M = 10
+function clusterGpsSightings(items) {
+  const clusters = []
+  for (const item of items) {
+    const [lat, lon] = item.ind.gps
+    const found = clusters.find(c => distMeters(lat, lon, c.lat, c.lon) <= CLUSTER_RADIUS_M)
+    if (found) {
+      found.items.push(item)
+      found.lat = found.items.reduce((s, i) => s + i.ind.gps[0], 0) / found.items.length
+      found.lon = found.items.reduce((s, i) => s + i.ind.gps[1], 0) / found.items.length
+    } else {
+      clusters.push({ lat, lon, items: [item] })
+    }
+  }
+  return clusters
+}
+
 // ══════════ TERRITOIRE — carte satellite éditable ══════════
 export function Territory({ wide, lang, onBack, edit }) {
   const t = UI[lang]
@@ -366,6 +397,7 @@ export function Territory({ wide, lang, onBack, edit }) {
   const [draftPin, setDraftPin] = useState(null)
   const [draftPts, setDraftPts] = useState([])  // sommets en cours (zone/ligne)
   const [typeEditor, setTypeEditor] = useState(false)
+  const [obsSpot, setObsSpot] = useState(null)  // spot d'observation cliqué : {kind:'single'|'cluster', ...}
 
   const reload = async () => {
     try {
@@ -381,6 +413,27 @@ export function Territory({ wide, lang, onBack, edit }) {
     color:allTypes[p.t]?.c || '#B5602F', emoji:allTypes[p.t]?.e || '📍'
   }))
   const center = sel ? { lat:sel.gps[0], lon:sel.gps[1] } : CENTER
+
+  // spots d'observation géolocalisés (toutes espèces) : un spot coloré à
+  // l'initiale de l'observateur, ou un regroupement sombre avec un compteur
+  // si plusieurs observations tombent dans la même zone de ~20 m
+  const ALL_PLAYERS = allPlayers()
+  const obsPins = clusterGpsSightings(allGpsSightings()).map((c, i) => {
+    if (c.items.length === 1) {
+      const { sp, ind } = c.items[0]
+      const photos = photosFor(`ind:${sp.id}:${ind.n}`)
+      const pl = ALL_PLAYERS.find(p => p.name === ind.by)
+      return { id:`obs${i}`, lat:c.lat, lon:c.lon, kind:'single', sp, ind,
+        color: ind.by ? playerColor(ind.by, ALL_PLAYERS) : T.mute,
+        label: pl?.id || ind.by?.[0]?.toUpperCase() || '?',
+        thumbUrl: photos[0]?.thumbUrl || photos[0]?.url || null }
+    }
+    const first = c.items[0]
+    const photos = photosFor(`ind:${first.sp.id}:${first.ind.n}`)
+    return { id:`obs${i}`, lat:c.lat, lon:c.lon, kind:'cluster', items:c.items,
+      color:'#2B2620', label:String(c.items.length),
+      thumbUrl: photos[0]?.thumbUrl || photos[0]?.url || null }
+  })
 
   const onMapClick = async (pos) => {
     if (tool === 'pin') {
@@ -472,7 +525,8 @@ export function Territory({ wide, lang, onBack, edit }) {
           selected={sel && { id:sel.id }} height={wide?680:'calc(100dvh - 260px)'}
           addMode={tool==='pin'} lineMode={tool==='zone'||tool==='line'}
           onSelect={(p)=>setSel(p ? pins.find(x=>x.id===p.id) : null)}
-          onMapClick={onMapClick} />
+          onMapClick={onMapClick}
+          obsPins={obsPins} onObsSelect={setObsSpot} />
         {sel && (
           <div style={{ position:'absolute', left:10, right:10, bottom:10, background:'rgba(20,22,14,.93)',
             borderRadius:12, padding:'11px 13px', zIndex:8 }}>
@@ -517,9 +571,158 @@ export function Territory({ wide, lang, onBack, edit }) {
         onSave={async(pin)=>{ const np={ ...pin, id:'p'+Date.now() }; setPins(v=>[...v,np]); setDraftPin(null); await savePin(np); reload() }} />}
       {typeEditor && <PinTypeEditor lang={lang} onCancel={()=>setTypeEditor(false)}
         onSave={async(ty)=>{ const nt={ ...ty, id:'t'+Date.now() }; setTypes(v=>[...v,nt]); setPinType(nt.id); setTypeEditor(false); await savePinType(nt); reload() }} />}
+      {obsSpot && <ObsSpotModal spot={obsSpot} lang={lang} onClose={()=>setObsSpot(null)} />}
     </div>
   )
 }
+
+// ── fiche d'observation en lecture seule, ouverte depuis un spot de la carte du
+// Territoire : reste sur la carte plutôt que de naviguer vers Le Conservatoire,
+// contrairement à la fiche complète (avec édition) accessible depuis là-bas ──
+function ObsCard({ sp, ind, lang, onBack, onClose }) {
+  const M = ind.method ? METHODS[ind.method] : null
+  const st = ind.state ? obsStateLabel(ind.state, sp) : null
+  const ALL_PLAYERS = allPlayers()
+  return (
+    <div onClick={e=>e.stopPropagation()} style={obsCardStyle}>
+      <div style={{ position:'relative', height:220 }}>
+        <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.62), transparent 60%)', pointerEvents:'none' }} />
+        {onBack
+          ? <button onClick={onBack} style={obsRoundBtn('left')}><i className="ti ti-arrow-left" style={{ fontSize:14 }} aria-hidden="true" /></button>
+          : <span style={{ position:'absolute', top:10, left:12, fontSize:28 }}>{sp.e}</span>}
+        <button onClick={onClose} style={obsRoundBtn('right')}>✕</button>
+        {st && <span title={lang==='ru'?st.ru:st.l} style={{ position:'absolute', bottom:10, right:12, background:'#3E6B8C',
+          color:'#fff', borderRadius:'50%', width:24, height:24, fontSize:12, display:'flex', alignItems:'center', justifyContent:'center' }}>{st.e}</span>}
+        <div style={{ position:'absolute', bottom:10, left:12 }}>
+          <div style={{ fontSize:9.5, color:'rgba(242,238,226,.7)', textTransform:'uppercase', letterSpacing:'1px' }}>{sp.n}</div>
+          <div className="serif" style={{ fontSize:18, fontWeight:900, color:'#F2EEE2', display:'flex', alignItems:'center', gap:6 }}>
+            {ind.named && <span style={{ fontSize:14 }}>⭐</span>}{ind.displayName || ind.n}
+          </div>
+        </div>
+      </div>
+      <div style={{ padding:14 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:7, marginBottom:10 }}>
+          <span style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:T.soft, background:T.card,
+            border:`1px solid ${T.line}`, borderRadius:12, padding:'3px 9px' }}>
+            <i className="ti ti-calendar" style={{ fontSize:12 }} aria-hidden="true" />{ind.d}{ind.time?` · ${ind.time}`:''}
+          </span>
+          {ind.by && <span style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'#fff',
+            background:playerColor(ind.by, ALL_PLAYERS), borderRadius:12, padding:'3px 9px', fontWeight:600 }}>
+            {ALL_PLAYERS.find(p=>p.name===ind.by)?.id || ind.by[0]} {ind.by}
+          </span>}
+          {M && <span style={{ fontSize:11, fontWeight:600, background:M.c, color:M.on, borderRadius:12, padding:'3px 9px' }}>{M.l}</span>}
+        </div>
+        {ind.story && <div className="serif" style={{ fontSize:13, color:T.ink, lineHeight:1.6, fontStyle:'italic', marginBottom:8 }}>« {ind.story} »</div>}
+        {ind.traits && <div style={{ fontSize:11.5, color:T.soft, lineHeight:1.5 }}>{ind.traits}</div>}
+        {ind.gps && <div style={{ fontSize:10.5, color:T.mute, marginTop:8 }}>{ind.gps[0].toFixed(5)}° N · {ind.gps[1].toFixed(5)}° E</div>}
+      </div>
+    </div>
+  )
+}
+
+// ── clic sur un spot de la carte : fiche directe si une seule observation,
+// sinon liste des créatures présentes à cet endroit (avec les joueurs qui les
+// ont observées), puis liste des passages de la créature choisie ──
+function ObsSpotModal({ spot, lang, onClose }) {
+  const [creature, setCreature] = useState(null)   // sp.id choisi, si cluster
+  const [openInd, setOpenInd] = useState(null)      // ind.n choisi dans la liste d'une créature
+  const ALL_PLAYERS = allPlayers()
+
+  if (spot.kind === 'single') {
+    return (
+      <div onClick={onClose} style={obsOverlayStyle}>
+        <ObsCard sp={spot.sp} ind={spot.ind} lang={lang} onClose={onClose} />
+      </div>
+    )
+  }
+
+  const bySpecies = {}
+  spot.items.forEach(({ sp, ind }) => { (bySpecies[sp.id] ||= { sp, items: [] }).items.push(ind) })
+  const speciesList = Object.values(bySpecies)
+
+  if (creature && openInd) {
+    const group = bySpecies[creature]
+    const ind = group.items.find(i => i.n === openInd)
+    return (
+      <div onClick={onClose} style={obsOverlayStyle}>
+        <ObsCard sp={group.sp} ind={ind} lang={lang} onBack={()=>setOpenInd(null)} onClose={onClose} />
+      </div>
+    )
+  }
+
+  if (creature) {
+    const group = bySpecies[creature]
+    return (
+      <div onClick={onClose} style={obsOverlayStyle}>
+        <div onClick={e=>e.stopPropagation()} style={obsCardStyle}>
+          <div style={obsHeaderRow}>
+            <button onClick={()=>setCreature(null)} style={obsHeaderBtn}><i className="ti ti-arrow-left" style={{ fontSize:14 }} aria-hidden="true" /></button>
+            <span style={{ fontSize:16 }}>{group.sp.e}</span>
+            <span className="serif" style={{ fontSize:14.5, fontWeight:700, color:T.ink, flex:1 }}>{nameOf(group.sp, lang).main}</span>
+            <button onClick={onClose} style={obsHeaderBtn}>✕</button>
+          </div>
+          <div style={{ padding:12, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(96px,1fr))', gap:8 }}>
+            {group.items.map((ind,i) => (
+              <button key={i} onClick={()=>setOpenInd(ind.n)} style={{ textAlign:'left', borderRadius:10, overflow:'hidden',
+                padding:0, position:'relative', minHeight:76, border:`1px solid ${T.line}` }}>
+                <PhotoBg target={`ind:${group.sp.id}:${ind.n}`} fallback={gradientFor(group.sp.id+ind.n)} />
+                <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
+                {ind.by && <span style={{ position:'absolute', top:5, left:5, width:16, height:16, borderRadius:'50%',
+                  background:playerColor(ind.by, ALL_PLAYERS), color:'#fff', fontSize:8.5, fontWeight:800,
+                  display:'flex', alignItems:'center', justifyContent:'center', border:'1.5px solid rgba(255,255,255,.85)' }}>
+                  {ALL_PLAYERS.find(p=>p.name===ind.by)?.id || ind.by[0]}
+                </span>}
+                <div style={{ position:'relative', padding:6, fontSize:9, color:'rgba(242,238,226,.85)' }}>{ind.d}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div onClick={onClose} style={obsOverlayStyle}>
+      <div onClick={e=>e.stopPropagation()} style={obsCardStyle}>
+        <div style={obsHeaderRow}>
+          <span className="serif" style={{ fontSize:14.5, fontWeight:700, color:T.ink, flex:1 }}>
+            {spot.items.length} {lang==='ru'?'наблюдений здесь':'observations ici'}
+          </span>
+          <button onClick={onClose} style={obsHeaderBtn}>✕</button>
+        </div>
+        <div style={{ padding:'6px 8px' }}>
+          {speciesList.map(({ sp, items }) => {
+            const players = [...new Set(items.map(i=>i.by).filter(Boolean))]
+            return (
+              <button key={sp.id} onClick={()=>setCreature(sp.id)} style={{ width:'100%', display:'flex', alignItems:'center',
+                gap:9, padding:'9px 8px', borderRadius:10, textAlign:'left' }}>
+                <span style={{ fontSize:18 }}>{sp.e}</span>
+                <span style={{ flex:1, fontSize:13, fontWeight:600, color:T.ink }}>{nameOf(sp, lang).main}</span>
+                <span style={{ display:'flex', gap:3 }}>
+                  {players.map(pl => <span key={pl} title={pl} style={{ width:15, height:15, borderRadius:'50%',
+                    background:playerColor(pl, ALL_PLAYERS), border:'1.5px solid #fff' }} />)}
+                </span>
+                <span style={{ fontSize:11.5, color:T.mute, fontWeight:700 }}>×{items.length}</span>
+                <i className="ti ti-chevron-right" style={{ fontSize:14, color:T.mute }} aria-hidden="true" />
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const obsOverlayStyle = { position:'fixed', inset:0, zIndex:90, background:'rgba(20,18,14,.5)',
+  display:'flex', alignItems:'center', justifyContent:'center', padding:18 }
+const obsCardStyle = { width:'100%', maxWidth:400, maxHeight:'86vh', overflowY:'auto', background:T.bg,
+  borderRadius:18, border:`1px solid ${T.line}`, boxShadow:'0 16px 48px rgba(20,18,14,.35)' }
+const obsHeaderRow = { display:'flex', alignItems:'center', gap:8, padding:'12px 12px 10px', borderBottom:`1px solid ${T.line}` }
+const obsHeaderBtn = { width:26, height:26, borderRadius:'50%', background:T.card, color:T.soft,
+  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }
+const obsRoundBtn = (side) => ({ position:'absolute', top:10, [side]:12, width:28, height:28, borderRadius:'50%',
+  background:'rgba(0,0,0,.35)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' })
 
 const toolBtn = (on) => ({ fontSize:11.5, padding:'6px 12px', borderRadius:16,
   border:`1px solid ${on?T.clay:T.line}`, background:on?T.clay:'transparent',

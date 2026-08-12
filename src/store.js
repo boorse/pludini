@@ -336,6 +336,20 @@ export function sightingsNearGps(lat, lon, tolerance = 0.0006) {
   }
   return results.sort((a, b) => parseFrDateTime(b.ind.d, b.ind.time) - parseFrDateTime(a.ind.d, a.ind.time))
 }
+// toutes les observations géolocalisées, toutes espèces confondues — sert à
+// afficher les spots d'observation sur la carte du Territoire (indépendant
+// d'un point de référence, contrairement à sightingsNearGps)
+export function allGpsSightings() {
+  const out = []
+  for (const sp of allSpecies()) {
+    for (const ind of (sp.inds || [])) {
+      if (!ind.gps) continue
+      const ov = S.named[`${sp.id}::${ind.n}`]
+      out.push({ sp, ind: { ...ind, displayName: ov ? ov.name : ind.n, named: !!ov } })
+    }
+  }
+  return out
+}
 
 // ══════ COUVERTURE D'ESPÈCE (issue des photos de ses individus) ══════
 // une entrée par individu qui a au moins une photo — sert au carrousel de la fiche et au sélecteur de vignette
