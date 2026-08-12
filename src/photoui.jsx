@@ -277,6 +277,11 @@ export function Lightbox({ photos, index, onIndex, onClose }) {
     const { mx, my } = centerOf(clientX, clientY)
     setTf(cur => {
       const k2 = clampK(cur.k * factor)
+      // au zoom minimal, on force le recentrage : sinon la translation calculée pour
+      // "zoomer vers le curseur" reste telle quelle même une fois revenu à k=1, et
+      // l'image part hors-champ sans qu'aucun geste ne permette de la recentrer
+      // (le double-clic de reset ne se déclenche que si k>1.05)
+      if (k2 <= 1.001) return { k:1, x:0, y:0 }
       const ratio = k2 / cur.k
       return { k:k2, x: mx - (mx - cur.x)*ratio, y: my - (my - cur.y)*ratio }
     })
@@ -321,8 +326,11 @@ export function Lightbox({ photos, index, onIndex, onClose }) {
       const [a,b] = [...ptrs.current.values()]
       const ratio = Math.hypot(a.x-b.x, a.y-b.y) / g.d
       const k2 = clampK(g.k * ratio)
-      const r = k2 / g.k
       movedRef.current = true
+      // même recentrage forcé qu'au zoom molette : sinon un pincement pour dézoomer
+      // jusqu'au bout laisse l'image décentrée, sans geste pour revenir dessus
+      if (k2 <= 1.001) { setTf({ k:1, x:0, y:0 }); return }
+      const r = k2 / g.k
       setTf({ k:k2, x: g.mx - (g.mx - g.x)*r, y: g.my - (g.my - g.y)*r })
     }
   }
