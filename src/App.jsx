@@ -1127,13 +1127,14 @@ export default function App() {
                               overflow:'hidden', padding:0, position:'relative', minHeight: isNamed?100:92,
                               border: isSel?'2px solid #B5602F':isNamed?'2px solid #C9A046':ind.by?`2px solid ${playerColor(ind.by, ALL_PLAYERS)}`:`1px solid ${T.line}`,
                               boxShadow: isSel?'0 0 0 1px rgba(181,96,47,.3), 0 3px 12px rgba(181,96,47,.25)'
-                                :isNamed?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)'
+                                :isNamed?`0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)${ind.by?`, 0 0 0 3px ${playerColor(ind.by, ALL_PLAYERS)}40`:''}`
                                 :ind.by?`0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55`:'none' }}>
                               <PhotoBg target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
                               <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
                               {isNamed && <span style={{ position:'absolute', top:6, left:6, background:'#C9A046',
-                                color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
-                                letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
+                                color:'#2B2620', borderRadius:8, padding:'2px 7px 2px 2px', fontSize:8.5, fontWeight:800,
+                                letterSpacing:'.4px', display:'flex', alignItems:'center', gap:4, zIndex:2 }}>
+                                {ind.by && <PlayerBadge name={ind.by} size={14} />}
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
                               {!isNamed && ind.by && (
                                 <span style={{ position:'absolute', top:6, left:6, zIndex:2 }}>
@@ -1332,16 +1333,28 @@ export default function App() {
     const [addingPassage, setAddingPassage] = useState(false)
     const [addSel, setAddSel] = useState(() => new Set())
     const candidates = addingPassage ? splitInds(sp).sightings : []
+    // bandeau d'action pleine largeur, toujours la même taille/forme — seule la
+    // couleur change selon qu'il s'agit d'une navigation (neutral) ou d'une action
+    // réversible/destructrice (warn), pour que tous les boutons du bas s'alignent
+    const bannerBtn = (variant='warn') => ({
+      width:'100%', padding:'11px', borderRadius:12,
+      border: variant==='warn' ? '1px dashed #C9A87C' : `1px solid ${T.line}`,
+      background:'transparent', color: variant==='warn' ? '#8F4A22' : T.ink,
+      fontSize:12.5, fontWeight: variant==='warn' ? 600 : 400,
+      marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+    })
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurInd(null)}>
         <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'hidden', display:'flex', flexDirection:'column',
-          border: ind.by && !ind.named ? `2px solid ${playerColor(ind.by, ALL_PLAYERS)}` : `1px solid ${T.line}`,
-          boxShadow: ind.by && !ind.named ? `0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55` : 'none' }}>
+          border: ind.named ? '2px solid #C9A046' : ind.by ? `2px solid ${playerColor(ind.by, ALL_PLAYERS)}` : `1px solid ${T.line}`,
+          boxShadow: ind.named
+            ? `0 0 0 1px rgba(201,160,70,.28)${ind.by?`, 0 0 0 3px ${playerColor(ind.by, ALL_PLAYERS)}40`:''}`
+            : ind.by ? `0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55` : 'none' }}>
           <div style={{ overflowY:'auto', overscrollBehavior:'contain', flex:'1 1 auto', minHeight:0 }}>
           <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
-            {ind.by && !ind.named && (
+            {ind.by && (
               <span style={{ position:'absolute', top:12, left:12, zIndex:2 }}>
                 <PlayerBadge name={ind.by} size={26} />
               </span>
@@ -1362,7 +1375,7 @@ export default function App() {
             <button onClick={()=>setCurInd(null)} style={{ position:'absolute', top:12, right:12, width:28, height:28, borderRadius:'50%', background:'rgba(0,0,0,.3)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
             </button>
-            <div style={{ position:'absolute', top:10, left: ind.by && !ind.named ? 46 : 14, fontSize:34 }}>{sp.e}</div>
+            <div style={{ position:'absolute', top:10, left: ind.by ? 46 : 14, fontSize:34 }}>{sp.e}</div>
             <div style={{ position:'relative' }}>
               <div style={{ fontSize:10.5, color:'rgba(242,238,226,.7)', textTransform:'uppercase', letterSpacing:'1px' }}>{sp.n}</div>
               <div className="serif" style={{ fontSize:24, fontWeight:900, color:'#F2EEE2', lineHeight:1.05,
@@ -1444,66 +1457,44 @@ export default function App() {
               </div>
             )}
 
-            {/* passage rattaché à un familier : lien vers sa fiche + option de le détacher, plutôt que le disparaître */}
-            {edit && ind.familierOf && (
-              <div style={{ display:'flex', gap:8, marginBottom:10 }}>
-                <button onClick={()=>setCurInd(ind.familierOf)}
-                  style={{ flex:1, padding:'11px', borderRadius:12, border:`1px solid ${T.line}`,
-                    color:T.ink, fontSize:12.5, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <i className="ti ti-arrow-back" style={{ fontSize:14 }} aria-hidden="true" />
-                  {lang==='ru'?'К особи':'Voir le familier'}
-                </button>
-                <button onClick={async()=>{ await removePassageFromFamilier(sp.id, ind.n); setRefresh(r=>r+1) }}
-                  style={{ flex:1, padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
-                    color:'#8F4A22', fontSize:12.5, fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <i className="ti ti-unlink" style={{ fontSize:14 }} aria-hidden="true" />
-                  {lang==='ru'?'Отсоединить':'Retirer du familier'}
-                </button>
-              </div>
-            )}
+            {/* tous les bandeaux d'action de cette fiche partagent la même taille et la
+                même forme (pleine largeur, mêmes marges) — seule la couleur distingue une
+                action de navigation (contour plein) d'une action réversible ou destructrice
+                (contour pointillé) ; bannerBtn() garantit qu'ils restent alignés entre eux */}
+            {edit && ind.familierOf && (<>
+              <button onClick={()=>setCurInd(ind.familierOf)} style={bannerBtn('neutral')}>
+                <i className="ti ti-arrow-back" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'К особи':'Voir le familier'}
+              </button>
+              <button onClick={async()=>{ await removePassageFromFamilier(sp.id, ind.n); setRefresh(r=>r+1) }} style={bannerBtn('warn')}>
+                <i className="ti ti-unlink" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Отсоединить':'Retirer du familier'}
+              </button>
+            </>)}
 
             {edit && !ind.named && !ind.familierOf && speciesType(sp)!==3 && (
-              <button onClick={()=>{ setCurInd(null); setPromoting({ sp, ind }) }}
-                style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
-                  background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
-                  marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <button onClick={()=>{ setCurInd(null); setPromoting({ sp, ind }) }} style={bannerBtn('warn')}>
                 <i className="ti ti-lock-open" style={{ fontSize:15 }} aria-hidden="true" />
                 {lang==='ru'?'Опознать эту особь и дать имя':'Reconnaître cet individu et lui donner un nom'}
               </button>
             )}
 
-            {/* familier : même bascule Passage/Familier que dans le formulaire d'observation, au même
-                endroit — juste à côté, l'action pour tout supprimer (individu + passages rattachés) */}
-            {edit && ind.named && speciesType(sp)!==3 && (
-              <>
-                <div style={{ display:'flex', gap:8, marginBottom:10 }}>
-                  <button onClick={async()=>{ await demote(sp.id, ind.n); setRefresh(r=>r+1) }}
-                    style={{ flex:1, padding:'11px', borderRadius:12, border:`1px solid ${T.line}`,
-                      background:'transparent', color:T.ink, fontSize:12.5, fontWeight:400 }}>
-                    👁 {lang==='ru'?'Проход':'Passage'}
-                  </button>
-                  <button disabled
-                    style={{ flex:1, padding:'11px', borderRadius:12, border:`2px solid #C9A046`,
-                      background:'#F5EBD6', color:T.ink, fontSize:12.5, fontWeight:700 }}>
-                    ★ {lang==='ru'?'Знакомый':'Familier'}
-                  </button>
-                </div>
-                <button onClick={()=>setConfirmDelFamilier({ sp, ind })}
-                  style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9877C',
-                    background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
-                    marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
-                  {lang==='ru'?'Удалить особь и все её проходы':'Supprimer le familier et tous ses passages'}
-                </button>
-                <button onClick={()=>{ setAddingPassage(true); setAddSel(new Set()) }}
-                  style={{ width:'100%', padding:'11px', borderRadius:12, border:'1px dashed #C9A87C',
-                    background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
-                    marginBottom:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
-                  <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
-                  {lang==='ru'?'Добавить проход этой особи':'Ajouter un passage à cet individu'}
-                </button>
-              </>
-            )}
+            {/* familier : bascule vers "passage" au même endroit et sous la même forme que
+                les autres bandeaux — plus le duo de boutons côte à côte d'avant */}
+            {edit && ind.named && speciesType(sp)!==3 && (<>
+              <button onClick={async()=>{ await demote(sp.id, ind.n); setRefresh(r=>r+1) }} style={bannerBtn('warn')}>
+                <i className="ti ti-eye" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Вернуть в проходы':'Repasser en passage'}
+              </button>
+              <button onClick={()=>setConfirmDelFamilier({ sp, ind })} style={bannerBtn('warn')}>
+                <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Удалить особь и все её проходы':'Supprimer le familier et tous ses passages'}
+              </button>
+              <button onClick={()=>{ setAddingPassage(true); setAddSel(new Set()) }} style={bannerBtn('warn')}>
+                <i className="ti ti-plus" style={{ fontSize:15 }} aria-hidden="true" />
+                {lang==='ru'?'Добавить проход этой особи':'Ajouter un passage à cet individu'}
+              </button>
+            </>)}
             {addingPassage && (
               <div onClick={e=>e.stopPropagation()} style={{ background:T.card, border:`1px solid ${T.line}`, borderRadius:12, padding:13, marginBottom:10 }}>
                 <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:8 }}>
@@ -1556,23 +1547,30 @@ export default function App() {
             {/* tous les passages rattachés à ce familier : chacun reste une fiche à part
                 entière (photos, récit, état…), cliquable pour l'ouvrir, modifier ou supprimer */}
             {ind.named && (() => {
-              const passages = familierPassages(sp, ind.n)
-              return passages.length>0 && (
+              // le fondateur lui-même est inclus en tête : sinon un familier reconnu à
+              // partir d'une seule observation (rien à fusionner) n'affichait aucune
+              // vignette dans cette section, qui restait vide
+              const passages = [ind, ...familierPassages(sp, ind.n)]
+              return (
                 <div style={{ marginBottom:10 }}>
                   <div style={{ fontSize:10.5, fontWeight:700, color:T.mute, textTransform:'uppercase',
                     letterSpacing:'.6px', marginBottom:8 }}>
                     {lang==='ru'?`Проходы этой особи (${passages.length})`:`Passages de ce familier (${passages.length})`}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?100:88}px,1fr))`, gap:7 }}>
-                    {passages.map((p,i)=>(
+                    {passages.map((p,i)=>{
+                      const isFounder = p.n === ind.n
+                      return (
                       <button key={i} onClick={()=>setCurInd(p.n)}
                         style={{ textAlign:'left', borderRadius:10, overflow:'hidden', padding:0, position:'relative', minHeight:76,
-                          border: p.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}` }}>
+                          border: isFounder?'1.5px solid #C9A046':p.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}` }}>
                         <PhotoBg target={`ind:${sp.id}:${p.n}`} fallback={gradientFor(sp.id+p.n)} />
                         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
+                        {isFounder && <span title={lang==='ru'?'Первое наблюдение':'Observation fondatrice'}
+                          style={{ position:'absolute', top:4, right:4, fontSize:11 }}>★</span>}
                         <div style={{ position:'relative', padding:6, fontSize:9, color:'rgba(242,238,226,.85)' }}>{p.d}</div>
                       </button>
-                    ))}
+                    )})}
                   </div>
                 </div>
               )
@@ -1585,10 +1583,7 @@ export default function App() {
               </div>
             )}
             {edit && (
-              <button onClick={()=>setConfirmDelSighting({ sp, ind })}
-                style={{ marginTop:16, width:'100%', padding:'10px', borderRadius:10,
-                  border:'1px dashed #C9877C', background:'transparent', color:'#8F4A22', fontSize:12.5, fontWeight:600,
-                  display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+              <button onClick={()=>setConfirmDelSighting({ sp, ind })} style={{ ...bannerBtn('warn'), marginTop:16 }}>
                 <i className="ti ti-trash" style={{ fontSize:15 }} aria-hidden="true" />
                 {lang==='ru'?'Удалить это наблюдение':'Supprimer cette observation'}
               </button>
