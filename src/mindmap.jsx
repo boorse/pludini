@@ -13,6 +13,22 @@ const STAGGER = [0, 46, 16, 62, 30, 74]
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
 const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
+// ids (n compris) de toutes les branches — ordre, famille — qui mènent à une
+// observation, récursivement jusqu'à l'espèce ; utilisé par toggleObserved et
+// expandDeep pour savoir jusqu'où cascader et si un clic est déjà "au maximum"
+function observedBranchIds(n) {
+  const ids = new Set()
+  const walk = (node) => {
+    ids.add(node.id)
+    for (const c of node.children || []) {
+      if (c.kind !== 'cat' && c.kind !== 'ordre' && c.kind !== 'fam') continue
+      if ((c.members || []).some(isObserved)) walk(c)
+    }
+  }
+  walk(n)
+  return ids
+}
+
 export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, levels, setLevels, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   const [infoNode, setInfoNode] = useState(null)
@@ -37,69 +53,75 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     })
   }, [])
 
-  // déplie un ordre en ne révélant que les familles (et espèces) observées
+  // déplie récursivement (ordre > famille > espèce) le long des branches
+  // observées, en excluant les branches vides — jusqu'aux observations en un
+  // seul clic. Un reclic n'annule ce dépli QUE s'il n'y a plus rien à ajouter
+  // (déjà "au maximum") — sinon il complète l'état courant sans jamais reculer,
+  // même si ce clic suit un dépli profond (expandDeep) qui avait laissé des
+  // branches vides visibles : ce clic-ci les filtre, mais ne referme rien
   const toggleObserved = useCallback((n) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(n.id)) {
+    const target = observedBranchIds(n)
+    const alreadyFull = [...target].every(id => expanded.has(id) && obsOnly.has(id))
+    if (alreadyFull) {
+      setExpanded(prev => {
+        const next = new Set(prev)
         next.delete(n.id)
         for (const k of [...next]) if (k.startsWith(n.id + ':')) next.delete(k)
-      } else {
-        next.add(n.id)
-        for (const c of n.children || []) {
-          if ((c.members || []).some(isObserved)) next.add(c.id)
-          else next.delete(c.id)
-        }
-      }
+        return next
+      })
+      setObsOnly(prev => {
+        const next = new Set(prev)
+        for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
+        return next
+      })
+      return
+    }
+    setExpanded(prev => {
+      const next = new Set(prev)
+      for (const id of target) next.add(id)
       return next
     })
     setObsOnly(prev => {
       const next = new Set(prev)
-      for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
-      const willOpen = !expanded.has(n.id)
-      if (willOpen) {
-        next.add(n.id)
-        for (const c of n.children || []) {
-          if ((c.members || []).some(isObserved)) next.add(c.id)
-        }
-      }
+      for (const id of target) next.add(id)
       return next
     })
-  }, [expanded])
+  }, [expanded, obsOnly])
 
   // dépli profond (petit onglet) : cascade sur tous les échelons — ordre, puis
   // famille, puis espèce — en ne suivant que les branches qui contiennent déjà
   // une observation ; les branches vides restent présentes mais repliées
   // (1 seule "unité" de largeur) plutôt que masquées comme avec toggleObserved,
   // pour qu'on voie qu'elles attendent encore des observations sans qu'elles
-  // n'envahissent la carte
+  // n'envahissent la carte. Même logique "jamais en arrière" que ci-dessus :
+  // un reclic ne referme que si le dépli est déjà complet (rien à ajouter)
   const expandDeep = useCallback((n) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(n.id)) {
+    const target = observedBranchIds(n)
+    const hasObsOnlyHere = [...obsOnly].some(k => k === n.id || k.startsWith(n.id + ':'))
+    const alreadyFull = !hasObsOnlyHere && [...target].every(id => expanded.has(id))
+    if (alreadyFull) {
+      setExpanded(prev => {
+        const next = new Set(prev)
         next.delete(n.id)
         for (const k of [...next]) if (k.startsWith(n.id + ':')) next.delete(k)
-      } else {
-        const walk = (node) => {
-          next.add(node.id)
-          for (const c of node.children || []) {
-            if (c.kind !== 'cat' && c.kind !== 'ordre' && c.kind !== 'fam') continue
-            if ((c.members || []).some(isObserved)) walk(c)
-          }
-        }
-        walk(n)
-      }
+        return next
+      })
+      return
+    }
+    setExpanded(prev => {
+      const next = new Set(prev)
+      for (const id of target) next.add(id)
       return next
     })
     // le dépli profond montre tout (branches vides comprises, juste repliées) :
     // il ne doit pas hériter d'un filtre "observées uniquement" déjà actif
     setObsOnly(prev => {
-      if (!prev.has(n.id) && ![...prev].some(k => k.startsWith(n.id + ':'))) return prev
+      if (!hasObsOnlyHere) return prev
       const next = new Set(prev)
       for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
       return next
     })
-  }, [])
+  }, [expanded, obsOnly])
 
   const SPECIES = allSpecies()
   const CATS = allCats()
