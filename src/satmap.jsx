@@ -97,15 +97,29 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
       if (nz !== z) setZ(nz)
     })
     liveRef.current = { x: 0, y: 0, k: 1 }
-    // setTransform(0,0,1,0) remet l'état interne de la bibliothèque à zéro,
-    // mais juste après un flushSync le contentComponent qu'elle vise pouvait
-    // être temporairement périmé : applyTransformation() ne touchait alors
-    // jamais le style réel, laissant l'ancien transform affiché en plus des
-    // tuiles déjà repositionnées (double décalage, zone noire sur un bord).
-    // On force donc aussi le nettoyage du DOM nous-mêmes, en filet de sécurité.
-    apiRef.current?.setTransform(0, 0, 1, 0)
+    // la plupart des gestes de zoom ne franchissent pas un niveau de tuile
+    // entier (il faut doubler la taille pour ça, dz = round(log2(k))) : nz
+    // reste alors égal à z, et le retour instantané à l'échelle 1 se voyait
+    // comme un petit "coup en arrière" — on anime ce retour plutôt que de le
+    // couper net, ce qui absorbe aussi le léger résidu quand nz change.
+    const RESET_MS = 180
+    // setTransform(0,0,1,RESET_MS) remet l'état interne de la bibliothèque à
+    // zéro en l'animant, mais juste après un flushSync le contentComponent
+    // qu'elle vise pouvait être temporairement périmé : applyTransformation()
+    // ne touchait alors jamais le style réel, laissant l'ancien transform
+    // affiché en plus des tuiles déjà repositionnées (double décalage, zone
+    // noire sur un bord). On anime donc aussi le DOM nous-mêmes, en filet de
+    // sécurité, avec la même durée.
+    apiRef.current?.setTransform(0, 0, 1, RESET_MS)
     const contentEl = apiRef.current?.instance?.contentComponent
-    if (contentEl) contentEl.style.transform = ''
+    if (contentEl) {
+      contentEl.style.transition = `transform ${RESET_MS}ms ease-out`
+      contentEl.style.transform = ''
+      setTimeout(() => {
+        const el = apiRef.current?.instance?.contentComponent
+        if (el) el.style.transition = ''
+      }, RESET_MS + 40)
+    }
     setTimeout(() => { drag.current.moved = false }, 0)
   }, [z, originX, originY, size.w, size.h])
 
