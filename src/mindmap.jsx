@@ -13,29 +13,7 @@ const STAGGER = [0, 46, 16, 62, 30, 74]
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
 const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
-// filtre vertical : calcule l'ensemble des noeuds à déplier pour atteindre
-// exactement le niveau demandé sur toutes les catégories actuellement visibles
-// — remplace "expanded" plutôt que de le compléter, comme "Tout replier"
-const DEPTHS = ['cat', 'ordre', 'famille', 'espece']
-function expandedForDepth(CATS, catVisible, depth) {
-  const ids = new Set()
-  if (depth === 'cat') return ids
-  for (const cat of CATS) {
-    if (!catVisible.has(cat.id)) continue
-    ids.add(cat.id)
-    if (depth === 'ordre') continue
-    const hasOrdres = cat.subs.some(sv => sv.ordre)
-    if (hasOrdres) {
-      const ordreKeys = new Set(cat.subs.map(sv => sv.ordre || sv.id))
-      for (const key of ordreKeys) ids.add(cat.id + ':ord:' + key)
-    }
-    if (depth === 'famille') continue
-    for (const sv of cat.subs) ids.add(cat.id + ':' + sv.id)
-  }
-  return ids
-}
-
-export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, depth, setDepth, edit, onAddSpecies }) {
+export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, levels, setLevels, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   const [infoNode, setInfoNode] = useState(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
@@ -92,42 +70,49 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   const SPECIES = allSpecies()
   const CATS = allCats()
 
-  // filtre vertical : jusqu'où déplier par défaut (catégorie / ordre / famille / espèce)
-  // — un simple repère visuel local, pas une contrainte : un dépli manuel peut
-  // toujours s'en écarter ensuite, comme "Tout replier" ne "verrouille" rien non plus
-  // (état levé dans App — voir mapDepth — car Explore redéfinit MindMap à chaque
-  // re-rendu et un useState ici serait réinitialisé à chaque clic)
-  const pickDepth = useCallback((d) => {
-    setDepth(d)
-    setExpanded(expandedForDepth(CATS, catVisible, d))
-  }, [CATS, catVisible, setExpanded, setDepth])
+  const showOrdre = levels.has('ordre')
+  const showFamille = levels.has('famille')
 
   const { nodes, links, width, height } = useMemo(() => {
     const root = {
       id: 'root', kind: 'root', label: lang==='ru' ? 'Заповедник' : 'Conservatoire', e: '🌿',
       children: CATS.filter(cat => catVisible.has(cat.id)).map((cat, ci) => {
-        // fiche famille (id, membres, espèces affichées…) — inchangé, que la
-        // famille soit un enfant direct de la catégorie ou d'un ordre inséré
-        const buildFam = (sv) => {
-          const famId = cat.id + ':' + sv.id
+        // espèces (+ bouton d'ajout) d'une famille, en noeuds nus — servent soit
+        // de contenu à la carte "famille" (buildFam), soit d'enfants directs du
+        // niveau parent quand la famille est masquée par le filtre Niveaux
+        const famId = (sv) => cat.id + ':' + sv.id
+        const buildSpNodes = (sv) => {
+          const id = famId(sv)
           const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
-          const onlyObs = obsOnly.has(famId)
+          const onlyObs = obsOnly.has(id)
           const shown = onlyObs ? members.filter(isObserved) : members
           return {
-            id: famId, kind: 'fam', label: sv.id, sub: sv.lat, catId: cat.id, subId: sv.id, niche: sv.niche,
             members,
-            children: [
-              ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
-              ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
+            nodes: [
+              ...shown.map(sp => ({ id: id + ':' + sp.id, kind: 'sp', sp, children: [] })),
+              ...(edit && !onlyObs ? [{ id: id + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
             ]
           }
         }
+        // fiche famille (id, membres, espèces affichées…) — inchangé, que la
+        // famille soit un enfant direct de la catégorie ou d'un ordre inséré
+        const buildFam = (sv) => {
+          const { members, nodes: children } = buildSpNodes(sv)
+          return {
+            id: famId(sv), kind: 'fam', label: sv.id, sub: sv.lat, catId: cat.id, subId: sv.id, niche: sv.niche,
+            members, children,
+          }
+        }
+        // quand la famille est masquée (filtre Niveaux), ses espèces deviennent
+        // les enfants directs du parent (ordre ou catégorie) — pas de carte "famille"
+        const buildLevel = (svList) => showFamille ? svList.map(buildFam) : svList.flatMap(sv => buildSpNodes(sv).nodes)
         const famHasObs = (sv) => SPECIES.some(sp => sp.cat === cat.id && sp.sub === sv.id && isObserved(sp))
         // certains règnes (mammifères, oiseaux) ont un vrai rang Ordre au-dessus
         // de la famille (ex. Carnivores > Canidés) ; les autres n'ont qu'un seul
         // niveau de famille, comme avant — inséré seulement quand `ordre` est
-        // renseigné sur au moins une famille de la catégorie
-        const hasOrdres = cat.subs.some(sv => sv.ordre)
+        // renseigné sur au moins une famille de la catégorie ET que le filtre
+        // Niveaux le laisse visible
+        const hasOrdres = showOrdre && cat.subs.some(sv => sv.ordre)
         let catChildren
         if (hasOrdres) {
           const byOrdre = new Map()
@@ -142,16 +127,18 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
             .map(o => {
               const ordId = cat.id + ':ord:' + o.key
               const ordOnlyObs = obsOnly.has(ordId)
-              const famNodes = o.subs.filter(sv => !ordOnlyObs || famHasObs(sv)).map(buildFam)
+              const subs = o.subs.filter(sv => !ordOnlyObs || famHasObs(sv))
+              const subMembers = subs.flatMap(sv => SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id))
               return {
                 id: ordId, kind: 'ordre', label: o.key, sub: o.lat, catId: cat.id,
-                members: famNodes.flatMap(f => f.members),
-                children: famNodes,
+                members: subMembers,
+                children: buildLevel(subs),
               }
             })
         } else {
           const catOnlyObs = obsOnly.has(cat.id)
-          catChildren = cat.subs.filter(sv => !catOnlyObs || famHasObs(sv)).map(buildFam)
+          const subs = cat.subs.filter(sv => !catOnlyObs || famHasObs(sv))
+          catChildren = buildLevel(subs)
         }
         return {
           id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
@@ -217,7 +204,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const width = root.units * (CARD_W + GAP_X) + 80
     const height = Math.max(...nodes.map(n => n.y)) + CARD_H + 70
     return { nodes, links, width, height }
-  }, [expanded, obsOnly, catVisible, edit, lang, SPECIES.length, CATS.length])
+  }, [expanded, obsOnly, catVisible, edit, lang, SPECIES.length, CATS.length, showOrdre, showFamille])
 
   const stageRef = useRef(null)
   const liveRef = useRef({ ...tf })
@@ -367,7 +354,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       </div>
       <div style={{ position:'absolute', top:9, left:10, zIndex:6, display:'flex', alignItems:'flex-start', gap:5, flexWrap:'wrap' }}>
         <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
-        <DepthFilter depth={depth} onPick={pickDepth} lang={lang} />
+        <LevelFilter levels={levels} setLevels={setLevels} lang={lang} />
       </div>
       {isTouch ? (
         <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
@@ -527,24 +514,46 @@ function CatFilter({ cats, visible, setVisible, lang }) {
   )
 }
 
-// filtre vertical : jusqu'où déplier par défaut (toutes catégories visibles
-// confondues) — un bouton actif remplace "expanded" par le niveau choisi,
-// comme "Tout replier" le fait déjà pour repartir de zéro
-const DEPTH_LABELS = {
-  cat:    { fr:'Catégorie', ru:'Царство' },
-  ordre:  { fr:'Ordre',     ru:'Отряд' },
-  famille:{ fr:'Famille',   ru:'Семья' },
-  espece: { fr:'Espèce',    ru:'Вид' },
-}
-function DepthFilter({ depth, onPick, lang }) {
+// filtre vertical : quelles étapes intermédiaires (ordre, famille) existent
+// comme cartes à part entière — décocher une étape la retire structurellement
+// de l'arbre (ses espèces remontent directement au niveau parent), ce n'est
+// pas un simple réglage du dépli par défaut comme "Tout replier"
+const LEVEL_ITEMS = [
+  { id:'ordre',   fr:'Ordre',   ru:'Отряд' },
+  { id:'famille', fr:'Famille', ru:'Семья' },
+]
+function LevelFilter({ levels, setLevels, lang }) {
+  const [open, setOpen] = useState(false)
+  const allOn = LEVEL_ITEMS.every(l => levels.has(l.id))
+  const toggle = (id) => setLevels(prev => {
+    const n = new Set(prev)
+    n.has(id) ? n.delete(id) : n.add(id)
+    return n
+  })
   return (
-    <div style={{ display:'flex', background:'#EDE7D8', border:'1px solid #D3C7AE', borderRadius:12, overflow:'hidden' }}>
-      {DEPTHS.map(d => (
-        <button key={d} onClick={()=>onPick(d)} style={{ fontSize:10, padding:'6px 9px', fontWeight: depth===d?700:400,
-          background: depth===d ? '#B5602F' : 'transparent', color: depth===d ? '#fff' : '#6B6357' }}>
-          {DEPTH_LABELS[d][lang==='ru'?'ru':'fr']}
-        </button>
-      ))}
+    <div style={{ position:'relative' }}>
+      <button onClick={()=>setOpen(v=>!v)} style={{ ...btn, display:'flex', alignItems:'center', gap:5 }}>
+        <i className="ti ti-stairs" style={{ fontSize:12 }} aria-hidden="true" />
+        {lang==='ru'?'Уровни':'Niveaux'}
+        {!allOn && <span style={{ background:'#B5602F', color:'#fff', borderRadius:8, padding:'0 5px', fontSize:9, fontWeight:700 }}>
+          {levels.size}/{LEVEL_ITEMS.length}
+        </span>}
+      </button>
+      {open && (
+        <div style={{ marginTop:6, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
+          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', width:150 }}>
+          {LEVEL_ITEMS.map(l => (
+            <label key={l.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 6px',
+              borderRadius:8, fontSize:11.5, color:'#3F382C', cursor:'pointer' }}>
+              <input type="checkbox" checked={levels.has(l.id)} onChange={()=>toggle(l.id)}
+                style={{ width:14, height:14, accentColor:'#7A8B5C', flexShrink:0 }} />
+              <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {lang==='ru'?l.ru:l.fr}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
