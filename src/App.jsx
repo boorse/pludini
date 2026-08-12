@@ -502,6 +502,22 @@ export default function App() {
   const PLAYERS = allPlayers().filter(p=>!p.demo)
   const ALL_PLAYERS = allPlayers()
 
+  // pastille ronde avec l'initiale du joueur, même esthétique que l'avatar
+  // utilisé dans l'onglet "Par observateur" — colorée comme la bordure de la
+  // vignette pour que les deux se lisent comme un seul repère
+  const PlayerBadge = ({ name, size = 22 }) => {
+    if (!name) return null
+    const p = ALL_PLAYERS.find(pl => pl.name === name)
+    return (
+      <span className="serif" style={{ width:size, height:size, borderRadius:'50%',
+        background:playerColor(name, ALL_PLAYERS), color:'#fff', display:'flex', alignItems:'center',
+        justifyContent:'center', fontSize:Math.round(size*.46), fontWeight:700,
+        border:'1.5px solid rgba(255,255,255,.85)', boxShadow:'0 1px 4px rgba(0,0,0,.35)' }}>
+        {p?.id || name[0].toUpperCase()}
+      </span>
+    )
+  }
+
   const sp = SPECIES.find(s => s.id === curSp)
   const catObj = CATS.find(c => c.id === curCat)
 
@@ -1014,14 +1030,19 @@ export default function App() {
                               {ind.note && <div style={{ fontSize:9, color:T.soft, marginTop:4, lineHeight:1.3 }}>{ind.note}</div>}
                             </div>
                           )}
+                          {ind.by && (
+                            <span style={{ position:'absolute', top:4, left:4, zIndex:2 }}>
+                              <PlayerBadge name={ind.by} size={19} />
+                            </span>
+                          )}
                           {ind.size && (
-                            <span style={{ position:'absolute', top:4, left:4, background:'rgba(20,18,14,.6)',
+                            <span style={{ position:'absolute', top:4, right:4, background:'rgba(20,18,14,.6)',
                               color:'#fff', fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:8,
                               textTransform:'capitalize' }}>{ind.size}</span>
                           )}
                           {ind.state && obsStateLabel(ind.state, sp) && (
                             <span title={lang==='ru'?obsStateLabel(ind.state, sp).ru:obsStateLabel(ind.state, sp).l}
-                              style={{ position:'absolute', top:4, left:4, background:OBS_STATE_COLOR,
+                              style={{ position:'absolute', top:4, right:4, background:OBS_STATE_COLOR,
                               color:'#fff', borderRadius:'50%', width:18, height:18, fontSize:10,
                               display:'flex', alignItems:'center', justifyContent:'center' }}>{obsStateLabel(ind.state, sp).e}</span>
                           )}
@@ -1114,6 +1135,11 @@ export default function App() {
                                 color:'#2B2620', borderRadius:8, padding:'2px 7px', fontSize:8.5, fontWeight:800,
                                 letterSpacing:'.4px', display:'flex', alignItems:'center', gap:3, zIndex:2 }}>
                                 ★ {lang==='ru'?'ЗНАКОМЫЙ':'FAMILIER'}</span>}
+                              {!isNamed && ind.by && (
+                                <span style={{ position:'absolute', top:6, left:6, zIndex:2 }}>
+                                  <PlayerBadge name={ind.by} size={20} />
+                                </span>
+                              )}
                               {ind.state && obsStateLabel(ind.state, sp) && (() => { const st = obsStateLabel(ind.state, sp); return (
                                 <span title={lang==='ru'?st.ru:st.l}
                                   style={{ position:'absolute', top:6, right:6, background:OBS_STATE_COLOR,
@@ -1308,11 +1334,23 @@ export default function App() {
     const candidates = addingPassage ? splitInds(sp).sightings : []
     return (
       <div style={{ position:'fixed', inset:0, background:'rgba(43,38,32,.6)', zIndex:80, display:'flex', alignItems:'center', justifyContent:'center', padding: wide?24:16 }} onClick={()=>setCurInd(null)}>
-        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'hidden', display:'flex', flexDirection:'column', border:`1px solid ${T.line}` }}>
+        <div onClick={e=>e.stopPropagation()} style={{ background:T.bg, borderRadius:20, width:'100%', maxWidth: wide?660:560, maxHeight: wide?'88vh':'74dvh', overflow:'hidden', display:'flex', flexDirection:'column',
+          border: ind.by && !ind.named ? `2px solid ${playerColor(ind.by, ALL_PLAYERS)}` : `1px solid ${T.line}`,
+          boxShadow: ind.by && !ind.named ? `0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55` : 'none' }}>
           <div style={{ overflowY:'auto', overscrollBehavior:'contain', flex:'1 1 auto', minHeight:0 }}>
           <div style={{ position:'relative', height: wide?380:260, display:'flex', alignItems:'flex-end', padding:18 }}>
             <PhotoHero target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(20,20,14,.6), transparent 62%)', pointerEvents:'none' }} />
+            {ind.by && !ind.named && (
+              <span style={{ position:'absolute', top:12, left:12, zIndex:2 }}>
+                <PlayerBadge name={ind.by} size={26} />
+              </span>
+            )}
+            {ind.state && obsStateLabel(ind.state, sp) && (() => { const st = obsStateLabel(ind.state, sp); return (
+              <span title={lang==='ru'?st.ru:st.l} style={{ position:'absolute', top:48, right:12, background:OBS_STATE_COLOR,
+                color:'#fff', borderRadius:'50%', width:26, height:26, fontSize:13,
+                display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}>{st.e}</span>
+            )})()}
             {edit && <div style={{ position:'absolute', top:12, right:48, display:'flex', gap:5 }}>
               <button onClick={(e)=>{ e.stopPropagation(); setSighting({ editing:{ sp, ind } }) }}
                 style={{ background:'rgba(0,0,0,.35)', color:'#fff', borderRadius:'50%', width:28, height:28,
@@ -1324,7 +1362,7 @@ export default function App() {
             <button onClick={()=>setCurInd(null)} style={{ position:'absolute', top:12, right:12, width:28, height:28, borderRadius:'50%', background:'rgba(0,0,0,.3)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>
               <i className="ti ti-x" style={{ fontSize:14 }} aria-hidden="true" />
             </button>
-            <div style={{ position:'absolute', top:12, left:14, fontSize:34 }}>{sp.e}</div>
+            <div style={{ position:'absolute', top:10, left: ind.by && !ind.named ? 46 : 14, fontSize:34 }}>{sp.e}</div>
             <div style={{ position:'relative' }}>
               <div style={{ fontSize:10.5, color:'rgba(242,238,226,.7)', textTransform:'uppercase', letterSpacing:'1px' }}>{sp.n}</div>
               <div className="serif" style={{ fontSize:24, fontWeight:900, color:'#F2EEE2', lineHeight:1.05,
