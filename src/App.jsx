@@ -2452,12 +2452,27 @@ function Shell({ children, lang, setLang, onHome, edit, onToggleEdit, pageTitle 
 function MiniMap({ gps, lang, excludeKey, onJump }) {
   const [lat, lon] = gps
   const [spotOpen, setSpotOpen] = useState(false)
+  // la mini-carte reste "inerte" tant qu'on n'a pas cliqué dessus : sinon le
+  // molette utilisé pour faire défiler la fiche zoome la carte à la place dès
+  // que le curseur la survole — un clic explicite l'active, comme un lecteur
+  // vidéo qui ne capte le défilement qu'une fois qu'on l'a touché
+  const [active, setActive] = useState(false)
   const spot = spotOpen ? sightingsNearGps(lat, lon).filter(r => `${r.sp.id}::${r.ind.n}` !== excludeKey) : []
   return (
     <div style={{ borderRadius:12, overflow:'hidden', border:'1px solid #D3C7AE', marginBottom:9 }}>
       <div style={{ position:'relative' }}>
         <SatMap center={{ lat, lon }} pins={[{ id:'p', lat, lon, color:'#B5602F', emoji:'📍' }]} height={170}
           onSelect={()=>setSpotOpen(v=>!v)} />
+        {!active && (
+          <div onClick={()=>setActive(true)} style={{ position:'absolute', inset:0, zIndex:5, cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(20,18,14,.25)' }}>
+            <span style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(20,18,14,.72)',
+              color:'#F2EEE2', fontSize:11.5, fontWeight:600, padding:'7px 14px', borderRadius:20 }}>
+              <i className="ti ti-hand-click" style={{ fontSize:14 }} aria-hidden="true" />
+              {lang==='ru' ? 'Нажми, чтобы перемещаться' : 'Clique pour te déplacer'}
+            </span>
+          </div>
+        )}
       </div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 11px', background:'#E6DDC8', fontSize:11, color:'#6B6357' }}>
         <button onClick={()=>setSpotOpen(v=>!v)} style={{ display:'flex', alignItems:'center', gap:5, color:'#6B6357' }}>
