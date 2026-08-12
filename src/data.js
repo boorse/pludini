@@ -49,6 +49,19 @@ export const TREE_PARTS = {
 export const OBS_STATE_BONUS_MULT = 1.1
 export const OBS_STATE_COLOR = '#3E6B8C'
 
+// ── Couleur par observateur — sert à border les vignettes d'observation pour
+// reconnaître qui a vu quoi d'un coup d'œil. Dérivée du rang du joueur dans la
+// liste (stable : un joueur n'est jamais réordonné, seulement ajouté en fin)
+// plutôt que stockée, pour n'exiger aucune migration à l'ajout d'un joueur ──
+const PLAYER_PALETTE = [
+  '#B5602F', '#3E6B8C', '#6B7F4E', '#9C5B8C', '#C08A3E',
+  '#4F8C7A', '#8C4F4F', '#5C6B8C', '#7A8B3E', '#A34E7A',
+]
+export function playerColor(name, players) {
+  const idx = players.findIndex(p => p.name === name)
+  return PLAYER_PALETTE[(idx < 0 ? 0 : idx) % PLAYER_PALETTE.length]
+}
+
 // le jeu d'états/parties applicable à une espèce, selon son règne — null si
 // cette espèce ne se prête pas à ce système (insectes, poissons, humains…)
 export function statesFor(sp) {

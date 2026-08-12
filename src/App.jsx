@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { SPECIES as _BASE, CATS as _BASECATS, RARITY, METHODS, SIZE_MULT, ACHIEVEMENTS, TIER_THRESHOLDS, calcPts, totalPts, speciesPts, isObserved,
-         OBS_STATE_COLOR, obsStateLabel, statesFor } from './data'
+         OBS_STATE_COLOR, obsStateLabel, statesFor, playerColor } from './data'
 import MindMap from './mindmap.jsx'
 import SatMap from './satmap.jsx'
 import { gradientFor, gradientForCat, catAccentColor } from './gradients.js'
@@ -904,6 +904,25 @@ export default function App() {
             )}
 
             {detTab==='obs' && <>
+              {/* légende discrète couleur ↔ observateur, seulement utile s'il y a
+                  plusieurs observateurs à distinguer sur cette espèce */}
+              {(() => {
+                const counts = {}
+                ;(sp.inds||[]).forEach(ind => { if (ind.by) counts[ind.by] = (counts[ind.by]||0) + 1 })
+                const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1])
+                if (entries.length < 2) return null
+                return (
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:14 }}>
+                    {entries.map(([name,n]) => (
+                      <span key={name} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9.5, color:T.soft,
+                        background:T.card, border:`1px solid ${T.line}`, borderRadius:10, padding:'2px 8px' }}>
+                        <span style={{ width:7, height:7, borderRadius:'50%', background:playerColor(name, ALL_PLAYERS), flexShrink:0 }} />
+                        {name} · {n}
+                      </span>
+                    ))}
+                  </div>
+                )
+              })()}
               {statesFor(sp) && (() => {
                 const STATES = statesFor(sp)
                 const firstByState = {}
@@ -982,8 +1001,8 @@ export default function App() {
                       {entries.map(({ ind, photos }, i)=>(
                         <div key={i} onClick={()=>edit && setSighting({ editing:{ sp, ind } })}
                           style={{ position:'relative', borderRadius:10, overflow:'hidden', aspectRatio:'1',
-                          border: ind.uncertain?'1.5px solid #D68C34':`1px solid ${T.line}`,
-                          boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':'none', background:T.card,
+                          border: ind.uncertain?'1.5px solid #D68C34':ind.by?`2px solid ${playerColor(ind.by, ALL_PLAYERS)}`:`1px solid ${T.line}`,
+                          boxShadow: ind.uncertain?'0 0 0 1px rgba(214,140,52,.3)':ind.by?`0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55`:'none', background:T.card,
                           cursor: edit?'pointer':'default' }}>
                           {photos[0] ? (
                             <img src={photos[0].thumbUrl||photos[0].url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover',
@@ -1085,10 +1104,10 @@ export default function App() {
                             <button key={i} onClick={()=> (!isNamed && selectMode) ? toggleSelect(ind.n) : setCurInd(ind.n)}
                               style={{ textAlign:'left', borderRadius:12,
                               overflow:'hidden', padding:0, position:'relative', minHeight: isNamed?100:92,
-                              border: isSel?'2px solid #B5602F':isNamed?'2px solid #C9A046':ind.state?`2px solid ${OBS_STATE_COLOR}`:`1px solid ${T.line}`,
+                              border: isSel?'2px solid #B5602F':isNamed?'2px solid #C9A046':ind.by?`2px solid ${playerColor(ind.by, ALL_PLAYERS)}`:`1px solid ${T.line}`,
                               boxShadow: isSel?'0 0 0 1px rgba(181,96,47,.3), 0 3px 12px rgba(181,96,47,.25)'
                                 :isNamed?'0 0 0 1px rgba(201,160,70,.28), 0 3px 12px rgba(201,160,70,.22)'
-                                :ind.state?'0 0 0 1px rgba(62,107,140,.28), 0 3px 12px rgba(62,107,140,.22)':'none' }}>
+                                :ind.by?`0 0 0 1px ${playerColor(ind.by, ALL_PLAYERS)}55`:'none' }}>
                               <PhotoBg target={`ind:${sp.id}:${ind.n}`} fallback={gradientFor(sp.id+ind.n)} />
                               <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.74), transparent 56%)' }} />
                               {isNamed && <span style={{ position:'absolute', top:6, left:6, background:'#C9A046',
