@@ -59,3 +59,23 @@ export function gradientForSub(catId) {
   const [a, b] = SUB_COLORS[catId] || SUB_COLORS.mammiferes
   return `linear-gradient(140deg,${a} 0%,${b} 100%)`
 }
+// dégradé des cartes d'ordre taxonomique (ex. Carnivores, Passereaux) — un cran
+// plus saturé que la famille, un cran moins que la catégorie : la carte se lit
+// comme un palier intermédiaire entre les deux, pas comme une famille de plus
+const ORDRE_COLORS = {
+  mammiferes: ['#7E9160','#6B8049'],
+  oiseaux:    ['#6E8C93','#5D7B82'],
+  arbres:     ['#5E7D5C','#4E6C4C'],
+  arbustes:   ['#8D8340','#7C7332'],
+  champignons:['#A87249','#96613A'],
+  lichens:    ['#7C8A64','#6B7953'],
+  insectes:   ['#B08A3E','#9C7730'],
+  poissons:   ['#4C7E88','#3D6B75'],
+  batraciens: ['#6E8A44','#5D7936'],
+  humains:    ['#8A7355','#796347'],
+  domestiques:['#8A5F52','#794F44'],
+}
+export function gradientForOrdre(catId) {
+  const [a, b] = ORDRE_COLORS[catId] || ORDRE_COLORS.mammiferes
+  return `linear-gradient(140deg,${a} 0%,${b} 100%)`
+}

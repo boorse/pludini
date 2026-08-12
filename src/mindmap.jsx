@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { isObserved } from './data'
 import { allSpecies, allCats, editSub } from './store.js'
-import { gradientFor, gradientForCat, gradientForSub } from './gradients.js'
+import { gradientFor, gradientForCat, gradientForSub, gradientForOrdre } from './gradients.js'
 import { nameOf, catNameOf, subNameOf } from './i18n.js'
 import { CoverBg } from './photoui.jsx'
 
@@ -13,7 +13,7 @@ const STAGGER = [0, 46, 16, 62, 30, 74]
 // état du geste au niveau module : ne disparaît pas si le composant se reconstruit
 const G = { on:false, sx:0, sy:0, ox:0, oy:0, moved:false, pinch:null }
 
-export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, edit, onAddSpecies }) {
+export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   const [infoNode, setInfoNode] = useState(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
@@ -73,28 +73,57 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
   const { nodes, links, width, height } = useMemo(() => {
     const root = {
       id: 'root', kind: 'root', label: lang==='ru' ? 'Заповедник' : 'Conservatoire', e: '🌿',
-      children: CATS.map((cat, ci) => {
-        const catOnlyObs = obsOnly.has(cat.id)
-        const subs = cat.subs.filter(sv => {
-          if (!catOnlyObs) return true
-          return SPECIES.some(sp => sp.cat === cat.id && sp.sub === sv.id && isObserved(sp))
-        })
+      children: CATS.filter(cat => catVisible.has(cat.id)).map((cat, ci) => {
+        // fiche famille (id, membres, espèces affichées…) — inchangé, que la
+        // famille soit un enfant direct de la catégorie ou d'un ordre inséré
+        const buildFam = (sv) => {
+          const famId = cat.id + ':' + sv.id
+          const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
+          const onlyObs = obsOnly.has(famId)
+          const shown = onlyObs ? members.filter(isObserved) : members
+          return {
+            id: famId, kind: 'fam', label: sv.id, sub: sv.lat, catId: cat.id, subId: sv.id, niche: sv.niche,
+            members,
+            children: [
+              ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
+              ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
+            ]
+          }
+        }
+        const famHasObs = (sv) => SPECIES.some(sp => sp.cat === cat.id && sp.sub === sv.id && isObserved(sp))
+        // certains règnes (mammifères, oiseaux) ont un vrai rang Ordre au-dessus
+        // de la famille (ex. Carnivores > Canidés) ; les autres n'ont qu'un seul
+        // niveau de famille, comme avant — inséré seulement quand `ordre` est
+        // renseigné sur au moins une famille de la catégorie
+        const hasOrdres = cat.subs.some(sv => sv.ordre)
+        let catChildren
+        if (hasOrdres) {
+          const byOrdre = new Map()
+          for (const sv of cat.subs) {
+            const key = sv.ordre || sv.id
+            if (!byOrdre.has(key)) byOrdre.set(key, { key, lat: sv.ordreLat || sv.lat, subs: [] })
+            byOrdre.get(key).subs.push(sv)
+          }
+          const catOnlyObs = obsOnly.has(cat.id)
+          catChildren = [...byOrdre.values()]
+            .filter(o => !catOnlyObs || o.subs.some(famHasObs))
+            .map(o => {
+              const ordId = cat.id + ':ord:' + o.key
+              const ordOnlyObs = obsOnly.has(ordId)
+              const famNodes = o.subs.filter(sv => !ordOnlyObs || famHasObs(sv)).map(buildFam)
+              return {
+                id: ordId, kind: 'ordre', label: o.key, sub: o.lat, catId: cat.id,
+                members: famNodes.flatMap(f => f.members),
+                children: famNodes,
+              }
+            })
+        } else {
+          const catOnlyObs = obsOnly.has(cat.id)
+          catChildren = cat.subs.filter(sv => !catOnlyObs || famHasObs(sv)).map(buildFam)
+        }
         return {
           id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
-          children: subs.map(sv => {
-            const famId = cat.id + ':' + sv.id
-            const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
-            const onlyObs = obsOnly.has(famId)
-            const shown = onlyObs ? members.filter(isObserved) : members
-            return {
-              id: famId, kind: 'fam', label: sv.id, sub: sv.lat, catId: cat.id, subId: sv.id, niche: sv.niche,
-              members,
-              children: [
-                ...shown.map(sp => ({ id: famId + ':' + sp.id, kind: 'sp', sp, children: [] })),
-                ...(edit && !onlyObs ? [{ id: famId + ':__add', kind: 'add', cat: cat.id, sub: sv.id, children: [] }] : []),
-              ]
-            }
-          })
+          children: catChildren,
         }
       })
     }
@@ -156,7 +185,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const width = root.units * (CARD_W + GAP_X) + 80
     const height = Math.max(...nodes.map(n => n.y)) + CARD_H + 70
     return { nodes, links, width, height }
-  }, [expanded, obsOnly, edit, lang, SPECIES.length, CATS.length])
+  }, [expanded, obsOnly, catVisible, edit, lang, SPECIES.length, CATS.length])
 
   const stageRef = useRef(null)
   const liveRef = useRef({ ...tf })
@@ -304,6 +333,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
         <button onClick={fit} style={btn}>Recentrer</button>
       </div>
+      <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
       {isTouch ? (
         <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
           <TransformWrapper ref={touchApiRef}
@@ -414,6 +444,54 @@ function InfoPanel({ n, lang, edit, onClose }) {
   )
 }
 
+// checklist en haut à gauche : chaque catégorie (règne) peut être montrée ou
+// masquée entièrement de la carte — indépendant du dépli, qui ne fait que
+// révéler ou cacher les enfants d'une branche déjà présente
+function CatFilter({ cats, visible, setVisible, lang }) {
+  const [open, setOpen] = useState(false)
+  const allOn = cats.every(c => visible.has(c.id))
+  const toggle = (id) => setVisible(prev => {
+    const n = new Set(prev)
+    n.has(id) ? n.delete(id) : n.add(id)
+    return n
+  })
+  return (
+    <div style={{ position:'absolute', top:9, left:10, zIndex:6 }}>
+      <button onClick={()=>setOpen(v=>!v)} style={{ ...btn, display:'flex', alignItems:'center', gap:5 }}>
+        <i className="ti ti-list-check" style={{ fontSize:12 }} aria-hidden="true" />
+        {lang==='ru'?'Ветви':'Embranchements'}
+        {!allOn && <span style={{ background:'#B5602F', color:'#fff', borderRadius:8, padding:'0 5px', fontSize:9, fontWeight:700 }}>
+          {visible.size}/{cats.length}
+        </span>}
+      </button>
+      {open && (
+        <div style={{ marginTop:6, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
+          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', maxHeight:'min(340px, 70vh)',
+          overflowY:'auto', width:180 }}>
+          <button onClick={()=>setVisible(allOn ? new Set() : new Set(cats.map(c=>c.id)))}
+            style={{ width:'100%', textAlign:'left', fontSize:10.5, fontWeight:700, color:'#8F4A22',
+              padding:'4px 6px', marginBottom:4 }}>
+            {allOn
+              ? (lang==='ru'?'Снять всё':'Tout décocher')
+              : (lang==='ru'?'Отметить всё':'Tout cocher')}
+          </button>
+          {cats.map(c => (
+            <label key={c.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 6px',
+              borderRadius:8, fontSize:11.5, color:'#3F382C', cursor:'pointer' }}>
+              <input type="checkbox" checked={visible.has(c.id)} onChange={()=>toggle(c.id)}
+                style={{ width:14, height:14, accentColor:'#7A8B5C', flexShrink:0 }} />
+              <span style={{ fontSize:13 }}>{c.e}</span>
+              <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {catNameOf(c, lang).main}
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onSp, onAdd, onInfo, view }) {
   // culling : on ne dessine que ce qui est visible, avec une marge généreuse
   const vis = view
@@ -490,6 +568,21 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
     )
   }
 
+  if (n.kind === 'ordre') {
+    const m = n.members || []
+    const obs = m.filter(isObserved).length
+    return (
+      <div role="button" tabIndex={0} onClick={toggle}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+        style={{ ...base, background:gradientForOrdre(n.catId), justifyContent:'center', alignItems:'flex-start' }}>
+        {hasKids && <Chev open={open} dark />}
+        <span style={{ fontSize:10, fontWeight:700, color:'#F2EEE2', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
+        <span style={{ fontSize:8, color:'rgba(242,238,226,.65)', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
+        <span style={{ fontSize:8.5, color:'rgba(242,238,226,.85)', marginTop:3 }}>{obs}/{m.length}</span>
+      </div>
+    )
+  }
+
   if (n.kind === 'fam') {
     const m = n.members || []
     const obs = m.filter(isObserved).length
@@ -499,7 +592,7 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
         onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
         style={{ ...base, background:gradientForSub(n.catId), justifyContent:'center', alignItems:'flex-start' }}>
         {hasKids && <Chev open={open} dark />}
-        <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur l'ordre"
+        <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur la famille"
           style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
             background: hasNiche?'rgba(63,56,44,.18)':'transparent', border: hasNiche?'none':'1.5px solid rgba(63,56,44,.22)',
             padding:0, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>

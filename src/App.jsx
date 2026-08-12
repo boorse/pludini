@@ -426,9 +426,13 @@ export default function App() {
   const [confirmDelFamilier, setConfirmDelFamilier] = useState(null) // {sp, ind}
   const [confirmClearObs, setConfirmClearObs] = useState(null) // {sp, player}
   const [refresh, setRefresh] = useState(0)
-  const [mapExpanded, setMapExpanded] = useState(() => new Set())
+  // filtre de base "ordre" : les catégories démarrent dépliées jusqu'aux
+  // embranchements (les "fam", ex. Cervidés, Canidés…), pas jusqu'aux espèces —
+  // pour vraiment voir la forêt sans devoir tout déplier une par une
+  const [mapExpanded, setMapExpanded] = useState(() => new Set(allCats().map(c => c.id)))
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
   const [mapObsOnly, setMapObsOnly] = useState(() => new Set())
+  const [mapCatVisible, setMapCatVisible] = useState(() => new Set(allCats().map(c => c.id)))
 
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
   const [sighting, setSighting] = useState(null)
@@ -1999,7 +2003,7 @@ export default function App() {
             ...(mobileTab==='map'
               ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
-            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
+            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
           </div>
         </div>
       )
@@ -2015,7 +2019,7 @@ export default function App() {
             transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
           <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" />
           <div style={{ flex:1, overflow:'hidden' }}>
-            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
+            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
           </div>
         </div>
         <div onMouseEnter={()=>setFocus('matrix')} onClick={()=>setFocus('matrix')}

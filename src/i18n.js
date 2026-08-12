@@ -36,10 +36,16 @@ export const CAT_RU = {
 // noms russes des familles (sous-catégories) — utilisés dans la Mind map et l'éditeur d'espèce
 export const SUB_RU = {
   'Cervidés':'Оленевые', 'Canidés':'Псовые', 'Félidés':'Кошачьи', 'Mustélidés':'Куньи',
-  'Rongeurs':'Грызуны', 'Autres':'Прочие',
+  'Rongeurs':'Грызуны', 'Suidés':'Свиньи', 'Léporidés':'Зайцевые', 'Érinacéidés':'Ежовые',
   'Gruidés':'Журавлиные', 'Strigidés':'Совиные', 'Picidés':'Дятловые', 'Accipitridés':'Ястребиные',
   'Ciconiidés':'Аистовые', 'Corvidés':'Врановые', 'Tétraonidés':'Тетеревиные', 'Paridés':'Синицевые',
   'Muscicapidés':'Мухоловковые', 'Alcédinidés':'Зимородковые', 'Anatidés':'Утиные', 'Fringillidés':'Вьюрковые',
+  // ordres taxonomiques (niveau ajouté au-dessus des familles pour mammifères et oiseaux)
+  'Artiodactyles':'Парнокопытные', 'Carnivores':'Хищные', 'Lagomorphes':'Зайцеобразные', 'Insectivores':'Насекомоядные',
+  'Passereaux':'Воробьинообразные', 'Rapaces diurnes':'Дневные хищники', 'Rapaces nocturnes':'Ночные хищники',
+  'Gallinacés':'Курообразные', 'Gruiformes':'Журавлеобразные', 'Piciformes':'Дятлообразные',
+  'Ciconiiformes':'Аистообразные', 'Coraciiformes':'Ракшеобразные', 'Ansériformes':'Гусеобразные',
+  'Columbiformes':'Голубеобразные',
   'Fagacées':'Буковые', 'Bétulacées':'Березовые', 'Pinacées':'Сосновые', 'Salicacées':'Ивовые',
   'Rosacées':'Розоцветные', 'Sapindacées':'Сапиндовые', 'Malvacées':'Мальвовые',
   'Éléagnacées':'Лоховые', 'Éricacées':'Вересковые', 'Adoxacées':'Адоксовые', 'Cupressacées':'Кипарисовые',
