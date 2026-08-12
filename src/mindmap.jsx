@@ -67,6 +67,40 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     })
   }, [expanded])
 
+  // dépli profond (petit onglet) : cascade sur tous les échelons — ordre, puis
+  // famille, puis espèce — en ne suivant que les branches qui contiennent déjà
+  // une observation ; les branches vides restent présentes mais repliées
+  // (1 seule "unité" de largeur) plutôt que masquées comme avec toggleObserved,
+  // pour qu'on voie qu'elles attendent encore des observations sans qu'elles
+  // n'envahissent la carte
+  const expandDeep = useCallback((n) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      if (next.has(n.id)) {
+        next.delete(n.id)
+        for (const k of [...next]) if (k.startsWith(n.id + ':')) next.delete(k)
+      } else {
+        const walk = (node) => {
+          next.add(node.id)
+          for (const c of node.children || []) {
+            if (c.kind !== 'cat' && c.kind !== 'ordre' && c.kind !== 'fam') continue
+            if ((c.members || []).some(isObserved)) walk(c)
+          }
+        }
+        walk(n)
+      }
+      return next
+    })
+    // le dépli profond montre tout (branches vides comprises, juste repliées) :
+    // il ne doit pas hériter d'un filtre "observées uniquement" déjà actif
+    setObsOnly(prev => {
+      if (!prev.has(n.id) && ![...prev].some(k => k.startsWith(n.id + ':'))) return prev
+      const next = new Set(prev)
+      for (const k of [...next]) if (k === n.id || k.startsWith(n.id + ':')) next.delete(k)
+      return next
+    })
+  }, [])
+
   const SPECIES = allSpecies()
   const CATS = allCats()
 
@@ -81,10 +115,13 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         // de contenu à la carte "famille" (buildFam), soit d'enfants directs du
         // niveau parent quand la famille est masquée par le filtre Niveaux
         const famId = (sv) => cat.id + ':' + sv.id
-        const buildSpNodes = (sv) => {
+        // parentId : quand la famille est masquée, le clic "observées uniquement"
+        // se fait sur l'ordre ou la catégorie (seul niveau cliquable restant) —
+        // son filtre doit donc aussi s'appliquer aux espèces qui remontent ici
+        const buildSpNodes = (sv, parentId) => {
           const id = famId(sv)
           const members = SPECIES.filter(sp => sp.cat === cat.id && sp.sub === sv.id)
-          const onlyObs = obsOnly.has(id)
+          const onlyObs = obsOnly.has(id) || (parentId !== undefined && obsOnly.has(parentId))
           const shown = onlyObs ? members.filter(isObserved) : members
           return {
             members,
@@ -105,7 +142,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
         }
         // quand la famille est masquée (filtre Niveaux), ses espèces deviennent
         // les enfants directs du parent (ordre ou catégorie) — pas de carte "famille"
-        const buildLevel = (svList) => showFamille ? svList.map(buildFam) : svList.flatMap(sv => buildSpNodes(sv).nodes)
+        const buildLevel = (svList, parentId) => showFamille ? svList.map(buildFam) : svList.flatMap(sv => buildSpNodes(sv, parentId).nodes)
         const famHasObs = (sv) => SPECIES.some(sp => sp.cat === cat.id && sp.sub === sv.id && isObserved(sp))
         // certains règnes (mammifères, oiseaux) ont un vrai rang Ordre au-dessus
         // de la famille (ex. Carnivores > Canidés) ; les autres n'ont qu'un seul
@@ -132,13 +169,13 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
               return {
                 id: ordId, kind: 'ordre', label: o.key, sub: o.lat, catId: cat.id,
                 members: subMembers,
-                children: buildLevel(subs),
+                children: buildLevel(subs, ordId),
               }
             })
         } else {
           const catOnlyObs = obsOnly.has(cat.id)
           const subs = cat.subs.filter(sv => !catOnlyObs || famHasObs(sv))
-          catChildren = buildLevel(subs)
+          catChildren = buildLevel(subs, cat.id)
         }
         return {
           id: cat.id, kind: 'cat', label: cat.n, sub: cat.lat, e: cat.e, cat, stagger: STAGGER[ci % STAGGER.length],
@@ -370,6 +407,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
                   view={view}
                   expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
                   onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
+                  onToggleDeep={(n)=>{ if(!G.moved) expandDeep(n) }}
                   onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
                   onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }}
                   onInfo={(n)=>{ if(!G.moved) setInfoNode(n) }} />
@@ -391,6 +429,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
               view={view}
               expanded={expanded} onToggle={(id)=>{ if(!G.moved) toggle(id) }}
               onToggleObserved={(n)=>{ if(!G.moved) toggleObserved(n) }}
+              onToggleDeep={(n)=>{ if(!G.moved) expandDeep(n) }}
               onSp={(sp)=>{ if(!G.moved) onSelectSpecies(sp.id) }}
               onAdd={(c,sv)=>{ if(!G.moved) onAddSpecies?.(c,sv) }}
               onInfo={(n)=>{ if(!G.moved) setInfoNode(n) }} />
@@ -558,7 +597,7 @@ function LevelFilter({ levels, setLevels, lang }) {
   )
 }
 
-const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onSp, onAdd, onInfo, view }) {
+const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded, onToggle, onToggleObserved, onToggleDeep, onSp, onAdd, onInfo, view }) {
   // culling : on ne dessine que ce qui est visible, avec une marge généreuse
   const vis = view
     ? nodes.filter(n => n.x > view.x0 && n.x < view.x1 && n.y > view.y0 && n.y < view.y1)
@@ -580,6 +619,7 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
         <Card key={n.id} n={n} lang={lang} expanded={expanded}
           toggle={()=>onToggle(n.id)}
           toggleObserved={()=>onToggleObserved(n)}
+          toggleDeep={()=>onToggleDeep(n)}
           onSp={()=> n.kind==='add' ? onAdd(n.cat, n.sub) : onSp(n.sp)}
           onInfo={()=>onInfo(n)} />
       ))}
@@ -590,7 +630,7 @@ const Stage = memo(function Stage({ nodes, links, width, height, lang, expanded,
 
 const btn = { fontSize:10.5, padding:'5px 9px', borderRadius:12, background:'#EDE7D8', color:'#6B6357', border:'1px solid #D3C7AE' }
 
-function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
+function Card({ n, lang, expanded, toggle, toggleObserved, toggleDeep, onSp, onInfo }) {
   const open = expanded.has(n.id)
   const hasKids = n.children?.length > 0
   const base = {
@@ -609,24 +649,22 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
     </button>
   )
 
+  // clic sur la vignette entière : ne déplie que ce qui a déjà des observations
+  // (les branches vides sont exclues, pas juste repliées) — pour une vue rapide
+  // et propre. Le petit onglet fait l'inverse : dépli complet et récursif
+  // (ordre > famille > espèce) le long des branches observées, en laissant les
+  // branches vides visibles mais repliées, pour ne pas perdre qu'elles existent
+  // sans qu'elles envahissent la carte
   if (n.kind === 'cat') {
     const all = allSpecies().filter(s=>s.cat===n.cat.id)
     const obs = all.filter(isObserved).length
     return (
-      <div role="button" tabIndex={0} onClick={toggle}
-        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+      <div role="button" tabIndex={0} onClick={toggleObserved}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggleObserved() } }}
         style={{ ...base, background:gradientForCat(n.cat.id) }}>
         <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(18,20,14,.62), transparent 58%)' }} />
         <span style={{ position:'absolute', top:6, left:8, fontSize:17 }}>{n.e}</span>
-        {hasKids && (
-          <button onClick={e=>{ e.stopPropagation(); toggleObserved() }}
-            title="N'afficher que les branches observées"
-            style={{ position:'absolute', top:6, right:7, width:15, height:15, borderRadius:5,
-              background:'rgba(255,255,255,.22)', border:'none', padding:0, cursor:'pointer',
-              display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <span style={{ fontSize:9, color:'#F2EEE2', transform:open?'rotate(180deg)':'none', transition:'transform .18s', lineHeight:1 }}>▾</span>
-          </button>
-        )}
+        {hasKids && <TabBtn open={open} onClick={toggleDeep} title="Tout déplier ce qui a des observations" />}
         <span style={{ position:'relative', fontSize:10.5, fontWeight:700, color:'#F2EEE2', lineHeight:1.15 }}>{catNameOf(n.cat, lang).main}</span>
         {catNameOf(n.cat, lang).sub && <span style={{ position:'relative', fontSize:7.5, color:'rgba(242,238,226,.5)', lineHeight:1.1 }}>{catNameOf(n.cat, lang).sub}</span>}
         <span style={{ position:'relative', fontSize:8.5, color:'rgba(242,238,226,.75)' }}>{obs}/{all.length}</span>
@@ -638,10 +676,10 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
     const m = n.members || []
     const obs = m.filter(isObserved).length
     return (
-      <div role="button" tabIndex={0} onClick={toggle}
-        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+      <div role="button" tabIndex={0} onClick={toggleObserved}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggleObserved() } }}
         style={{ ...base, background:gradientForOrdre(n.catId), justifyContent:'center', alignItems:'flex-start' }}>
-        {hasKids && <Chev open={open} dark />}
+        {hasKids && <TabBtn open={open} dark onClick={toggleDeep} title="Tout déplier ce qui a des observations" />}
         <span style={{ fontSize:10, fontWeight:700, color:'#F2EEE2', lineHeight:1.2 }}>{subNameOf(n.label, lang).main}</span>
         <span style={{ fontSize:8, color:'rgba(242,238,226,.65)', fontStyle:'italic', marginTop:2 }}>{n.sub}</span>
         <span style={{ fontSize:8.5, color:'rgba(242,238,226,.85)', marginTop:3 }}>{obs}/{m.length}</span>
@@ -654,10 +692,10 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
     const obs = m.filter(isObserved).length
     const hasNiche = !!n.niche
     return (
-      <div role="button" tabIndex={0} onClick={toggle}
-        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggle() } }}
+      <div role="button" tabIndex={0} onClick={toggleObserved}
+        onKeyDown={e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); toggleObserved() } }}
         style={{ ...base, background:gradientForSub(n.catId), justifyContent:'center', alignItems:'flex-start' }}>
-        {hasKids && <Chev open={open} dark />}
+        {hasKids && <TabBtn open={open} dark onClick={toggleDeep} title="Tout déplier ce qui a des observations" />}
         <button onClick={e=>{ e.stopPropagation(); onInfo() }} title="Informations sur la famille"
           style={{ position:'absolute', bottom:6, right:7, width:15, height:15, borderRadius:'50%',
             background: hasNiche?'rgba(63,56,44,.18)':'transparent', border: hasNiche?'none':'1.5px solid rgba(63,56,44,.22)',
@@ -702,12 +740,14 @@ function Card({ n, lang, expanded, toggle, toggleObserved, onSp, onInfo }) {
   )
 }
 
-function Chev({ open, dark }) {
+// petit onglet cliquable en coin de vignette — dépli profond (voir toggleDeep)
+function TabBtn({ open, dark, onClick, title }) {
   return (
-    <span style={{ position:'absolute', top:6, right:7, width:15, height:15, borderRadius:5,
-      background: dark?'rgba(107,99,87,.16)':'rgba(255,255,255,.22)',
-      display:'flex', alignItems:'center', justifyContent:'center' }}>
+    <button onClick={e=>{ e.stopPropagation(); onClick() }} title={title}
+      style={{ position:'absolute', top:6, right:7, width:15, height:15, borderRadius:5,
+        background: dark?'rgba(107,99,87,.16)':'rgba(255,255,255,.22)', border:'none', padding:0, cursor:'pointer',
+        display:'flex', alignItems:'center', justifyContent:'center' }}>
       <span style={{ fontSize:9, color: dark?'#5A5245':'#F2EEE2', transform:open?'rotate(180deg)':'none', transition:'transform .18s', lineHeight:1 }}>▾</span>
-    </span>
+    </button>
   )
 }
