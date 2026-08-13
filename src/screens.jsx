@@ -412,7 +412,9 @@ export function Territory({ wide, lang, onBack, edit }) {
     id:p.id, lat:p.gps[0], lon:p.gps[1], label:p.l,
     color:allTypes[p.t]?.c || '#B5602F', emoji:allTypes[p.t]?.e || '📍'
   }))
-  const center = sel ? { lat:sel.gps[0], lon:sel.gps[1] } : CENTER
+  // ne recentre plus la caméra sur le repère sélectionné (comme pour un clic
+  // sur une observation) — cliquer un pin ne fait qu'ouvrir sa fiche en bas
+  const center = CENTER
 
   // spots d'observation géolocalisés (toutes espèces) : un spot coloré à
   // l'initiale de l'observateur, ou un regroupement sombre avec un compteur

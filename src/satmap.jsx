@@ -94,8 +94,12 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     const lat = y2lat(worldY / TS, z)
     const dz = Math.round(Math.log2(k))
     const nz = Math.max(3, Math.min(19, z + dz))
+    // origine (coin haut-gauche, en pixels monde) qu'auront les tuiles UNE
+    // FOIS le nouveau centre/zoom appliqués — calculée à la main avec les
+    // mêmes formules que le composant, avant que le re-rendu n'ait lieu
+    const newOriginX = lon2x(lon, nz) * TS - screenCx
+    const newOriginY = lat2y(lat, nz) * TS - screenCy
     const contentEl = apiRef.current?.instance?.contentComponent
-    const fromTransform = contentEl?.style.transform
     flushSync(() => {
       setC({ lat, lon })
       if (nz !== z) setZ(nz)
@@ -111,22 +115,23 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     // répété. L'état interne doit donc être exactement (0,0,1) dès la fin de
     // CE commit, sans aucune fenêtre où un geste pourrait démarrer entre deux.
     apiRef.current?.setTransform(0, 0, 1, 0)
-    // pour un pan pur (k=1, pas de zoom dans ce geste), le reset instantané
-    // ci-dessus ne produit AUCUN saut visuel : les tuiles sont recalculées à
-    // l'identique de ce que le transform affichait déjà (translation pure),
-    // donc rejouer une transition ici ne ferait que "remontrer" le geste que
-    // l'utilisateur vient de faire une seconde fois. On ne l'anime que quand
-    // il y a eu un zoom optique (k≠1) : la plupart de ces gestes ne
-    // franchissent pas un niveau de tuile entier (il faut doubler la taille
-    // pour ça, dz = round(log2(k))), nz reste alors égal à z, et le reset se
-    // voit comme un petit "coup en arrière" côté échelle qu'on rejoue en
-    // douceur nous-mêmes, en CSS pur sur le DOM, complètement découplé de
-    // l'état de la bibliothèque (déjà réglé, correct, plus haut) — cette
-    // animation est donc purement cosmétique et ne peut plus fausser aucun calcul.
+    // retour visuel en douceur, en CSS pur, découplé de l'état de la
+    // bibliothèque (déjà réglé, correct, plus haut) : on rejoue tel quel le
+    // transform du geste (tx,ty,k) comme point de départ, mais CORRIGÉ du
+    // déplacement d'origine qu'entraîne le recentrage — les tuiles affichées
+    // pendant la transition sont déjà celles du nouveau centre, pas celles
+    // d'avant. Sans cette correction (revoyait juste tx,ty,k tel quel), le
+    // point de départ ne correspondait à rien de réel dès qu'un zoom
+    // impliquait un recentrage (systématique), d'où le "zoom puis dézoom" —
+    // un saut visible qui se corrigeait de travers en cours de transition.
+    // Pour un pan pur (k=1), cette correction s'annule exactement : le point
+    // de départ recalculé est déjà l'identité, donc rien ne s'anime.
     const RESET_MS = 180
-    if (contentEl && fromTransform && Math.abs(k - 1) > 0.001) {
+    if (contentEl) {
+      const adjX = tx + k * (newOriginX - originX)
+      const adjY = ty + k * (newOriginY - originY)
       contentEl.style.transition = 'none'
-      contentEl.style.transform = fromTransform
+      contentEl.style.transform = `translate(${adjX}px, ${adjY}px) scale(${k})`
       contentEl.offsetHeight   // force le navigateur à peindre ce point de départ
       contentEl.style.transition = `transform ${RESET_MS}ms ease-out`
       contentEl.style.transform = ''

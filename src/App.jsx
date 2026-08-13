@@ -426,10 +426,10 @@ export default function App() {
   const [confirmDelFamilier, setConfirmDelFamilier] = useState(null) // {sp, ind}
   const [confirmClearObs, setConfirmClearObs] = useState(null) // {sp, player}
   const [refresh, setRefresh] = useState(0)
-  // la carte démarre repliée au niveau des catégories (Oiseaux, Mammifères,
-  // Arbres…) : la racine est dépliée pour les montrer, mais rien en dessous —
-  // ni ordre, ni famille, ni espèce
-  const [mapExpanded, setMapExpanded] = useState(() => new Set(['root']))
+  // la racine (Conservatoire) n'est plus repliable (voir mindmap.jsx) — les
+  // catégories (Oiseaux, Mammifères, Arbres…), elles, démarrent dépliées
+  // jusqu'aux embranchements (les "fam", ex. Cervidés, Canidés…)
+  const [mapExpanded, setMapExpanded] = useState(() => new Set(allCats().map(c => c.id)))
   const [mapTf, setMapTf] = useState({ x: 0, y: 0, k: 1 })
   const [mapObsOnly, setMapObsOnly] = useState(() => new Set())
   const [mapCatVisible, setMapCatVisible] = useState(() => new Set(allCats().map(c => c.id)))

@@ -209,7 +209,8 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const COLS = (n) => n <= 2 ? n : n <= 6 ? 2 : n <= 12 ? 3 : 4
 
     const measure = (n) => {
-      const open = expanded.has(n.id)
+      // la racine n'est jamais repliable — seuls ses enfants (les catégories) le sont
+      const open = n.kind === 'root' ? true : expanded.has(n.id)
       if (!open || !n.children.length) { n.units = 1; return 1 }
       if (n.kind === 'fam') {
         // grille : largeur = nb de colonnes, hauteur gérée au placement
@@ -229,7 +230,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       n.x = left + w / 2
       n.y = depth * LEVEL_Y + 56 + offsetY
       nodes.push(n)
-      const open = expanded.has(n.id)
+      const open = n.kind === 'root' ? true : expanded.has(n.id)
       if (!open || !n.children.length) return
 
       if (n.kind === 'fam') {
@@ -679,11 +680,12 @@ function Card({ n, lang, expanded, toggle, toggleObserved, toggleDeep, onSp, onI
     transition:'box-shadow .15s, transform .15s', userSelect:'none',
   }
 
+  // racine non repliable — vignette purement décorative, pas de clic
   if (n.kind === 'root') return (
-    <button onClick={toggle} style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
+    <div style={{ ...base, width:CARD_W+30, left:n.x-(CARD_W+30)/2, cursor:'default', background:'linear-gradient(150deg,#22301C,#5A7248)' }}>
       <span style={{ position:'absolute', top:7, left:9, fontSize:19 }}>{n.e}</span>
       <span className="serif" style={{ fontSize:14, fontWeight:900, color:'#F2EEE2' }}>{n.label}</span>
-    </button>
+    </div>
   )
 
   // clic sur la vignette entière : ne déplie que ce qui a déjà des observations
