@@ -94,33 +94,43 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     const lat = y2lat(worldY / TS, z)
     const dz = Math.round(Math.log2(k))
     const nz = Math.max(3, Math.min(19, z + dz))
+    const contentEl = apiRef.current?.instance?.contentComponent
+    const fromTransform = contentEl?.style.transform
     flushSync(() => {
       setC({ lat, lon })
       if (nz !== z) setZ(nz)
     })
     liveRef.current = { x: 0, y: 0, k: 1 }
-    // la plupart des gestes de zoom ne franchissent pas un niveau de tuile
-    // entier (il faut doubler la taille pour ça, dz = round(log2(k))) : nz
-    // reste alors égal à z, et le retour instantané à l'échelle 1 se voyait
-    // comme un petit "coup en arrière" — on anime ce retour plutôt que de le
-    // couper net, ce qui absorbe aussi le léger résidu quand nz change.
+    // reset TOUJOURS instantané (durée 0, appliqué de façon synchrone par la
+    // bibliothèque) : si on l'anime (durée > 0), la moindre reprise de geste
+    // avant la fin de l'animation la fait annuler en plein vol par la
+    // bibliothèque elle-même (handlePanningStart) SANS aller jusqu'à zéro —
+    // le geste suivant repart alors d'un résidu non nul, que le prochain
+    // commit recompte en plus du nouveau déplacement : c'est ce qui causait
+    // la dérive/décalage constatés en va-et-vient rapide ou en zoom/dézoom
+    // répété. L'état interne doit donc être exactement (0,0,1) dès la fin de
+    // CE commit, sans aucune fenêtre où un geste pourrait démarrer entre deux.
+    apiRef.current?.setTransform(0, 0, 1, 0)
+    // pour un pan pur (k=1, pas de zoom dans ce geste), le reset instantané
+    // ci-dessus ne produit AUCUN saut visuel : les tuiles sont recalculées à
+    // l'identique de ce que le transform affichait déjà (translation pure),
+    // donc rejouer une transition ici ne ferait que "remontrer" le geste que
+    // l'utilisateur vient de faire une seconde fois. On ne l'anime que quand
+    // il y a eu un zoom optique (k≠1) : la plupart de ces gestes ne
+    // franchissent pas un niveau de tuile entier (il faut doubler la taille
+    // pour ça, dz = round(log2(k))), nz reste alors égal à z, et le reset se
+    // voit comme un petit "coup en arrière" côté échelle qu'on rejoue en
+    // douceur nous-mêmes, en CSS pur sur le DOM, complètement découplé de
+    // l'état de la bibliothèque (déjà réglé, correct, plus haut) — cette
+    // animation est donc purement cosmétique et ne peut plus fausser aucun calcul.
     const RESET_MS = 180
-    // setTransform(0,0,1,RESET_MS) remet l'état interne de la bibliothèque à
-    // zéro en l'animant, mais juste après un flushSync le contentComponent
-    // qu'elle vise pouvait être temporairement périmé : applyTransformation()
-    // ne touchait alors jamais le style réel, laissant l'ancien transform
-    // affiché en plus des tuiles déjà repositionnées (double décalage, zone
-    // noire sur un bord). On anime donc aussi le DOM nous-mêmes, en filet de
-    // sécurité, avec la même durée.
-    apiRef.current?.setTransform(0, 0, 1, RESET_MS)
-    const contentEl = apiRef.current?.instance?.contentComponent
-    if (contentEl) {
+    if (contentEl && fromTransform && Math.abs(k - 1) > 0.001) {
+      contentEl.style.transition = 'none'
+      contentEl.style.transform = fromTransform
+      contentEl.offsetHeight   // force le navigateur à peindre ce point de départ
       contentEl.style.transition = `transform ${RESET_MS}ms ease-out`
       contentEl.style.transform = ''
-      setTimeout(() => {
-        const el = apiRef.current?.instance?.contentComponent
-        if (el) el.style.transition = ''
-      }, RESET_MS + 40)
+      setTimeout(() => { contentEl.style.transition = '' }, RESET_MS + 40)
     }
     setTimeout(() => { drag.current.moved = false }, 0)
   }, [z, originX, originY, size.w, size.h])

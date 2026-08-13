@@ -209,7 +209,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
     const COLS = (n) => n <= 2 ? n : n <= 6 ? 2 : n <= 12 ? 3 : 4
 
     const measure = (n) => {
-      const open = n.kind === 'root' ? true : expanded.has(n.id)
+      const open = expanded.has(n.id)
       if (!open || !n.children.length) { n.units = 1; return 1 }
       if (n.kind === 'fam') {
         // grille : largeur = nb de colonnes, hauteur gérée au placement
@@ -229,7 +229,7 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       n.x = left + w / 2
       n.y = depth * LEVEL_Y + 56 + offsetY
       nodes.push(n)
-      const open = n.kind === 'root' ? true : expanded.has(n.id)
+      const open = expanded.has(n.id)
       if (!open || !n.children.length) return
 
       if (n.kind === 'fam') {
