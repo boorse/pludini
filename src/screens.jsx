@@ -1019,12 +1019,16 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
               const spInds = (sp.inds||[]).filter(ind=>ind.by===who)
               const unc = spInds.some(ind=>ind.uncertain)
               const states = [...new Set(spInds.map(ind=>ind.state).filter(Boolean))]
+              // la photo de CET observateur pour cette espèce, pas la vignette
+              // d'espèce globale (partagée par tous — sinon la case d'Erwan
+              // montrait la photo de Ferdinand dès qu'il en avait une meilleure)
+              const myPhoto = spInds.map(ind => photosFor(`ind:${sp.id}:${ind.n}`)[0]).find(Boolean) || null
               return (
                 <button key={sp.id} onClick={()=>onSelectSpecies(sp.id)} style={{ textAlign:'left', borderRadius:12,
                   overflow:'hidden', padding:0, position:'relative', minHeight:86,
                   border: unc?'2px solid #D68C34':`1px solid ${T.line}`,
                   boxShadow: unc?'0 0 0 1px rgba(214,140,52,.3), 0 3px 12px rgba(214,140,52,.22)':'none' }}>
-                  <CoverBg sp={sp} fallback={gradientFor(sp.id)} />
+                  <CoverBg sp={sp} fallback={gradientFor(sp.id)} photo={myPhoto} />
                   <div style={{ position:'absolute', inset:0, background:'linear-gradient(to top, rgba(16,18,12,.72), transparent 58%)' }} />
                   {states.length>0 && (
                     <div style={{ position:'absolute', top:6, right:6, display:'flex', gap:3, zIndex:2 }}>

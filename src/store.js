@@ -153,8 +153,16 @@ export async function removePhotosFor(target) {
 export async function movePhotos(oldTarget, newTarget) {
   const list = S.photos[oldTarget] || []
   if (!list.length) return
-  await Promise.all(list.map(p => sb.from('photos').update({ target: newTarget }).eq('id', p.id)))
-  S.photos[newTarget] = [...(S.photos[newTarget] || []), ...list]
+  // UPDATE sur "photos" est bloqué côté Supabase (RLS) et échoue sans lever
+  // d'erreur (voir replacePhotoImage juste en dessous) : on recrée les lignes
+  // sous le nouveau target plutôt que de les mettre à jour en place
+  const moved = await Promise.all(list.map(async p => {
+    const ins = await sb.from('photos').insert({ target: newTarget, path: p.path, caption: p.caption, author: p.by }).select().single()
+    if (ins.error) throw new Error(ins.error.message)
+    await sb.from('photos').delete().eq('id', p.id)
+    return { ...p, id: ins.data.id }
+  }))
+  S.photos[newTarget] = [...(S.photos[newTarget] || []), ...moved]
   delete S.photos[oldTarget]
   notify()
 }
@@ -208,14 +216,26 @@ export async function flushPhotoZoom(id) {
   await sb.from('overrides').upsert({ kind:'photozoom', key, value:{ target, photoId:id, zoom }, updated_at:new Date().toISOString() }, { onConflict:'key' })
 }
 
-// remplace le fichier image d'une photo existante (même id, même position dans
-// la liste, mêmes pos/zoom/statut de vignette) — utilisé pour recadrer une
+// remplace le fichier image d'une photo existante (même position dans la
+// liste, mêmes pos/zoom conservés localement) — utilisé pour recadrer une
 // mauvaise prise sans perdre les réglages déjà faits dessus
 export async function replacePhotoImage(target, id, path) {
   const url = publicUrl(path), thumbUrl = publicUrl(path.replace(/\.jpg$/, '_t.jpg'))
-  S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, path, url, thumbUrl } : p)
+  const old = (S.photos[target] || []).find(p => p.id === id)
+  // UPDATE sur "photos" est bloqué côté Supabase (RLS) et échoue SANS lever
+  // d'erreur : l'app avait l'air de fonctionner (l'état local était mis à
+  // jour, optimiste) mais la base gardait l'ancien chemin — au rechargement
+  // suivant (ou pour quiconque d'autre), la photo pointait vers un fichier
+  // que le remplacement venait par ailleurs de supprimer. On recrée la ligne
+  // (nouvel id) plutôt que de la mettre à jour en place.
+  const ins = await sb.from('photos').insert({ target, path, caption: old?.caption || '', author: old?.by || '' }).select().single()
+  if (ins.error) throw new Error(ins.error.message)
+  await sb.from('photos').delete().eq('id', id)
+  const newId = ins.data.id
+  S.photos[target] = (S.photos[target] || []).map(p => p.id === id ? { ...p, id: newId, path, url, thumbUrl } : p)
+  if (S.covers[target] === id) await setPhotoCover(target, newId)
   notify()
-  await sb.from('photos').update({ path }).eq('id', id)
+  return newId
 }
 
 // ══════ VIGNETTE CHOISIE (par cible, pour tout type de photo) ══════

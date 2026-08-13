@@ -700,15 +700,26 @@ export default function App() {
                                   // d'un individu, la 2e "vignette" devient directement le compteur "+N"
                                   // plutôt que d'afficher 2 photos ET un badge à part (3 éléments)
                                   <span style={{ display:'flex', gap:3, flexWrap:'wrap', justifyContent:'center' }}>
-                                    {mine.slice(0, mine.length>2 ? 1 : 2).map((ind,i)=>(
-                                      <span key={i} style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap:2 }}>
-                                        <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named} uncertain={ind.uncertain}
-                                          label={`${ind.displayName} — ${METHODS[best].l}${ind.uncertain?' — à confirmer':''}`} />
-                                        <span style={{ fontSize:7.5, color: ind.named?'#A07C28':T.mute,
-                                          fontWeight: ind.named?700:400, maxWidth:44, whiteSpace:'normal',
-                                          wordBreak:'break-word', textAlign:'center', lineHeight:1.25 }}>{ind.displayName}</span>
-                                      </span>
-                                    ))}
+                                    {mine.slice(0, mine.length>2 ? 1 : 2).map((ind,i)=>{
+                                      // texte sous la vignette : le nom pour un familier reconnu, sinon
+                                      // juste la date courte ("5 juin") plutôt que le texte complet du
+                                      // passage ("Passage du 5 juin à 08h33") — sur une seule ligne
+                                      // tronquée, pour que toutes les lignes de la matrice restent
+                                      // homogènes en hauteur
+                                      const [dd, mm, yyyy] = (ind.d || '').split('/').map(Number)
+                                      const shortDate = dd ? new Date(yyyy, mm-1, dd)
+                                        .toLocaleDateString(lang==='ru'?'ru-RU':'fr-FR', { day:'numeric', month:'short' }) : ''
+                                      const label = ind.named ? ind.displayName : shortDate
+                                      return (
+                                        <span key={i} style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                                          <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named} uncertain={ind.uncertain}
+                                            label={`${ind.displayName} — ${METHODS[best].l}${ind.uncertain?' — à confirmer':''}`} />
+                                          <span style={{ fontSize:7.5, color: ind.named?'#A07C28':T.mute,
+                                            fontWeight: ind.named?700:400, maxWidth:44, whiteSpace:'nowrap',
+                                            overflow:'hidden', textOverflow:'ellipsis', textAlign:'center', lineHeight:1.25 }}>{label}</span>
+                                        </span>
+                                      )
+                                    })}
                                     {mine.length>2 && (
                                       <span title={`+${mine.length-1} ${lang==='ru'?'ещё':'de plus'}`}
                                         style={{ display:'inline-flex', alignItems:'center', justifyContent:'center',

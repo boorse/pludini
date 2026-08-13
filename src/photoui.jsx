@@ -149,9 +149,13 @@ function useStoreTick() {
 // ── Fond vignette d'espèce : reprend la photo choisie en réglages (ou la 1ère dispo) ──
 // plain=true : saute le filtre colorimétrique (coûteux à composer sur mobile
 // quand beaucoup de vignettes sont visibles en même temps, ex. Mindmap dense)
-export function CoverBg({ sp, fallback, rounded = 0, thumb = true, plain = false }) {
+// photo : impose une photo précise au lieu de la vignette d'espèce globale —
+// utilisé par "Par observateur" pour montrer LA photo de CET observateur,
+// pas celle d'un autre (la vignette d'espèce est partagée par tous, donc
+// sinon on affichait par exemple la photo de Ferdinand sur la case d'Erwan)
+export function CoverBg({ sp, fallback, rounded = 0, thumb = true, plain = false, photo }) {
   useStoreTick()
-  const cover = coverPhoto(sp)
+  const cover = photo !== undefined ? photo : coverPhoto(sp)
   const src = cover ? (thumb && cover.thumbUrl ? cover.thumbUrl : cover.url) : null
   return (
     <div style={{ position:'absolute', inset:0, borderRadius:rounded, overflow:'hidden',
