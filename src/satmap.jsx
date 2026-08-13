@@ -66,6 +66,30 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     return out
   }, [z, originX, originY, size.w, size.h])
 
+  // franchir un niveau de zoom charge un tout nouveau jeu de tuiles (résolution
+  // différente, URLs différentes) : le temps qu'elles arrivent, il n'y avait
+  // plus rien à l'écran que le fond sombre du conteneur — d'où l'impression de
+  // "rechargement"/flash noir signalée. On garde donc affichées, en arrière-
+  // plan, les tuiles du niveau précédent — remises à la bonne échelle et
+  // position pour rester alignées avec la vue actuelle — jusqu'à ce que les
+  // nouvelles aient eu le temps de charger.
+  const [backdrop, setBackdrop] = useState(null)   // { z, tiles, originX, originY } | null
+  const backdropTimerRef = useRef(null)
+  // dernier (z, tiles, origine) connu, mis à jour à la fin de l'effet
+  // ci-dessous seulement — donc encore égal au rendu PRÉCÉDENT au moment où
+  // l'effet détecte un changement de z, ce qui est justement ce qu'il faut
+  // figer comme arrière-plan
+  const lastKnownRef = useRef({ z, tiles, originX, originY })
+  useEffect(() => {
+    if (lastKnownRef.current.z !== z) {
+      setBackdrop(lastKnownRef.current)
+      clearTimeout(backdropTimerRef.current)
+      backdropTimerRef.current = setTimeout(() => setBackdrop(null), 700)
+    }
+    lastKnownRef.current = { z, tiles, originX, originY }
+  }, [z, tiles, originX, originY])
+  useEffect(() => () => clearTimeout(backdropTimerRef.current), [])
+
   const toScreen = useCallback((lat, lon) => ({
     left: lon2x(lon, z) * TS - originX,
     top: lat2y(lat, z) * TS - originY,
@@ -149,6 +173,18 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
 
   const content = (
     <>
+      {/* tuiles de l'ancien niveau de zoom, remises à l'échelle du niveau
+          actuel — comble le trou pendant que les vraies tuiles (ci-dessous)
+          chargent, plutôt que de laisser voir le fond sombre du conteneur */}
+      {backdrop && (
+        <div style={{ position:'absolute', inset:0, transformOrigin:'0 0', pointerEvents:'none',
+          transform:`translate(${backdrop.originX * Math.pow(2, z - backdrop.z) - originX}px, ${backdrop.originY * Math.pow(2, z - backdrop.z) - originY}px) scale(${Math.pow(2, z - backdrop.z)})` }}>
+          {backdrop.tiles.map(t => (
+            <img key={t.key} src={t.url} alt="" draggable={false}
+              style={{ position:'absolute', left:t.left, top:t.top, width:TS, height:TS, display:'block' }} />
+          ))}
+        </div>
+      )}
       {tiles.map(t => (
         <img key={t.key} src={t.url} alt="" draggable={false}
           style={{ position:'absolute', left:t.left, top:t.top, width:TS, height:TS, display:'block', pointerEvents:'none' }} />
