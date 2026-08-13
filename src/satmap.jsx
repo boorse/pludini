@@ -37,6 +37,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
   const drag = useRef({ moved: false })
   const liveRef = useRef({ x: 0, y: 0, k: 1 })   // geste en cours (relatif, remis à zéro après commit)
   const apiRef = useRef(null)
+  const settleElRef = useRef(null)   // calque décoratif de transition (jamais mesuré par la bibliothèque)
 
   useEffect(() => {
     const el = wrapRef.current; if (!el) return
@@ -66,29 +67,33 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     return out
   }, [z, originX, originY, size.w, size.h])
 
-  // franchir un niveau de zoom charge un tout nouveau jeu de tuiles (résolution
-  // différente, URLs différentes) : le temps qu'elles arrivent, il n'y avait
-  // plus rien à l'écran que le fond sombre du conteneur — d'où l'impression de
-  // "rechargement"/flash noir signalée. On garde donc affichées, en arrière-
-  // plan, les tuiles du niveau précédent — remises à la bonne échelle et
-  // position pour rester alignées avec la vue actuelle — jusqu'à ce que les
-  // nouvelles aient eu le temps de charger.
-  const [backdrop, setBackdrop] = useState(null)   // { z, tiles, originX, originY } | null
-  const backdropTimerRef = useRef(null)
-  // dernier (z, tiles, origine) connu, mis à jour à la fin de l'effet
-  // ci-dessous seulement — donc encore égal au rendu PRÉCÉDENT au moment où
-  // l'effet détecte un changement de z, ce qui est justement ce qu'il faut
-  // figer comme arrière-plan
-  const lastKnownRef = useRef({ z, tiles, originX, originY })
+  // calque de transition, purement décoratif (pointer-events:none, jamais lu
+  // par la bibliothèque de pan/zoom) : montre les tuiles TELLES QU'AFFICHÉES
+  // juste avant ce commit, puis glisse en douceur vers leur position alignée
+  // sur la nouvelle vue — pendant que le vrai contenu, lui, saute
+  // instantanément à la bonne place sans jamais être manipulé à la main (la
+  // bibliothèque mesure sa position réelle en direct pour le prochain geste ;
+  // la moindre divergence entre son état interne et le DOM faussait ses
+  // calculs, ce qui provoquait de grands sauts si un geste reprenait pendant
+  // l'ancienne transition — molette à crans, zooms rapprochés). Sert aussi de
+  // filet anti-flash noir quand le niveau de zoom change (tuiles à charger) :
+  // on le garde alors affiché plus longtemps, déjà aligné, le temps que les
+  // nouvelles tuiles arrivent.
+  const [settle, setSettle] = useState(null)
   useEffect(() => {
-    if (lastKnownRef.current.z !== z) {
-      setBackdrop(lastKnownRef.current)
-      clearTimeout(backdropTimerRef.current)
-      backdropTimerRef.current = setTimeout(() => setBackdrop(null), 700)
+    if (!settle) return
+    const el = settleElRef.current
+    if (el) {
+      el.style.transition = 'none'
+      el.style.transform = `translate(${settle.fromX}px, ${settle.fromY}px) scale(${settle.fromScale})`
+      el.offsetHeight   // force le navigateur à peindre ce point de départ
+      el.style.transition = 'transform 180ms ease-out'
+      el.style.transform = `translate(${settle.toX}px, ${settle.toY}px) scale(1)`
     }
-    lastKnownRef.current = { z, tiles, originX, originY }
-  }, [z, tiles, originX, originY])
-  useEffect(() => () => clearTimeout(backdropTimerRef.current), [])
+    const id = settle.id
+    const t = setTimeout(() => setSettle(s => (s?.id === id ? null : s)), settle.crossesZoomLevel ? 700 : 220)
+    return () => clearTimeout(t)
+  }, [settle])
 
   const toScreen = useCallback((lat, lon) => ({
     left: lon2x(lon, z) * TS - originX,
@@ -123,46 +128,39 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     // mêmes formules que le composant, avant que le re-rendu n'ait lieu
     const newOriginX = lon2x(lon, nz) * TS - screenCx
     const newOriginY = lat2y(lat, nz) * TS - screenCy
-    const contentEl = apiRef.current?.instance?.contentComponent
+    // point d'arrivée du calque de transition (voir plus haut) : la position
+    // à laquelle les tuiles ACTUELLES (pas encore recentrées) doivent glisser
+    // pour rester alignées avec la vue une fois le recentrage effectué —
+    // sans cette correction (rejouer tx,ty,k tel quel), le point d'arrivée
+    // ne correspondait à rien de réel dès qu'un zoom impliquait un
+    // recentrage (systématique), d'où le "zoom puis dézoom" signalé. Pour un
+    // pan pur (k=1), cette correction s'annule exactement : le calque
+    // termine à l'identique de ce qu'il montrait déjà, donc rien ne "bouge".
+    const adjX = tx + k * (newOriginX - originX)
+    const adjY = ty + k * (newOriginY - originY)
+    setSettle({ id: Date.now() + Math.random(), tiles, fromX: tx, fromY: ty, fromScale: k, toX: adjX, toY: adjY, crossesZoomLevel: nz !== z })
     flushSync(() => {
       setC({ lat, lon })
       if (nz !== z) setZ(nz)
     })
     liveRef.current = { x: 0, y: 0, k: 1 }
     // reset TOUJOURS instantané (durée 0, appliqué de façon synchrone par la
-    // bibliothèque) : si on l'anime (durée > 0), la moindre reprise de geste
-    // avant la fin de l'animation la fait annuler en plein vol par la
-    // bibliothèque elle-même (handlePanningStart) SANS aller jusqu'à zéro —
-    // le geste suivant repart alors d'un résidu non nul, que le prochain
-    // commit recompte en plus du nouveau déplacement : c'est ce qui causait
-    // la dérive/décalage constatés en va-et-vient rapide ou en zoom/dézoom
-    // répété. L'état interne doit donc être exactement (0,0,1) dès la fin de
-    // CE commit, sans aucune fenêtre où un geste pourrait démarrer entre deux.
+    // bibliothèque) — jamais animé : le vrai contenu (mesuré en direct par
+    // la bibliothèque pour calculer tout geste suivant, molette y compris)
+    // doit refléter EXACTEMENT son état interne à tout instant, sans jamais
+    // être retouché à la main. On a longtemps animé ce retour directement
+    // sur cet élément (en le "rejouant" depuis tx,ty,k avant de le laisser
+    // glisser vers l'identité) : ça fonctionnait tant que rien n'interrompait
+    // la transition, mais dès qu'un geste reprenait pendant ses 180ms — une
+    // molette à crans, très courant — la bibliothèque mesurait alors un DOM
+    // en cours d'animation pendant que son propre état interne disait déjà
+    // autre chose, et calculait une position n'importe où (constaté : un
+    // bond de plusieurs centaines de milliers de pixels, carte entièrement
+    // noire). L'habillage visuel se fait maintenant exclusivement sur le
+    // calque décoratif ci-dessus, jamais lu par la bibliothèque.
     apiRef.current?.setTransform(0, 0, 1, 0)
-    // retour visuel en douceur, en CSS pur, découplé de l'état de la
-    // bibliothèque (déjà réglé, correct, plus haut) : on rejoue tel quel le
-    // transform du geste (tx,ty,k) comme point de départ, mais CORRIGÉ du
-    // déplacement d'origine qu'entraîne le recentrage — les tuiles affichées
-    // pendant la transition sont déjà celles du nouveau centre, pas celles
-    // d'avant. Sans cette correction (revoyait juste tx,ty,k tel quel), le
-    // point de départ ne correspondait à rien de réel dès qu'un zoom
-    // impliquait un recentrage (systématique), d'où le "zoom puis dézoom" —
-    // un saut visible qui se corrigeait de travers en cours de transition.
-    // Pour un pan pur (k=1), cette correction s'annule exactement : le point
-    // de départ recalculé est déjà l'identité, donc rien ne s'anime.
-    const RESET_MS = 180
-    if (contentEl) {
-      const adjX = tx + k * (newOriginX - originX)
-      const adjY = ty + k * (newOriginY - originY)
-      contentEl.style.transition = 'none'
-      contentEl.style.transform = `translate(${adjX}px, ${adjY}px) scale(${k})`
-      contentEl.offsetHeight   // force le navigateur à peindre ce point de départ
-      contentEl.style.transition = `transform ${RESET_MS}ms ease-out`
-      contentEl.style.transform = ''
-      setTimeout(() => { contentEl.style.transition = '' }, RESET_MS + 40)
-    }
     setTimeout(() => { drag.current.moved = false }, 0)
-  }, [z, originX, originY, size.w, size.h])
+  }, [z, originX, originY, size.w, size.h, tiles])
 
   const click = (e) => {
     if (drag.current.moved || (!addMode && !lineMode) || !onMapClick) return
@@ -173,13 +171,13 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
 
   const content = (
     <>
-      {/* tuiles de l'ancien niveau de zoom, remises à l'échelle du niveau
-          actuel — comble le trou pendant que les vraies tuiles (ci-dessous)
-          chargent, plutôt que de laisser voir le fond sombre du conteneur */}
-      {backdrop && (
-        <div style={{ position:'absolute', inset:0, transformOrigin:'0 0', pointerEvents:'none',
-          transform:`translate(${backdrop.originX * Math.pow(2, z - backdrop.z) - originX}px, ${backdrop.originY * Math.pow(2, z - backdrop.z) - originY}px) scale(${Math.pow(2, z - backdrop.z)})` }}>
-          {backdrop.tiles.map(t => (
+      {/* calque de transition (voir le commentaire au niveau de son état) :
+          tuiles telles qu'affichées juste avant ce commit, glissant en
+          douceur vers leur position alignée — purement décoratif, jamais lu
+          par la bibliothèque de pan/zoom */}
+      {settle && (
+        <div ref={settleElRef} style={{ position:'absolute', inset:0, transformOrigin:'0 0', pointerEvents:'none' }}>
+          {settle.tiles.map(t => (
             <img key={t.key} src={t.url} alt="" draggable={false}
               style={{ position:'absolute', left:t.left, top:t.top, width:TS, height:TS, display:'block' }} />
           ))}
