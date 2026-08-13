@@ -696,8 +696,11 @@ export default function App() {
                               textAlign:'center', cursor:'pointer' }}>
                               {best ? (
                                 mine.length>0 ? (
+                                  // au plus 2 vignettes dans la cellule au total : dès qu'il y a plus
+                                  // d'un individu, la 2e "vignette" devient directement le compteur "+N"
+                                  // plutôt que d'afficher 2 photos ET un badge à part (3 éléments)
                                   <span style={{ display:'flex', gap:3, flexWrap:'wrap', justifyContent:'center' }}>
-                                    {mine.slice(0,2).map((ind,i)=>(
+                                    {mine.slice(0, mine.length>2 ? 1 : 2).map((ind,i)=>(
                                       <span key={i} style={{ display:'inline-flex', flexDirection:'column', alignItems:'center', gap:2 }}>
                                         <ObsCell spId={s.id} indName={ind.n} method={best} named={ind.named} uncertain={ind.uncertain}
                                           label={`${ind.displayName} — ${METHODS[best].l}${ind.uncertain?' — à confirmer':''}`} />
@@ -707,11 +710,11 @@ export default function App() {
                                       </span>
                                     ))}
                                     {mine.length>2 && (
-                                      <span title={`+${mine.length-2} ${lang==='ru'?'ещё':'de plus'}`}
+                                      <span title={`+${mine.length-1} ${lang==='ru'?'ещё':'de plus'}`}
                                         style={{ display:'inline-flex', alignItems:'center', justifyContent:'center',
                                         width:38, height:30, borderRadius:6, border:`1px solid ${T.line}`,
                                         background:T.card, fontSize:11, fontWeight:700, color:T.soft, flexShrink:0 }}>
-                                        +{mine.length-2}
+                                        +{mine.length-1}
                                       </span>
                                     )}
                                   </span>

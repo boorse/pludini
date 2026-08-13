@@ -407,13 +407,22 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
 
   return (
     <div style={{ position:'relative', height:'100%', display:'flex', flexDirection:'column', background:'#E3DAC5', userSelect:'none', WebkitUserSelect:'none' }}>
-      <div style={{ position:'absolute', top:9, right:10, zIndex:5, display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
-        <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
-        <button onClick={fit} style={btn}>Recentrer</button>
-      </div>
-      <div style={{ position:'absolute', top:9, left:10, zIndex:6, display:'flex', alignItems:'flex-start', gap:5, flexWrap:'wrap' }}>
-        <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
-        <LevelFilter levels={levels} setLevels={setLevels} lang={lang} />
+      {/* un seul conteneur plein-largeur pour les 4 contrôles : sur écran étroit,
+          le groupe "Tout replier/Recentrer" doit passer à la ligne SOUS le groupe
+          des filtres plutôt que de rester ancré à droite et chevaucher — deux
+          conteneurs absolus indépendants (l'un à left:10, l'autre à right:10) ne
+          se "voient" pas l'un l'autre et se superposent dès que la somme de leurs
+          largeurs dépasse celle de l'écran */}
+      <div style={{ position:'absolute', top:9, left:10, right:10, zIndex:6,
+        display:'flex', alignItems:'flex-start', flexWrap:'wrap', gap:5, justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'flex-start', gap:5, flexWrap:'wrap' }}>
+          <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
+          <LevelFilter levels={levels} setLevels={setLevels} lang={lang} />
+        </div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
+          <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
+          <button onClick={fit} style={btn}>Recentrer</button>
+        </div>
       </div>
       {isTouch ? (
         <div ref={wrapRef} style={{ flex:1, minHeight:300, overflow:'hidden', position:'relative' }}>
@@ -547,10 +556,14 @@ function CatFilter({ cats, visible, setVisible, lang }) {
           {visible.size}/{cats.length}
         </span>}
       </button>
+      {/* position:absolute — un panneau en flux normal élargit sa carte parente
+          (position:relative) à sa propre largeur, ce qui grossit cet élément
+          dans le conteneur flex parent et décale les boutons voisins (Niveaux)
+          au moment même de l'ouverture */}
       {open && (
-        <div style={{ marginTop:6, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
+        <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
           padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', maxHeight:'min(340px, 70vh)',
-          overflowY:'auto', width:180 }}>
+          overflowY:'auto', width:180, zIndex:10 }}>
           <button onClick={()=>setVisible(allOn ? new Set() : new Set(cats.map(c=>c.id)))}
             style={{ width:'100%', textAlign:'left', fontSize:10.5, fontWeight:700, color:'#8F4A22',
               padding:'4px 6px', marginBottom:4 }}>
@@ -600,9 +613,11 @@ function LevelFilter({ levels, setLevels, lang }) {
           {levels.size}/{LEVEL_ITEMS.length}
         </span>}
       </button>
+      {/* position:absolute — même raison que dans CatFilter ci-dessus : évite
+          que l'ouverture ne décale les boutons voisins */}
       {open && (
-        <div style={{ marginTop:6, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
-          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', width:150 }}>
+        <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
+          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', width:150, zIndex:10 }}>
           {LEVEL_ITEMS.map(l => (
             <label key={l.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 6px',
               borderRadius:8, fontSize:11.5, color:'#3F382C', cursor:'pointer' }}>

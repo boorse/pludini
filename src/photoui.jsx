@@ -80,6 +80,19 @@ export function PhotoBg({ target, fallback, rounded = 0, thumb = true }) {
   )
 }
 
+// sur connexion instable (terrain, forêt), l'upload peut se résoudre côté
+// client SANS erreur alors que le fichier n'a en réalité jamais été conservé
+// côté serveur (constaté : une fiche photo pointant vers un objet inexistant,
+// pendant qu'un essai ultérieur avait fini par passer sous un autre nom,
+// orphelin) — on vérifie que le fichier est bien récupérable par l'URL
+// publique, exactement comme le fera la balise <img>, avant d'enregistrer quoi
+// que ce soit qui pointe vers lui
+async function verifyUploaded(path) {
+  const url = sb.storage.from('photos').getPublicUrl(path).data.publicUrl
+  const res = await fetch(url, { method: 'HEAD', cache: 'no-store' }).catch(() => null)
+  if (!res || !res.ok) throw new Error('La photo n’a pas pu être confirmée après l’envoi — vérifie ta connexion et réessaie.')
+}
+
 // import + compression + upload d'une seule photo — réutilisé par PhotoManager et par le formulaire d'observation
 export async function uploadPhotoFile(target, file, caption = '', by = '') {
   const isHero = String(target) === 'site:hero'
@@ -91,7 +104,9 @@ export async function uploadPhotoFile(target, file, caption = '', by = '') {
   const path = base + '.jpg'
   const up = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' })
   if (up.error) throw new Error(up.error.message)
-  await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  const upThumb = await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  if (upThumb.error) throw new Error(upThumb.error.message)
+  await verifyUploaded(path)
   return addPhotoRec({ target, path, caption, by })
 }
 
@@ -107,7 +122,9 @@ export async function replacePhotoFile(target, photo, file) {
   const path = base + '.jpg'
   const up = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' })
   if (up.error) throw new Error(up.error.message)
-  await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  const upThumb = await sb.storage.from('photos').upload(base + '_t.jpg', thumb, { contentType:'image/jpeg' })
+  if (upThumb.error) throw new Error(upThumb.error.message)
+  await verifyUploaded(path)
   await replacePhotoImage(target, photo.id, path)
   if (photo.path) await sb.storage.from('photos').remove([photo.path, thumbOf(photo.path)]).catch(()=>{})
 }
