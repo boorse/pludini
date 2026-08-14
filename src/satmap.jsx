@@ -162,6 +162,37 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
     setTimeout(() => { drag.current.moved = false }, 0)
   }, [z, originX, originY, size.w, size.h, tiles])
 
+  // molette/pincement trackpad : géré à la main plutôt que par la bibliothèque,
+  // dont le pas est ADDITIF (targetScale = scale + delta*step) — un même
+  // nombre de crans dézoome donc bien plus vite qu'il ne zoome (diviser
+  // l'échelle par 2 ne "coûte" que 0.5 en unités additives, la multiplier par
+  // 2 en coûte 1, deux fois plus de crans pour le même zoom relatif). On
+  // recalcule l'échelle de façon MULTIPLICATIVE (comme le fait déjà la mind
+  // map côté PC) pour que zoomer et dézoomer d'un même facteur prenne le même
+  // nombre de crans, dans un sens comme dans l'autre.
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const onWheel = (e) => {
+      e.preventDefault()
+      const inst = apiRef.current?.instance
+      if (!inst?.contentComponent) return
+      const { scale, positionX, positionY } = inst.state
+      const newScale = Math.min(4, Math.max(0.25, scale * (1 - e.deltaY * 0.0014)))
+      if (newScale === scale) return
+      const rect = inst.contentComponent.getBoundingClientRect()
+      const mouseX = (e.clientX - rect.left) / scale
+      const mouseY = (e.clientY - rect.top) / scale
+      const scaleDiff = newScale - scale
+      apiRef.current.setTransform(positionX - mouseX * scaleDiff, positionY - mouseY * scaleDiff, newScale, 0)
+      drag.current.moved = true
+      clearTimeout(el._wheelStopTimer)
+      el._wheelStopTimer = setTimeout(commit, 160)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => { el.removeEventListener('wheel', onWheel); clearTimeout(el._wheelStopTimer) }
+  }, [commit])
+
   const click = (e) => {
     if (drag.current.moved || (!addMode && !lineMode) || !onMapClick) return
     const r = wrapRef.current.getBoundingClientRect()
@@ -268,7 +299,14 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         doubleClick={{ disabled: true }}
         panning={{ velocityDisabled: true }}
         trackPadPanning={{ velocityDisabled: true }}
-        wheel={{ step: 0.04 }}
+        // molette ET pincement trackpad (déclaré "wheel" côté navigateur, avec
+        // ctrlKey) désactivés côté bibliothèque — gérés à la main juste au-
+        // dessus (voir le useEffect sur "wheel") pour un pas multiplicatif
+        // plutôt que le pas additif de la bibliothèque, source de l'asymétrie
+        // zoom/dézoom. Le pincement tactile (deux doigts sur écran), lui,
+        // reste géré par la bibliothèque : déjà multiplicatif nativement
+        // (ratio de distance entre les doigts), pas concerné par ce défaut.
+        wheel={{ wheelDisabled: true, touchPadDisabled: true }}
         // "autoAlignment" (snap-back aux limites) est activé par défaut
         // indépendamment de limitToBounds, et se déclenche à chaque fin de
         // geste dès que la vélocité est désactivée : ça ajoutait un second
@@ -276,7 +314,7 @@ export default function SatMap({ center, pins = [], zones = [], draftPts = [], d
         // nous-mêmes (la carte "faisait deux fois la distance")
         autoAlignment={{ disabled: true }}
         onTransform={onTransform}
-        onPanningStop={commit} onPinchStop={commit} onWheelStop={commit}>
+        onPanningStop={commit} onPinchStop={commit}>
         <TransformComponent wrapperStyle={{ width:'100%', height:'100%', touchAction:'none' }} contentStyle={{ width:size.w, height:size.h }}>
           <div style={{ position:'relative', width:size.w, height:size.h }} onClick={click}>{content}</div>
         </TransformComponent>
