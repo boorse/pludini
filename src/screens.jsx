@@ -405,6 +405,9 @@ export function Territory({ wide, lang, onBack, edit }) {
   // recentrage manuel (bouton "le plus d'observations") — null tant qu'on n'a
   // pas cliqué, la carte démarre alors sur le centre par défaut du domaine
   const [manualCenter, setManualCenter] = useState(null)
+  // panneau latéral gauche (observateurs, outils d'édition, liste des repères)
+  // — replié par défaut : la page tient dans l'écran, jamais de défilement
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const reload = async () => {
     try {
@@ -471,100 +474,149 @@ export function Territory({ wide, lang, onBack, edit }) {
     await saveZone(z); reload()
   }
 
+  const darkChip = (on, color=T.clay) => ({ fontSize:11.5, padding:'5px 11px', borderRadius:14,
+    border:`1px solid ${on?color:'rgba(242,238,226,.28)'}`, background:on?color:'transparent',
+    color:on?'#fff':'rgba(242,238,226,.8)', fontWeight:on?600:400 })
+  const panelLabel = { fontSize:10, color:'rgba(242,238,226,.55)', textTransform:'uppercase', letterSpacing:'.5px', marginBottom:6 }
+
+  // la page tient dans l'écran, sans défilement : en-tête compact + carte qui
+  // occupe tout le reste (59px = hauteur de l'en-tête sticky du Shell) ; tout
+  // ce qui n'est pas la carte elle-même (observateurs, outils d'édition,
+  // liste des repères) va dans le panneau repliable à gauche
   return (
-    <div style={{ padding: wide?'16px 40px 40px':'14px 18px 30px' }}>
+    <div style={{ height:'calc(100dvh - 59px)', display:'flex', flexDirection:'column', overflow:'hidden',
+      padding: wide?'16px 40px 16px':'10px 14px 10px' }}>
       <Back onBack={onBack} label={t.home} />
-      <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:12 }}>
+      <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', flexWrap:'wrap', gap:10, marginBottom:10 }}>
         <div>
-          <h2 className="serif" style={{ fontSize: wide?30:23, fontWeight:900, color:T.ink, marginBottom:3 }}>
+          <h2 className="serif" style={{ fontSize: wide?30:21, fontWeight:900, color:T.ink, marginBottom:2 }}>
             {lang==='ru'?'Территория':'Le territoire'}
           </h2>
-          <p style={{ fontSize:12, color:T.mute }}>57°17′10.9″N · 25°35′38.1″E</p>
+          <p style={{ fontSize:11.5, color:T.mute }}>57°17′10.9″N · 25°35′38.1″E</p>
         </div>
       </div>
 
-      {/* filtre des spots d'observation par observateur — additif : cliquer une
-          personne l'ajoute/la retire de la sélection, vide affiche tout le
-          monde ; toujours visible (pas seulement en édition), utile à tous
-          pour repérer les passages d'une personne en particulier */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12, alignItems:'center' }}>
-        <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'Наблюдатели:':'Observateurs :'}</span>
-        <button onClick={()=>setFocusPlayers(new Set())} style={{ fontSize:11.5, padding:'5px 11px', borderRadius:14,
-          border:`1px solid ${!focusPlayers.size?T.clay:T.line}`, background:!focusPlayers.size?T.clay:'transparent',
-          color:!focusPlayers.size?'#fff':T.soft, fontWeight:!focusPlayers.size?600:400 }}>{t.all}</button>
-        {ALL_PLAYERS.map(p=>{
-          const on = focusPlayers.has(p.name)
-          const c = playerColor(p.name, ALL_PLAYERS)
-          return (
-            <button key={p.id} onClick={()=>toggleFocusPlayer(p.name)} style={{ fontSize:11.5, padding:'5px 11px',
-              borderRadius:14, border:`1px solid ${on?c:T.line}`, background:on?c:'transparent',
-              color:on?'#fff':T.soft, fontWeight:on?600:400 }}>{p.name}</button>
-          )
-        })}
-      </div>
-
-      {edit && (
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12, alignItems:'center' }}>
-          <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'Инструмент:':'Outil :'}</span>
-          <button onClick={()=>{ setTool(tool==='pin'?null:'pin'); setDraftPts([]) }}
-            style={toolBtn(tool==='pin')}>
-            <i className="ti ti-map-pin" style={{ fontSize:14 }} aria-hidden="true" /> {lang==='ru'?'Точка':'Repère'}
-          </button>
-          <button onClick={()=>{ setTool(tool==='zone'?null:'zone'); setDraftPts([]) }}
-            style={toolBtn(tool==='zone')}>
-            <i className="ti ti-polygon" style={{ fontSize:14 }} aria-hidden="true" /> {lang==='ru'?'Зона':'Zone'}
-          </button>
-          <button onClick={()=>{ setTool(tool==='line'?null:'line'); setDraftPts([]) }}
-            style={toolBtn(tool==='line')}>
-            <i className="ti ti-line" style={{ fontSize:14 }} aria-hidden="true" /> {lang==='ru'?'Линия':'Tracé'}
-          </button>
-          <button onClick={()=>setTypeEditor(true)} style={{ ...toolBtn(false), marginLeft:6 }}>
-            <i className="ti ti-plus" style={{ fontSize:14 }} aria-hidden="true" /> {lang==='ru'?'Тип точки':'Type de repère'}
-          </button>
-        </div>
-      )}
-
-      {edit && tool==='pin' && (
-        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
-          <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'Тип:':'Type :'}</span>
-          {Object.entries(allTypes).map(([k,ty])=>(
-            <button key={k} onClick={()=>setPinType(k)} style={{ fontSize:11.5, padding:'5px 10px', borderRadius:14,
-              border:`1px solid ${(pinType||Object.keys(allTypes)[0])===k?ty.c:T.line}`,
-              background:(pinType||Object.keys(allTypes)[0])===k?ty.c:'transparent',
-              color:(pinType||Object.keys(allTypes)[0])===k?'#fff':T.soft }}>{ty.e} {ty.l}</button>
-          ))}
-        </div>
-      )}
-
-      {edit && (tool==='zone'||tool==='line') && (
-        <div style={{ background:'#F0E4CF', border:'1px solid #DCC79E', borderRadius:11, padding:'9px 12px',
-          fontSize:12, color:'#6B5330', marginBottom:10, display:'flex', alignItems:'center', gap:9, flexWrap:'wrap' }}>
-          <i className="ti ti-hand-click" style={{ fontSize:15 }} aria-hidden="true" />
-          <span style={{ flex:1 }}>
-            {tool==='zone'
-              ? (lang==='ru'?'Отметьте углы зоны на карте.':'Clique les coins de la zone sur la carte.')
-              : (lang==='ru'?'Отметьте точки линии.':'Clique les points du tracé.')}
-            {draftPts.length>0 && ` (${draftPts.length})`}
-          </span>
-          <button onClick={finishShape} disabled={draftPts.length<2}
-            className="serif" style={{ padding:'6px 13px', borderRadius:10,
-              background:draftPts.length>=2?T.sageDark:'#CFC3A8', color:'#fff', fontSize:12.5, fontWeight:700 }}>
-            {lang==='ru'?'Готово':'Terminer'}
-          </button>
-          <button onClick={()=>{ setDraftPts([]); setTool(null) }}
-            style={{ padding:'6px 11px', borderRadius:10, border:`1px solid #DCC79E`, color:'#6B5330', fontSize:12 }}>
-            {lang==='ru'?'Отмена':'Annuler'}
-          </button>
-        </div>
-      )}
-
-      <div style={{ borderRadius:16, overflow:'hidden', border:`1px solid ${T.line}`, position:'relative' }}>
+      <div style={{ flex:1, minHeight:0, borderRadius:16, overflow:'hidden', border:`1px solid ${T.line}`, position:'relative' }}>
         <SatMap center={center} pins={mapPins} zones={zones} draftPts={draftPts} draftKind={tool}
-          selected={sel && { id:sel.id }} height={wide?680:'calc(100dvh - 260px)'}
+          selected={sel && { id:sel.id }} height="100%"
           addMode={tool==='pin'} lineMode={tool==='zone'||tool==='line'}
           onSelect={(p)=>setSel(p ? pins.find(x=>x.id===p.id) : null)}
           onMapClick={onMapClick}
           obsPins={obsPins} onObsSelect={setObsSpot} />
+
+        {/* bouton menu : observateurs, outils d'édition, liste des repères —
+            replié par défaut pour ne jamais pousser la carte hors de l'écran */}
+        <button onClick={()=>setMenuOpen(v=>!v)}
+          title={lang==='ru'?'Меню':'Menu'}
+          style={{ position:'absolute', top:10, left:10, zIndex:9, width:36, height:36, borderRadius:'50%',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            background: menuOpen?T.clay:'rgba(20,22,14,.78)', color:'#F2EEE2' }}>
+          <i className={`ti ti-${menuOpen?'x':'menu-2'}`} style={{ fontSize:16 }} aria-hidden="true" />
+        </button>
+
+        {menuOpen && (
+          <div style={{ position:'absolute', top:54, left:10, bottom:10, width:236, zIndex:8, overflowY:'auto',
+            background:'rgba(20,22,14,.93)', borderRadius:14, padding:'12px 12px 14px',
+            display:'flex', flexDirection:'column', gap:14 }}>
+
+            {/* filtre des spots d'observation par observateur — additif : cliquer
+                une personne l'ajoute/la retire de la sélection, vide affiche
+                tout le monde */}
+            <div>
+              <div style={panelLabel}>{lang==='ru'?'Наблюдатели':'Observateurs'}</div>
+              <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                <button onClick={()=>setFocusPlayers(new Set())} style={darkChip(!focusPlayers.size)}>{t.all}</button>
+                {ALL_PLAYERS.map(p=>(
+                  <button key={p.id} onClick={()=>toggleFocusPlayer(p.name)}
+                    style={darkChip(focusPlayers.has(p.name), playerColor(p.name, ALL_PLAYERS))}>{p.name}</button>
+                ))}
+              </div>
+            </div>
+
+            {edit && (
+              <div>
+                <div style={panelLabel}>{lang==='ru'?'Инструмент':'Outil'}</div>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  <button onClick={()=>{ setTool(tool==='pin'?null:'pin'); setDraftPts([]) }} style={darkChip(tool==='pin')}>
+                    <i className="ti ti-map-pin" style={{ fontSize:13 }} aria-hidden="true" /> {lang==='ru'?'Точка':'Repère'}
+                  </button>
+                  <button onClick={()=>{ setTool(tool==='zone'?null:'zone'); setDraftPts([]) }} style={darkChip(tool==='zone')}>
+                    <i className="ti ti-polygon" style={{ fontSize:13 }} aria-hidden="true" /> {lang==='ru'?'Зона':'Zone'}
+                  </button>
+                  <button onClick={()=>{ setTool(tool==='line'?null:'line'); setDraftPts([]) }} style={darkChip(tool==='line')}>
+                    <i className="ti ti-line" style={{ fontSize:13 }} aria-hidden="true" /> {lang==='ru'?'Линия':'Tracé'}
+                  </button>
+                  <button onClick={()=>setTypeEditor(true)} style={darkChip(false)}>
+                    <i className="ti ti-plus" style={{ fontSize:13 }} aria-hidden="true" /> {lang==='ru'?'Тип точки':'Type de repère'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {edit && tool==='pin' && (
+              <div>
+                <div style={panelLabel}>{lang==='ru'?'Тип':'Type'}</div>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+                  {Object.entries(allTypes).map(([k,ty])=>(
+                    <button key={k} onClick={()=>setPinType(k)}
+                      style={darkChip((pinType||Object.keys(allTypes)[0])===k, ty.c)}>{ty.e} {ty.l}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {edit && (tool==='zone'||tool==='line') && (
+              <div style={{ background:'rgba(255,255,255,.08)', borderRadius:11, padding:'9px 10px',
+                fontSize:11.5, color:'rgba(242,238,226,.85)', display:'flex', flexDirection:'column', gap:8 }}>
+                <span style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <i className="ti ti-hand-click" style={{ fontSize:14 }} aria-hidden="true" />
+                  {tool==='zone'
+                    ? (lang==='ru'?'Отметьте углы зоны на карте.':'Clique les coins de la zone sur la carte.')
+                    : (lang==='ru'?'Отметьте точки линии.':'Clique les points du tracé.')}
+                  {draftPts.length>0 && ` (${draftPts.length})`}
+                </span>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={finishShape} disabled={draftPts.length<2}
+                    className="serif" style={{ flex:1, padding:'6px 10px', borderRadius:10,
+                      background:draftPts.length>=2?T.sageDark:'rgba(255,255,255,.12)', color:'#fff', fontSize:12, fontWeight:700 }}>
+                    {lang==='ru'?'Готово':'Terminer'}
+                  </button>
+                  <button onClick={()=>{ setDraftPts([]); setTool(null) }}
+                    style={{ flex:1, padding:'6px 10px', borderRadius:10, border:`1px solid rgba(242,238,226,.28)`,
+                      color:'rgba(242,238,226,.85)', fontSize:12 }}>
+                    {lang==='ru'?'Отмена':'Annuler'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* liste des repères */}
+            {pins.length>0 && (
+              <div>
+                <div style={panelLabel}>{lang==='ru'?'Точки':'Repères'}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {pins.map(p=>{
+                    const ty = allTypes[p.t] || {}; const on = sel?.id===p.id
+                    return (
+                      <button key={p.id} onClick={()=>setSel(on?null:p)} style={{ textAlign:'left',
+                        background:on?'rgba(181,96,47,.35)':'rgba(255,255,255,.06)',
+                        border:`1px solid ${on?T.clay:'rgba(242,238,226,.15)'}`, borderRadius:10,
+                        padding:'7px 9px', display:'flex', alignItems:'flex-start', gap:7 }}>
+                        <span style={{ width:22, height:22, borderRadius:'50%', background:ty.c||'#B5602F', display:'flex',
+                          alignItems:'center', justifyContent:'center', fontSize:10, flexShrink:0 }}>{ty.e||'📍'}</span>
+                        <div style={{ minWidth:0 }}>
+                          <div className="serif" style={{ fontSize:11.5, fontWeight:700, color:'#F2EEE2' }}>{p.l||ty.l}</div>
+                          {p.d && <div style={{ fontSize:10, color:'rgba(242,238,226,.65)', lineHeight:1.4, marginTop:1 }}>{p.d}</div>}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {hottestSpot && (
           <button onClick={()=>setManualCenter({ lat: hottestSpot.lat, lon: hottestSpot.lon })}
             title={lang==='ru'?'Центрировать на самом активном месте':'Recentrer sur l’endroit le plus observé'}
@@ -591,27 +643,6 @@ export function Territory({ wide, lang, onBack, edit }) {
           </div>
         )}
       </div>
-
-      {/* liste des repères */}
-      {pins.length>0 && (
-        <div style={{ display:'grid', gridTemplateColumns: wide?'1fr 1fr':'1fr', gap:7, marginTop:14 }}>
-          {pins.map(p=>{
-            const ty = allTypes[p.t] || {}; const on = sel?.id===p.id
-            return (
-              <button key={p.id} onClick={()=>setSel(on?null:p)} style={{ textAlign:'left',
-                background:on?'#F0E4CF':T.card, border:`1px solid ${on?T.clay:T.line}`, borderRadius:11,
-                padding:'9px 11px', display:'flex', alignItems:'flex-start', gap:9 }}>
-                <span style={{ width:26, height:26, borderRadius:'50%', background:ty.c||'#B5602F', display:'flex',
-                  alignItems:'center', justifyContent:'center', fontSize:12, flexShrink:0 }}>{ty.e||'📍'}</span>
-                <div>
-                  <div className="serif" style={{ fontSize:12.5, fontWeight:700, color:T.ink }}>{p.l||ty.l}</div>
-                  {p.d && <div style={{ fontSize:11, color:T.soft, lineHeight:1.45, marginTop:2 }}>{p.d}</div>}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
 
       {draftPin && <PinEditor draft={draftPin} types={allTypes} lang={lang}
         onCancel={()=>setDraftPin(null)}
@@ -770,10 +801,6 @@ const obsHeaderBtn = { width:26, height:26, borderRadius:'50%', background:T.car
   display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }
 const obsRoundBtn = (side) => ({ position:'absolute', top:10, [side]:12, width:28, height:28, borderRadius:'50%',
   background:'rgba(0,0,0,.35)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' })
-
-const toolBtn = (on) => ({ fontSize:11.5, padding:'6px 12px', borderRadius:16,
-  border:`1px solid ${on?T.clay:T.line}`, background:on?T.clay:'transparent',
-  color:on?'#fff':T.soft, fontWeight:on?600:400, display:'flex', alignItems:'center', gap:5 })
 
 function PinEditor({ draft, types, lang, onCancel, onSave }) {
   const [l, setL] = useState('')
