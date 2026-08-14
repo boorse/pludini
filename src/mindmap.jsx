@@ -29,7 +29,7 @@ function observedBranchIds(n) {
   return ids
 }
 
-export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, levels, setLevels, edit, onAddSpecies }) {
+export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpanded, tf, setTf, obsOnly, setObsOnly, catVisible, setCatVisible, levels, setLevels, filterOpen, setFilterOpen, edit, onAddSpecies }) {
   const wrapRef = useRef(null)
   const [infoNode, setInfoNode] = useState(null)
   // écran tactile (téléphone/tablette) : bibliothèque dédiée (react-zoom-pan-pinch)
@@ -417,8 +417,8 @@ export default function MindMap({ onSelectSpecies, lang='fr', expanded, setExpan
       <div style={{ position:'absolute', top:9, left:10, right:10, zIndex:6,
         display:'flex', alignItems:'flex-start', flexWrap:'wrap', gap:5, justifyContent:'space-between' }}>
         <div style={{ display:'flex', alignItems:'flex-start', gap:5, flexWrap:'wrap' }}>
-          <CatFilter cats={CATS} visible={catVisible} setVisible={setCatVisible} lang={lang} />
-          <LevelFilter levels={levels} setLevels={setLevels} lang={lang} />
+          <MapFilter cats={CATS} catVisible={catVisible} setCatVisible={setCatVisible}
+            levels={levels} setLevels={setLevels} lang={lang} open={filterOpen} setOpen={setFilterOpen} />
         </div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', justifyContent:'flex-end' }}>
           <button onClick={()=>setExpanded(new Set())} style={btn}>Tout replier</button>
@@ -537,45 +537,67 @@ function InfoPanel({ n, lang, edit, onClose }) {
   )
 }
 
-// checklist en haut à gauche : chaque catégorie (règne) peut être montrée ou
-// masquée entièrement de la carte — indépendant du dépli, qui ne fait que
-// révéler ou cacher les enfants d'une branche déjà présente
-function CatFilter({ cats, visible, setVisible, lang }) {
-  const [open, setOpen] = useState(false)
-  const allOn = cats.every(c => visible.has(c.id))
-  const toggle = (id) => setVisible(prev => {
+// filtre unique en haut à gauche, combinant deux réglages jusqu'ici séparés :
+// - embranchements (catégories montrées/masquées entièrement, indépendant du
+//   dépli qui ne fait que révéler/cacher les enfants d'une branche présente)
+// - niveaux (quelles étapes intermédiaires — ordre, famille — existent comme
+//   cartes à part entière ; décocher une étape la retire structurellement de
+//   l'arbre, ses espèces remontant directement au niveau parent)
+// un seul bouton/panneau plutôt que deux : "open" vit dans App (passé en
+// props, voir MindMap) — Explore y étant redéfini à chaque re-rendu d'App,
+// un état local ici ne survivrait pas au remontage que cocher une case
+// provoque, refermant aussitôt le panneau après chaque coche
+const LEVEL_ITEMS = [
+  { id:'ordre',   fr:'Ordre',   ru:'Отряд' },
+  { id:'famille', fr:'Famille', ru:'Семья' },
+]
+function MapFilter({ cats, catVisible, setCatVisible, levels, setLevels, lang, open, setOpen }) {
+  const allOn = cats.every(c => catVisible.has(c.id)) && LEVEL_ITEMS.every(l => levels.has(l.id))
+  const toggleCat = (id) => setCatVisible(prev => {
     const n = new Set(prev)
     n.has(id) ? n.delete(id) : n.add(id)
     return n
   })
+  const toggleLevel = (id) => setLevels(prev => {
+    const n = new Set(prev)
+    n.has(id) ? n.delete(id) : n.add(id)
+    return n
+  })
+  const activeCount = catVisible.size + levels.size
+  const totalCount = cats.length + LEVEL_ITEMS.length
   return (
     <div style={{ position:'relative' }}>
       <button onClick={()=>setOpen(v=>!v)} style={{ ...btn, display:'flex', alignItems:'center', gap:5 }}>
-        <i className="ti ti-list-check" style={{ fontSize:12 }} aria-hidden="true" />
-        {lang==='ru'?'Ветви':'Embranchements'}
+        <i className="ti ti-filter" style={{ fontSize:12 }} aria-hidden="true" />
+        {lang==='ru'?'Фильтр':'Filtre'}
         {!allOn && <span style={{ background:'#B5602F', color:'#fff', borderRadius:8, padding:'0 5px', fontSize:9, fontWeight:700 }}>
-          {visible.size}/{cats.length}
+          {activeCount}/{totalCount}
         </span>}
       </button>
       {/* position:absolute — un panneau en flux normal élargit sa carte parente
           (position:relative) à sa propre largeur, ce qui grossit cet élément
-          dans le conteneur flex parent et décale les boutons voisins (Niveaux)
-          au moment même de l'ouverture */}
+          dans le conteneur flex parent et décale les boutons voisins */}
       {open && (
         <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
-          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', maxHeight:'min(340px, 70vh)',
-          overflowY:'auto', width:180, zIndex:10 }}>
-          <button onClick={()=>setVisible(allOn ? new Set() : new Set(cats.map(c=>c.id)))}
+          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', maxHeight:'min(420px, 70vh)',
+          overflowY:'auto', width:190, zIndex:10 }}>
+          <button onClick={()=>{
+              if (allOn) { setCatVisible(new Set()); setLevels(new Set()) }
+              else { setCatVisible(new Set(cats.map(c=>c.id))); setLevels(new Set(LEVEL_ITEMS.map(l=>l.id))) }
+            }}
             style={{ width:'100%', textAlign:'left', fontSize:10.5, fontWeight:700, color:'#8F4A22',
-              padding:'4px 6px', marginBottom:4 }}>
+              padding:'4px 6px', marginBottom:6 }}>
             {allOn
               ? (lang==='ru'?'Снять всё':'Tout décocher')
               : (lang==='ru'?'Отметить всё':'Tout cocher')}
           </button>
+          <div style={{ fontSize:9.5, fontWeight:700, color:'#9A9081', textTransform:'uppercase', letterSpacing:'.4px', padding:'2px 6px' }}>
+            {lang==='ru'?'Ветви':'Embranchements'}
+          </div>
           {cats.map(c => (
             <label key={c.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 6px',
               borderRadius:8, fontSize:11.5, color:'#3F382C', cursor:'pointer' }}>
-              <input type="checkbox" checked={visible.has(c.id)} onChange={()=>toggle(c.id)}
+              <input type="checkbox" checked={catVisible.has(c.id)} onChange={()=>toggleCat(c.id)}
                 style={{ width:14, height:14, accentColor:'#7A8B5C', flexShrink:0 }} />
               <span style={{ fontSize:13 }}>{c.e}</span>
               <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -583,46 +605,13 @@ function CatFilter({ cats, visible, setVisible, lang }) {
               </span>
             </label>
           ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// filtre vertical : quelles étapes intermédiaires (ordre, famille) existent
-// comme cartes à part entière — décocher une étape la retire structurellement
-// de l'arbre (ses espèces remontent directement au niveau parent), ce n'est
-// pas un simple réglage du dépli par défaut comme "Tout replier"
-const LEVEL_ITEMS = [
-  { id:'ordre',   fr:'Ordre',   ru:'Отряд' },
-  { id:'famille', fr:'Famille', ru:'Семья' },
-]
-function LevelFilter({ levels, setLevels, lang }) {
-  const [open, setOpen] = useState(false)
-  const allOn = LEVEL_ITEMS.every(l => levels.has(l.id))
-  const toggle = (id) => setLevels(prev => {
-    const n = new Set(prev)
-    n.has(id) ? n.delete(id) : n.add(id)
-    return n
-  })
-  return (
-    <div style={{ position:'relative' }}>
-      <button onClick={()=>setOpen(v=>!v)} style={{ ...btn, display:'flex', alignItems:'center', gap:5 }}>
-        <i className="ti ti-stairs" style={{ fontSize:12 }} aria-hidden="true" />
-        {lang==='ru'?'Уровни':'Niveaux'}
-        {!allOn && <span style={{ background:'#B5602F', color:'#fff', borderRadius:8, padding:'0 5px', fontSize:9, fontWeight:700 }}>
-          {levels.size}/{LEVEL_ITEMS.length}
-        </span>}
-      </button>
-      {/* position:absolute — même raison que dans CatFilter ci-dessus : évite
-          que l'ouverture ne décale les boutons voisins */}
-      {open && (
-        <div style={{ position:'absolute', top:'calc(100% + 6px)', left:0, background:'#F2EEE2', border:'1px solid #D3C7AE', borderRadius:12,
-          padding:'8px 6px', boxShadow:'0 8px 24px rgba(43,38,32,.2)', width:150, zIndex:10 }}>
+          <div style={{ fontSize:9.5, fontWeight:700, color:'#9A9081', textTransform:'uppercase', letterSpacing:'.4px', padding:'2px 6px', marginTop:8 }}>
+            {lang==='ru'?'Уровни':'Niveaux'}
+          </div>
           {LEVEL_ITEMS.map(l => (
             <label key={l.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'4px 6px',
               borderRadius:8, fontSize:11.5, color:'#3F382C', cursor:'pointer' }}>
-              <input type="checkbox" checked={levels.has(l.id)} onChange={()=>toggle(l.id)}
+              <input type="checkbox" checked={levels.has(l.id)} onChange={()=>toggleLevel(l.id)}
                 style={{ width:14, height:14, accentColor:'#7A8B5C', flexShrink:0 }} />
               <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {lang==='ru'?l.ru:l.fr}

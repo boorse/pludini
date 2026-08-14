@@ -438,6 +438,12 @@ export default function App() {
   // remonté en boucle — un useState interne pour les niveaux affichés serait
   // réinitialisé à chaque clic, d'où la nécessité de le faire vivre ici
   const [mapLevels, setMapLevels] = useState(() => new Set(['ordre', 'famille']))
+  // même raison : si ce "ouvert/fermé" du panneau de filtres restait local au
+  // composant du bouton, cocher une case dans le panneau (qui touche
+  // mapCatVisible/mapLevels ci-dessus, donc re-rend App, donc redémonte
+  // Explore) le referme aussitôt — l'utilisateur devait rouvrir le panneau
+  // après chaque case cochée
+  const [mapFilterOpen, setMapFilterOpen] = useState(false)
 
   const [spEditor, setSpEditor] = useState(null)   // {initial?, presetCat?, presetSub?}
   const [sighting, setSighting] = useState(null)
@@ -614,24 +620,33 @@ export default function App() {
 
   // ═════ MATRIX PANE ═════
   const MatrixPane = ({ compact }) => {
-    const [focusPerson, setFocusPerson] = useState(null)
-    if (!compact) return <MatrixWide focusPerson={focusPerson} setFocusPerson={setFocusPerson} />
+    // ensemble additif plutôt qu'une seule personne : cliquer une personne
+    // l'ajoute/la retire de la sélection sans remplacer les autres, comme
+    // partout ailleurs où l'on filtre en cliquant (embranchements/niveaux
+    // de la mind map notamment) — vide = "Tout"
+    const [focusPersons, setFocusPersons] = useState(() => new Set())
+    if (!compact) return <MatrixWide focusPersons={focusPersons} setFocusPersons={setFocusPersons} />
     return <MatrixCompact />
   }
 
   // vue large : une colonne complète par personne
-  const MatrixWide = ({ focusPerson, setFocusPerson }) => {
-    const cols = focusPerson ? ALL_PLAYERS.filter(p=>p.name===focusPerson) : ALL_PLAYERS
+  const MatrixWide = ({ focusPersons, setFocusPersons }) => {
+    const cols = focusPersons.size ? ALL_PLAYERS.filter(p=>focusPersons.has(p.name)) : ALL_PLAYERS
+    const toggleFocus = (name) => setFocusPersons(prev => {
+      const n = new Set(prev)
+      n.has(name) ? n.delete(name) : n.add(name)
+      return n
+    })
     return (
       <div style={{ padding:'14px 18px' }}>
         <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:14, alignItems:'center' }}>
           <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'Показать:':'Afficher :'}</span>
-          <button onClick={()=>setFocusPerson(null)} style={{ fontSize:11.5, padding:'5px 11px', borderRadius:14,
-            border:`1px solid ${!focusPerson?T.clay:T.line}`, background:!focusPerson?T.clay:'transparent',
-            color:!focusPerson?'#fff':T.soft, fontWeight:!focusPerson?600:400 }}>{t.all}</button>
+          <button onClick={()=>setFocusPersons(new Set())} style={{ fontSize:11.5, padding:'5px 11px', borderRadius:14,
+            border:`1px solid ${!focusPersons.size?T.clay:T.line}`, background:!focusPersons.size?T.clay:'transparent',
+            color:!focusPersons.size?'#fff':T.soft, fontWeight:!focusPersons.size?600:400 }}>{t.all}</button>
           {ALL_PLAYERS.map(p=>{
-            const on = focusPerson===p.name
-            return <button key={p.id} onClick={()=>setFocusPerson(on?null:p.name)} style={{ fontSize:11.5, padding:'5px 11px',
+            const on = focusPersons.has(p.name)
+            return <button key={p.id} onClick={()=>toggleFocus(p.name)} style={{ fontSize:11.5, padding:'5px 11px',
               borderRadius:14, border:`1px solid ${on?T.clay:T.line}`, background:on?T.clay:'transparent',
               color:on?'#fff':T.soft, fontWeight:on?600:400 }}>{p.name}</button>
           })}
@@ -2022,7 +2037,7 @@ export default function App() {
             ...(mobileTab==='map'
               ? { overflow:'hidden', height:mapH, minHeight:320 }
               : { overflow:'auto' }) }}>
-            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} levels={mapLevels} setLevels={setMapLevels} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
+            {mobileTab==='map' ? <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} levels={mapLevels} setLevels={setMapLevels} filterOpen={mapFilterOpen} setFilterOpen={setMapFilterOpen} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} /> : <MatrixPane compact />}
           </div>
         </div>
       )
@@ -2038,7 +2053,7 @@ export default function App() {
             transition:'flex .2s cubic-bezier(.4,0,.2,1), border-color .2s' }}>
           <PaneHeader title={t.mapTitle} icon="ti-hierarchy-2" />
           <div style={{ flex:1, overflow:'hidden' }}>
-            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} levels={mapLevels} setLevels={setMapLevels} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
+            <MindMap onSelectSpecies={selSpFull} lang={lang} expanded={mapExpanded} setExpanded={setMapExpanded} tf={mapTf} setTf={setMapTf} obsOnly={mapObsOnly} setObsOnly={setMapObsOnly} catVisible={mapCatVisible} setCatVisible={setMapCatVisible} levels={mapLevels} setLevels={setMapLevels} filterOpen={mapFilterOpen} setFilterOpen={setMapFilterOpen} edit={edit} onAddSpecies={(c,sv)=>setSpEditor({ cat:c, sub:sv })} />
           </div>
         </div>
         <div onMouseEnter={()=>setFocus('matrix')} onClick={()=>setFocus('matrix')}

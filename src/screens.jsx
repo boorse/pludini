@@ -398,6 +398,10 @@ export function Territory({ wide, lang, onBack, edit }) {
   const [draftPts, setDraftPts] = useState([])  // sommets en cours (zone/ligne)
   const [typeEditor, setTypeEditor] = useState(false)
   const [obsSpot, setObsSpot] = useState(null)  // spot d'observation cliqué : {kind:'single'|'cluster', ...}
+  // filtre des spots d'observation par observateur — additif (comme la
+  // matrice/Par observateur) : vide = tout le monde
+  const [focusPlayers, setFocusPlayers] = useState(() => new Set())
+  const toggleFocusPlayer = (name) => setFocusPlayers(s => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n })
 
   const reload = async () => {
     try {
@@ -420,7 +424,8 @@ export function Territory({ wide, lang, onBack, edit }) {
   // l'initiale de l'observateur, ou un regroupement sombre avec un compteur
   // si plusieurs observations tombent dans la même zone de ~20 m
   const ALL_PLAYERS = allPlayers()
-  const obsPins = clusterGpsSightings(allGpsSightings()).map((c, i) => {
+  const gpsSightings = allGpsSightings().filter(({ ind }) => focusPlayers.size === 0 || focusPlayers.has(ind.by))
+  const obsPins = clusterGpsSightings(gpsSightings).map((c, i) => {
     if (c.items.length === 1) {
       const { sp, ind } = c.items[0]
       const photos = photosFor(`ind:${sp.id}:${ind.n}`)
@@ -465,6 +470,26 @@ export function Territory({ wide, lang, onBack, edit }) {
           </h2>
           <p style={{ fontSize:12, color:T.mute }}>57°17′10.9″N · 25°35′38.1″E</p>
         </div>
+      </div>
+
+      {/* filtre des spots d'observation par observateur — additif : cliquer une
+          personne l'ajoute/la retire de la sélection, vide affiche tout le
+          monde ; toujours visible (pas seulement en édition), utile à tous
+          pour repérer les passages d'une personne en particulier */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12, alignItems:'center' }}>
+        <span style={{ fontSize:11, color:T.mute }}>{lang==='ru'?'Наблюдатели:':'Observateurs :'}</span>
+        <button onClick={()=>setFocusPlayers(new Set())} style={{ fontSize:11.5, padding:'5px 11px', borderRadius:14,
+          border:`1px solid ${!focusPlayers.size?T.clay:T.line}`, background:!focusPlayers.size?T.clay:'transparent',
+          color:!focusPlayers.size?'#fff':T.soft, fontWeight:!focusPlayers.size?600:400 }}>{t.all}</button>
+        {ALL_PLAYERS.map(p=>{
+          const on = focusPlayers.has(p.name)
+          const c = playerColor(p.name, ALL_PLAYERS)
+          return (
+            <button key={p.id} onClick={()=>toggleFocusPlayer(p.name)} style={{ fontSize:11.5, padding:'5px 11px',
+              borderRadius:14, border:`1px solid ${on?c:T.line}`, background:on?c:'transparent',
+              color:on?'#fff':T.soft, fontWeight:on?600:400 }}>{p.name}</button>
+          )
+        })}
       </div>
 
       {edit && (
@@ -950,21 +975,26 @@ function Lightbox({ sh, lang, wide, onClose }) {
 export function ByPerson({ wide, lang, onSelectSpecies }) {
   const t = UI[lang]
   // par défaut, on ouvre sur la personne qui a fait la toute dernière observation
-  // (tous individus confondus), plutôt que sur le premier joueur de la liste
-  const [who, setWho] = useState(() => {
+  // (tous individus confondus), plutôt que sur le premier joueur de la liste —
+  // ensemble additif ensuite (comme la matrice) : cliquer une autre personne
+  // l'ajoute à la sélection au lieu de la remplacer ; vide = "Tout"
+  const [whos, setWhos] = useState(() => {
     let best = null, bestT = -Infinity
     allSpecies().forEach(sp => (sp.inds||[]).forEach(ind => {
       const ts = parseFrDateTime(ind.d, ind.time)
       if (ts > bestT) { bestT = ts; best = ind.by }
     }))
-    return best || allPlayers()[0]?.name || ''
+    const name = best || allPlayers()[0]?.name
+    return name ? new Set([name]) : new Set()
   })
+  const toggleWho = (name) => setWhos(s => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n })
   const [openCats, setOpenCats] = useState(() => new Set())
   const [openSp, setOpenSp] = useState(() => new Set())
   const SPECIES = allSpecies(); const ALL_PLAYERS = allPlayers(); const CATS = allCats()
-  const mySpecies = SPECIES.filter(s=>(s.obs[who]||[]).length)
+  const matchesWhos = (names) => whos.size === 0 ? names.length > 0 : names.some(w => whos.has(w))
+  const mySpecies = SPECIES.filter(s => matchesWhos(Object.keys(s.obs).filter(w => (s.obs[w]||[]).length)))
   const myInds = []
-  SPECIES.forEach(sp => (sp.inds||[]).forEach(ind => { if (ind.by===who) myInds.push({sp,ind}) }))
+  SPECIES.forEach(sp => (sp.inds||[]).forEach(ind => { if (whos.size === 0 || whos.has(ind.by)) myInds.push({sp,ind}) }))
   // repliée par dossier : ordre (règne) > espèce > individus
   const byCat = {}
   myInds.forEach(({sp,ind}) => {
@@ -975,15 +1005,22 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
   const catGroups = CATS.map(c => byCat[c.id]).filter(Boolean)
   const toggleCat = (id) => setOpenCats(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleSp = (id) => setOpenSp(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const whosLabel = whos.size ? [...whos].join(', ') : (lang==='ru'?'Никто':'Personne')
+  const nothingAddedMsg = whos.size===1
+    ? `${whosLabel} ${t.nothingAdded}`
+    : `${whosLabel} ${lang==='ru'?'пока ничего не добавили.':"n'ont encore rien ajouté."}`
 
   return (
     <div style={{ padding: wide?'14px 24px 30px':'12px 18px 26px' }}>
       <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:16 }}>
+        <button onClick={()=>setWhos(new Set())} style={{ fontSize:14, padding:'8px 16px', borderRadius:20,
+          border:`1px solid ${!whos.size?T.clay:T.line}`, background:!whos.size?T.clay:'transparent',
+          color:!whos.size?'#fff':T.ink, fontWeight:!whos.size?700:500 }} className="serif">{t.all}</button>
         {ALL_PLAYERS.map(p=>{
-          const on = who===p.name
+          const on = whos.has(p.name)
           const n = SPECIES.filter(s=>(s.obs[p.name]||[]).length).length
           return (
-            <button key={p.id} onClick={()=>setWho(p.name)} style={{ display:'flex', alignItems:'center', gap:8,
+            <button key={p.id} onClick={()=>toggleWho(p.name)} style={{ display:'flex', alignItems:'center', gap:8,
               padding:'8px 14px', borderRadius:20, border:`1px solid ${on?T.clay:T.line}`,
               background:on?T.clay:'transparent' }}>
               <span className="serif" style={{ width:26, height:26, borderRadius:'50%',
@@ -1007,7 +1044,7 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
       </div>
 
       {mySpecies.length===0
-        ? <div style={{ fontSize:13, color:T.mute }}>{who} {t.nothingAdded}</div>
+        ? <div style={{ fontSize:13, color:T.mute }}>{nothingAddedMsg}</div>
         : <>
           <div style={{ fontSize:10.5, fontWeight:600, color:T.mute, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:9 }}>
             {mySpecies.length} {lang==='ru'?'видов':'espèces'}
@@ -1015,13 +1052,13 @@ export function ByPerson({ wide, lang, onSelectSpecies }) {
           <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?150:130}px,1fr))`, gap:9, marginBottom:20 }}>
             {mySpecies.map(sp=>{
               const nm = nameOf(sp,lang)
-              // individus de CETTE personne pour cette espèce : liseré orange si un
+              // individus de CES observateurs pour cette espèce : liseré orange si un
               // doute traîne dessus, badges ronds pour chaque état bonus déjà croisé
               // (bébé/maman/papa/vieux/malade/gîte) — un coup d'œil, pas le détail
-              const spInds = (sp.inds||[]).filter(ind=>ind.by===who)
+              const spInds = (sp.inds||[]).filter(ind=> whos.size===0 || whos.has(ind.by))
               const unc = spInds.some(ind=>ind.uncertain)
               const states = [...new Set(spInds.map(ind=>ind.state).filter(Boolean))]
-              // la photo de CET observateur pour cette espèce, pas la vignette
+              // la photo de CES observateurs pour cette espèce, pas la vignette
               // d'espèce globale (partagée par tous — sinon la case d'Erwan
               // montrait la photo de Ferdinand dès qu'il en avait une meilleure)
               const myPhoto = spInds.map(ind => photosFor(`ind:${sp.id}:${ind.n}`)[0]).find(Boolean) || null
