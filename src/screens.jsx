@@ -402,6 +402,9 @@ export function Territory({ wide, lang, onBack, edit }) {
   // matrice/Par observateur) : vide = tout le monde
   const [focusPlayers, setFocusPlayers] = useState(() => new Set())
   const toggleFocusPlayer = (name) => setFocusPlayers(s => { const n = new Set(s); n.has(name) ? n.delete(name) : n.add(name); return n })
+  // recentrage manuel (bouton "le plus d'observations") — null tant qu'on n'a
+  // pas cliqué, la carte démarre alors sur le centre par défaut du domaine
+  const [manualCenter, setManualCenter] = useState(null)
 
   const reload = async () => {
     try {
@@ -417,8 +420,9 @@ export function Territory({ wide, lang, onBack, edit }) {
     color:allTypes[p.t]?.c || '#B5602F', emoji:allTypes[p.t]?.e || '📍'
   }))
   // ne recentre plus la caméra sur le repère sélectionné (comme pour un clic
-  // sur une observation) — cliquer un pin ne fait qu'ouvrir sa fiche en bas
-  const center = CENTER
+  // sur une observation) — cliquer un pin ne fait qu'ouvrir sa fiche en bas ;
+  // seul le bouton dédié (voir hottestSpot plus bas) recentre la carte
+  const center = manualCenter || CENTER
 
   // spots d'observation géolocalisés (toutes espèces) : un spot coloré à
   // l'initiale de l'observateur, ou un regroupement sombre avec un compteur
@@ -441,6 +445,13 @@ export function Territory({ wide, lang, onBack, edit }) {
       color:'#2B2620', label:String(c.items.length),
       thumbUrl: photos[0]?.thumbUrl || photos[0]?.url || null }
   })
+  // spot avec le plus d'observations (le plus grand regroupement, ou à
+  // défaut n'importe quel spot isolé) — respecte le filtre observateur en
+  // cours, comme le reste de la carte
+  const hottestSpot = obsPins.reduce((best, p) => {
+    const weight = p.kind === 'cluster' ? p.items.length : 1
+    return (!best || weight > best.weight) ? { lat: p.lat, lon: p.lon, weight } : best
+  }, null)
 
   const onMapClick = async (pos) => {
     if (tool === 'pin') {
@@ -554,6 +565,15 @@ export function Territory({ wide, lang, onBack, edit }) {
           onSelect={(p)=>setSel(p ? pins.find(x=>x.id===p.id) : null)}
           onMapClick={onMapClick}
           obsPins={obsPins} onObsSelect={setObsSpot} />
+        {hottestSpot && (
+          <button onClick={()=>setManualCenter({ lat: hottestSpot.lat, lon: hottestSpot.lon })}
+            title={lang==='ru'?'Центрировать на самом активном месте':'Recentrer sur l’endroit le plus observé'}
+            style={{ position:'absolute', top:10, right:10, zIndex:6, display:'flex', alignItems:'center', gap:6,
+              padding:'7px 12px', borderRadius:20, background:'rgba(20,22,14,.78)', color:'#F2EEE2', fontSize:11.5, fontWeight:600 }}>
+            <i className="ti ti-target" style={{ fontSize:14 }} aria-hidden="true" />
+            {lang==='ru'?'Самое активное место':'Le plus observé'}
+          </button>
+        )}
         {sel && (
           <div style={{ position:'absolute', left:10, right:10, bottom:10, background:'rgba(20,22,14,.93)',
             borderRadius:12, padding:'11px 13px', zIndex:8 }}>
