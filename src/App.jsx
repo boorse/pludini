@@ -463,7 +463,7 @@ export default function App() {
 
   useEffect(() => { try { localStorage.setItem('pludini_screen', screen) } catch {} }, [screen])
   useEffect(() => { try { localStorage.setItem('pludini_edit', edit ? '1' : '0') } catch {} }, [edit])
-  useEffect(() => { setObsColExpanded(new Set()) }, [curSp?.id])
+  useEffect(() => { setObsColExpanded(new Set()) }, [curSp])
 
   // bloque le scroll de la page derrière une fenêtre plein écran (fiche espèce,
   // score, etc.) : sans ça, sur mobile, un geste de défilement dans la fenêtre
@@ -1141,43 +1141,25 @@ export default function App() {
                   next.has(n) ? next.delete(n) : next.add(n)
                   return { ...m, selected: next }
                 })
-                const Col = ({ title, icon, list, isNamed, colKey }) => {
-                  // au-delà de 2 lignes de vignettes, la colonne se replie : on
-                  // limite la hauteur de la grille à 2 rangées (hauteur de
-                  // vignette connue, peu importe le nombre de colonnes réel) et
-                  // on affiche un bouton "Voir plus" par-dessus le dégradé —
-                  // état du dépli levé dans App (obsColExpanded), voir plus haut
+                // grille de vignettes d'une colonne (ou d'un sous-groupe joueur) —
+                // au-delà de 2 lignes elle se replie : hauteur de grille limitée à
+                // 2 rangées (hauteur de vignette connue, peu importe le nombre de
+                // colonnes réel), avec un bouton "Voir plus" par-dessus le dégradé —
+                // état du dépli levé dans App (obsColExpanded), voir plus haut ;
+                // simple fonction (pas un composant JSX) pour ne pas dépendre d'une
+                // identité stable comme Col ci-dessous
+                const vignetteGrid = ({ items, isNamed, selectMode, selected, toggleSelect, gridKey }) => {
                   const rowH = isNamed ? 100 : 92
                   const collapsedH = rowH*2 + 8
-                  const canCollapse = list.length > 6
-                  const isExpanded = obsColExpanded.has(colKey)
-                  const toggleExpand = () => setObsColExpanded(s => { const n = new Set(s); n.has(colKey) ? n.delete(colKey) : n.add(colKey); return n })
+                  const canCollapse = items.length > 6
+                  const isExpanded = obsColExpanded.has(gridKey)
+                  const toggleExpand = () => setObsColExpanded(s => { const n = new Set(s); n.has(gridKey) ? n.delete(gridKey) : n.add(gridKey); return n })
                   return (
-                  <div>
-                    <div style={{ fontSize:10.5, fontWeight:700, color: isNamed?'#A07C28':T.mute, textTransform:'uppercase',
-                      letterSpacing:'.6px', marginBottom:8, display:'flex', alignItems:'center', gap:5,
-                      paddingBottom:5, borderBottom: isNamed?'1.5px solid #C9A046':`1px solid ${T.line}` }}>
-                      <i className={`ti ${icon}`} style={{ fontSize:13 }} aria-hidden="true" />
-                      {title} ({list.length})
-                      {edit && !isNamed && list.length>1 && (
-                        <button onClick={()=>setMerging(selectMode ? null : { spId:sp.id, selected:new Set() })}
-                          style={{ marginLeft:'auto', fontSize:9.5, fontWeight:600, padding:'3px 8px', borderRadius:10,
-                            border:`1px solid ${selectMode?'#B5602F':T.line}`, background:selectMode?'#B5602F':'transparent',
-                            color:selectMode?'#fff':T.mute, textTransform:'none', letterSpacing:0 }}>
-                          {selectMode ? (lang==='ru'?'Отмена':'Annuler')
-                            : (lang==='ru'?'Выбрать':'Sélectionner')}
-                        </button>
-                      )}
-                    </div>
-                    {list.length===0
-                      ? <div style={{ fontSize:11.5, color:T.mute, padding:'8px 0', fontStyle:'italic' }}>
-                          {isNamed ? (lang==='ru'?'Пока никого не опознали':'Aucun individu reconnu pour l\'instant')
-                                   : (lang==='ru'?'Нет наблюдений':'Aucune observation')}
-                        </div>
-                      : <div style={{ position:'relative' }}>
+                    <div>
+                      <div style={{ position:'relative' }}>
                         <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?118:104}px,1fr))`, gap:8,
                           maxHeight: (canCollapse && !isExpanded) ? collapsedH : 'none', overflow:'hidden' }}>
-                          {list.map((ind,i)=>{
+                          {items.map((ind,i)=>{
                             const isSel = !isNamed && selectMode && selected.has(ind.n)
                             return (
                             <button key={i} onClick={()=> (!isNamed && selectMode) ? toggleSelect(ind.n) : setCurInd(ind.n)}
@@ -1237,15 +1219,64 @@ export default function App() {
                             </button>
                           </div>
                         )}
-                      </div>}
-                    {canCollapse && isExpanded && (
-                      <button onClick={toggleExpand} style={{ display:'flex', alignItems:'center', gap:4,
-                        margin:'8px auto 0', padding:'4px 12px', borderRadius:12, background:'transparent',
-                        border:`1px solid ${T.line}`, color:T.soft, fontSize:11, fontWeight:600 }}>
-                        {lang==='ru'?'Свернуть':'Réduire'}
-                        <i className="ti ti-chevron-up" style={{ fontSize:13 }} aria-hidden="true" />
-                      </button>
-                    )}
+                      </div>
+                      {canCollapse && isExpanded && (
+                        <button onClick={toggleExpand} style={{ display:'flex', alignItems:'center', gap:4,
+                          margin:'8px auto 0', padding:'4px 12px', borderRadius:12, background:'transparent',
+                          border:`1px solid ${T.line}`, color:T.soft, fontSize:11, fontWeight:600 }}>
+                          {lang==='ru'?'Свернуть':'Réduire'}
+                          <i className="ti ti-chevron-up" style={{ fontSize:13 }} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                }
+                const Col = ({ title, icon, list, isNamed, colKey, groupByPlayer }) => {
+                  // "Passages" se subdivise par observateur (une grille repliable
+                  // à 2 lignes par joueur), plutôt qu'une seule grille pour tout
+                  // le monde mélangé — plus lisible dès qu'il y a plusieurs
+                  // observateurs actifs sur une espèce très observée
+                  const groups = groupByPlayer
+                    ? Object.entries(list.reduce((acc, ind) => { const k = ind.by || ''; (acc[k] ||= []).push(ind); return acc }, {}))
+                        .sort((a,b) => b[1].length - a[1].length)
+                    : null
+                  return (
+                  <div>
+                    <div style={{ fontSize:10.5, fontWeight:700, color: isNamed?'#A07C28':T.mute, textTransform:'uppercase',
+                      letterSpacing:'.6px', marginBottom:8, display:'flex', alignItems:'center', gap:5,
+                      paddingBottom:5, borderBottom: isNamed?'1.5px solid #C9A046':`1px solid ${T.line}` }}>
+                      <i className={`ti ${icon}`} style={{ fontSize:13 }} aria-hidden="true" />
+                      {title} ({list.length})
+                      {edit && !isNamed && list.length>1 && (
+                        <button onClick={()=>setMerging(selectMode ? null : { spId:sp.id, selected:new Set() })}
+                          style={{ marginLeft:'auto', fontSize:9.5, fontWeight:600, padding:'3px 8px', borderRadius:10,
+                            border:`1px solid ${selectMode?'#B5602F':T.line}`, background:selectMode?'#B5602F':'transparent',
+                            color:selectMode?'#fff':T.mute, textTransform:'none', letterSpacing:0 }}>
+                          {selectMode ? (lang==='ru'?'Отмена':'Annuler')
+                            : (lang==='ru'?'Выбрать':'Sélectionner')}
+                        </button>
+                      )}
+                    </div>
+                    {list.length===0
+                      ? <div style={{ fontSize:11.5, color:T.mute, padding:'8px 0', fontStyle:'italic' }}>
+                          {isNamed ? (lang==='ru'?'Пока никого не опознали':'Aucun individu reconnu pour l\'instant')
+                                   : (lang==='ru'?'Нет наблюдений':'Aucune observation')}
+                        </div>
+                      : groups
+                        ? <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                            {groups.map(([name, items])=>(
+                              <div key={name||'anon'}>
+                                <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                                  {name && <span style={{ width:7, height:7, borderRadius:'50%', background:playerColor(name, ALL_PLAYERS), flexShrink:0 }} />}
+                                  <span style={{ fontSize:10, fontWeight:600, color:T.soft }}>
+                                    {name || (lang==='ru'?'Без наблюдателя':'Non attribué')} ({items.length})
+                                  </span>
+                                </div>
+                                {vignetteGrid({ items, isNamed, selectMode, selected, toggleSelect, gridKey:`${colKey}:${name||'anon'}` })}
+                              </div>
+                            ))}
+                          </div>
+                        : vignetteGrid({ items:list, isNamed, selectMode, selected, toggleSelect, gridKey:colKey })}
                   </div>
                 )}
                 const showFamiliers = speciesType(sp)!==3
@@ -1276,7 +1307,7 @@ export default function App() {
                     <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:16,
                       paddingBottom: selectMode ? 64 : 0 }}>
                       {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} colKey="familiers" />}
-                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} colKey="passages" />
+                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} colKey="passages" groupByPlayer />
                     </div>
                     {selectMode && (
                       <div style={{ position:'sticky', bottom:0, zIndex:5, marginTop:12, padding:'10px 12px', borderRadius:12,
