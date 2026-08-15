@@ -405,6 +405,10 @@ export default function App() {
   const [curSub, setCurSub] = useState('Tous')
   const [curSp, setCurSp] = useState(null)
   const [detTab, setDetTab] = useState('obs')
+  // colonnes "Familiers"/"Passages" dépliées au-delà de 2 lignes dans la fiche
+  // espèce ouverte — levé ici (comme mapFilterOpen plus bas) car Detail/Col
+  // sont redéfinis à chaque rendu d'App et perdraient un état local au clic
+  const [obsColExpanded, setObsColExpanded] = useState(() => new Set())
   const [pane, setPane] = useState('split')      // split | map | matrix
   const [edit, setEdit] = useState(() => {
     try { return localStorage.getItem('pludini_edit') === '1' || localStorage.getItem('pluduni_edit') === '1' } catch { return false }
@@ -459,6 +463,7 @@ export default function App() {
 
   useEffect(() => { try { localStorage.setItem('pludini_screen', screen) } catch {} }, [screen])
   useEffect(() => { try { localStorage.setItem('pludini_edit', edit ? '1' : '0') } catch {} }, [edit])
+  useEffect(() => { setObsColExpanded(new Set()) }, [curSp?.id])
 
   // bloque le scroll de la page derrière une fenêtre plein écran (fiche espèce,
   // score, etc.) : sans ça, sur mobile, un geste de défilement dans la fenêtre
@@ -1136,7 +1141,18 @@ export default function App() {
                   next.has(n) ? next.delete(n) : next.add(n)
                   return { ...m, selected: next }
                 })
-                const Col = ({ title, icon, list, isNamed }) => (
+                const Col = ({ title, icon, list, isNamed, colKey }) => {
+                  // au-delà de 2 lignes de vignettes, la colonne se replie : on
+                  // limite la hauteur de la grille à 2 rangées (hauteur de
+                  // vignette connue, peu importe le nombre de colonnes réel) et
+                  // on affiche un bouton "Voir plus" par-dessus le dégradé —
+                  // état du dépli levé dans App (obsColExpanded), voir plus haut
+                  const rowH = isNamed ? 100 : 92
+                  const collapsedH = rowH*2 + 8
+                  const canCollapse = list.length > 6
+                  const isExpanded = obsColExpanded.has(colKey)
+                  const toggleExpand = () => setObsColExpanded(s => { const n = new Set(s); n.has(colKey) ? n.delete(colKey) : n.add(colKey); return n })
+                  return (
                   <div>
                     <div style={{ fontSize:10.5, fontWeight:700, color: isNamed?'#A07C28':T.mute, textTransform:'uppercase',
                       letterSpacing:'.6px', marginBottom:8, display:'flex', alignItems:'center', gap:5,
@@ -1158,7 +1174,9 @@ export default function App() {
                           {isNamed ? (lang==='ru'?'Пока никого не опознали':'Aucun individu reconnu pour l\'instant')
                                    : (lang==='ru'?'Нет наблюдений':'Aucune observation')}
                         </div>
-                      : <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?118:104}px,1fr))`, gap:8 }}>
+                      : <div style={{ position:'relative' }}>
+                        <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fill,minmax(${wide?118:104}px,1fr))`, gap:8,
+                          maxHeight: (canCollapse && !isExpanded) ? collapsedH : 'none', overflow:'hidden' }}>
                           {list.map((ind,i)=>{
                             const isSel = !isNamed && selectMode && selected.has(ind.n)
                             return (
@@ -1206,9 +1224,30 @@ export default function App() {
                               </div>
                             </button>
                           )})}
-                        </div>}
+                        </div>
+                        {canCollapse && !isExpanded && (
+                          <div style={{ position:'absolute', left:0, right:0, bottom:0, height:44,
+                            background:`linear-gradient(to bottom, transparent, ${T.bg})`,
+                            display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+                            <button onClick={toggleExpand} style={{ display:'flex', alignItems:'center', gap:4,
+                              padding:'4px 12px', borderRadius:12, background:T.card, border:`1px solid ${T.line}`,
+                              color:T.clay, fontSize:11, fontWeight:600 }}>
+                              {lang==='ru'?'Показать все':'Voir plus'}
+                              <i className="ti ti-chevron-down" style={{ fontSize:13 }} aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </div>}
+                    {canCollapse && isExpanded && (
+                      <button onClick={toggleExpand} style={{ display:'flex', alignItems:'center', gap:4,
+                        margin:'8px auto 0', padding:'4px 12px', borderRadius:12, background:'transparent',
+                        border:`1px solid ${T.line}`, color:T.soft, fontSize:11, fontWeight:600 }}>
+                        {lang==='ru'?'Свернуть':'Réduire'}
+                        <i className="ti ti-chevron-up" style={{ fontSize:13 }} aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
-                )
+                )}
                 const showFamiliers = speciesType(sp)!==3
                 return (
                   <div>
@@ -1236,8 +1275,8 @@ export default function App() {
                     )}
                     <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:16,
                       paddingBottom: selectMode ? 64 : 0 }}>
-                      {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} />}
-                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} />
+                      {showFamiliers && <Col title={lang==='ru'?'Знакомые':'Familiers'} icon="ti-star" list={named} isNamed={true} colKey="familiers" />}
+                      <Col title={lang==='ru'?'Проходы':'Passages'} icon="ti-eye" list={sightings} isNamed={false} colKey="passages" />
                     </div>
                     {selectMode && (
                       <div style={{ position:'sticky', bottom:0, zIndex:5, marginTop:12, padding:'10px 12px', borderRadius:12,
